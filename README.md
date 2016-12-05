@@ -1,2 +1,2 @@
-# Freedom
-Front end framework by TypeScript.
+# Ares
+An MVVM framework for everything.
