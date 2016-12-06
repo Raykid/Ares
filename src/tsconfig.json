@@ -1,0 +1,11 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "target": "es6",
+    "sourceMap": true,
+    "outFile": "../dist/ares.js"
+  },
+  "files": [
+    "./Ares.ts"
+  ]
+}
