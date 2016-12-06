@@ -1,3 +1,5 @@
+/// <reference path="Dependent.ts"/>
+
 /**
  * Created by Raykid on 2016/12/5.
  */
@@ -9,8 +11,7 @@ namespace core
         private _data:any;
         private _element:HTMLElement;
 
-        //private _depMap:{[path:string]:Dep} = {};
-        private _depList:Dep[] = [];
+        private _updaters:Updater[] = [];
 
         public constructor(data:any, element:HTMLElement)
         {
@@ -18,10 +19,12 @@ namespace core
             this._data = data;
             // 生成一个data的浅层拷贝对象，作为data原始值的保存
             this._record = this.proxyData(data, []);
-            // 开始解析整个element
-            this.walkThrough(element);
-            // 更新依赖
-            this.updateDeps();
+            // 向data中加入$parent和$root参数，都是data本身，用以构建一个Scope对象
+            data.$parent = data.$root = data;
+            // 开始解析整个element，用整个data作为当前词法作用域
+            this.walkThrough(element, data);
+            // 进行一次全局更新
+            this.update();
         }
 
         /**
@@ -59,7 +62,7 @@ namespace core
                             configurable: true,
                             enumerable: true,
                             get: this.getProxy.bind(this, result, key),
-                            set: this.setProxy.bind(this, result, key, path)
+                            set: this.setProxy.bind(this, result, key)
                         });
                         break;
                 }
@@ -67,78 +70,68 @@ namespace core
             return result;
         }
 
-        private getProxy(result:any, key:string):void
+        private getProxy(result:any, key:string):any
         {
             return result[key];
         }
 
-        private setProxy(result:any, key:string, path:string[], value:any):void
+        private setProxy(result:any, key:string, value:any):void
         {
             result[key] = value;
-            // 设置了一个属性，去寻找对应的依赖
-            this.updateDeps();
+            this.update();
         }
 
-        private updateDeps():void
+        private walkThrough(element:HTMLElement, curScope:Scope):void
         {
-            //var depKey:string = `${path.join(".")}.${key}`;
-            for(var i:number = 0, len:number = this._depList.length; i < len; i++)
+            // 检查节点上面以data-a-或者a-开头的属性，将其认为是绑定属性
+            var attrs:NamedNodeMap = element.attributes;
+            for(var i:number = 0, len:number = attrs.length; i < len; i++)
             {
-                var dep:Dep = this._depList[i];
-                if(dep)
+                var attr:Attr = attrs[i];
+                var name:string = attr.name;
+                // 所有ares属性必须以data-a-或者a-开头
+                if(name.indexOf("a-") == 0 || name.indexOf("data-a-") == 0)
                 {
-                    var result:any = dep.exp;
-                    var reg:RegExp = /\{\{(.*?)\}\}/;
-                    for(var temp:RegExpExecArray = reg.exec(result); temp != null; temp = reg.exec(result))
+                    var index:number = name.indexOf("a-") + 2;
+                    // 取到命令名
+                    var cmdName:string = name.substr(index);
+                    // 用命令名取到命令依赖对象
+                    var dep:Dep = Dependent.getDep(cmdName);
+                    if(dep)
                     {
-                        // 获取表达式
-                        var exp:string = temp[1];
-                        // 计算表达式的值
-                        var value:any = this.runExp(exp, this._data);
-                        result = result.substr(0, temp.index) + value + result.substr(temp.index + temp.input.length);
+                        // 取到命令表达式
+                        var cmdExp:string = attr.value;
+                        // 看是否需要生成子域
+                        if(dep.subScope)
+                        {
+                            curScope = {
+                                $parent: curScope,
+                                $root: curScope.$root
+                            };
+                        }
+                        // 生成一个更新项
+                        var updater:Updater = dep.depend(element, cmdExp, curScope);
+                        // TODO Raykid 现在是全局更新，要改为条件更新
+                        this._updaters.push(updater);
                     }
-                    // 设置依赖对象的属性
-                    dep.target[dep.key] = result;
                 }
+            }
+            // 遍历子节点
+            var children:HTMLCollection = element.children;
+            for(var i:number = 0, len:number = children.length; i < len; i++)
+            {
+                var child:HTMLElement = children[i] as HTMLElement;
+                this.walkThrough(child, curScope);
             }
         }
 
-        private walkThrough(element:HTMLElement):void
+        private update():void
         {
-            // 创建依赖
-            var dep:Dep = {
-                target: element,
-                key: "textContent",
-                exp: element.textContent,
-                scope: this._data
-            };
-            this._depList.push(dep);
+            // TODO Raykid 现在是全局更新，要改为条件更新
+            for(var i:number = 0, len:number = this._updaters.length; i < len; i++)
+            {
+                this._updaters[i].update();
+            }
         }
-
-        private runExp(exp:string, scope:any):any
-        {
-            return new Function(
-                "$data",
-                "$parent",
-                "$root",
-                "return " + exp)
-            (
-                scope,
-                scope.$parent ? scope.$parent : this._data,
-                this._data
-            );
-        }
-    }
-
-    interface Dep
-    {
-        /** 依赖的目标节点对象 */
-        target:any;
-        /** 依赖的属性名 */
-        key:string;
-        /** 依赖的表达式 */
-        exp:string;
-        /** 依赖所在的词法作用域 */
-        scope:any;
     }
 }

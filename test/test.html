@@ -7,8 +7,7 @@
     <script src="test.js"></script>
 </head>
 <body>
-<div id="div_root">
-    你好，这是{{$data.test + $data.testRecursion.fuck + (1 + 2 * 3)}}
+<div id="div_root" a-text="`你好，这是${$data.test + $data.testRecursion.fuck + (1 + 2 * 3)}`">
 </div>
 </body>
 </html>
