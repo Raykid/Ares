@@ -23,7 +23,3 @@ Ares.create({
         }, 4000);
     }
 });
-
-
-
-alert(new Function("a", "b", "return a + b")(3, 5));
