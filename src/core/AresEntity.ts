@@ -115,6 +115,8 @@ namespace core
                         this._updaters.push(updater);
                         // 从DOM节点上移除属性
                         attr.ownerElement.removeAttributeNode(attr);
+                        i --;
+                        len --;
                     }
                 }
             }

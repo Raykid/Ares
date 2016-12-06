@@ -3,6 +3,7 @@
  */
 Ares.create({
     test: "测试数据",
+    testVisible: false,
     testRecursion: {
         fuck: 1,
         testRecFunc: function(y){return y+y;}
@@ -12,6 +13,10 @@ Ares.create({
     initialized: function(vm)
     {
         vm.testRecursion.fuck = "fuck you!!!";
+
+        setTimeout(function(){
+            vm.testVisible = true;
+        }, 1000);
 
         setTimeout(function(){
             vm.test = "fuck！！！！！！！";

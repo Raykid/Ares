@@ -13,7 +13,8 @@ namespace core
         // 系统默认的命令表
         private static _depMap:{[name:string]:Cmd} = {
             text: new TextCmd(),
-            html: new HtmlCmd()
+            html: new HtmlCmd(),
+            visible: new VisibleCmd()
         };
 
         /** 获取命令对象 */

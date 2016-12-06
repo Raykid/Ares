@@ -8,7 +8,7 @@
 </head>
 <body>
 <div id="div_root">
-    <div a-html="`你特么的<h1>${$data.test}</h1>我勒个去`"></div>
+    <div a-html="`你特么的<h1>${$data.test}</h1>我勒个去`" a-visible="$data.testVisible"></div>
     <h1 a-text="`你好，这是${$data.test + $data.testRecursion.fuck + (1 + 2 * 3)}`"></h1>
 </div>
 </body>

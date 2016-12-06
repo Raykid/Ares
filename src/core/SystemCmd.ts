@@ -42,4 +42,24 @@ namespace core
             };
         }
     }
+
+    /** visible命令 */
+    export class VisibleCmd implements Cmd
+    {
+        public get subScope():boolean
+        {
+            return false;
+        }
+
+        public exec(target:HTMLElement, exp:string, scope:Scope):Updater
+        {
+            var expresion:Expresion = new Expresion(exp);
+            return {
+                update: ()=>{
+                    var condition:boolean = expresion.run(scope);
+                    target.style.display = (condition ? "" : "none");
+                }
+            };
+        }
+    }
 }

@@ -65,6 +65,29 @@ var core;
         return HtmlCmd;
     })();
     core.HtmlCmd = HtmlCmd;
+    /** visible命令 */
+    var VisibleCmd = (function () {
+        function VisibleCmd() {
+        }
+        Object.defineProperty(VisibleCmd.prototype, "subScope", {
+            get: function () {
+                return false;
+            },
+            enumerable: true,
+            configurable: true
+        });
+        VisibleCmd.prototype.exec = function (target, exp, scope) {
+            var expresion = new core.Expresion(exp);
+            return {
+                update: function () {
+                    var condition = expresion.run(scope);
+                    target.style.display = (condition ? "" : "none");
+                }
+            };
+        };
+        return VisibleCmd;
+    })();
+    core.VisibleCmd = VisibleCmd;
 })(core || (core = {}));
 /// <reference path="Expresion.ts"/>
 /// <reference path="SystemCmd.ts"/>
@@ -105,7 +128,8 @@ var core;
         // 系统默认的命令表
         Command._depMap = {
             text: new core.TextCmd(),
-            html: new core.HtmlCmd()
+            html: new core.HtmlCmd(),
+            visible: new core.VisibleCmd()
         };
         return Command;
     })();
@@ -206,6 +230,8 @@ var core;
                         this._updaters.push(updater);
                         // 从DOM节点上移除属性
                         attr.ownerElement.removeAttributeNode(attr);
+                        i--;
+                        len--;
                     }
                 }
             }
