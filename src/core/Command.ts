@@ -1,72 +1,11 @@
 /// <reference path="Expresion.ts"/>
+/// <reference path="SystemCmd.ts"/>
 
 /**
  * Created by Raykid on 2016/12/6.
  */
 namespace core
 {
-    export interface Cmd
-    {
-        /** 表示该命令是否会对内容生成子域 */
-        subScope:boolean;
-
-        /**
-         * 根据依赖创建更新器
-         * @param target 依赖的DOM节点引用
-         * @param exp 依赖表达式
-         * @param scope 依赖的表达式所在的词法作用域
-         */
-        exec(target:HTMLElement, exp:string, scope:Scope):Updater;
-    }
-
-    export interface Updater
-    {
-        /** 更新渲染 */
-        update():void;
-    }
-
-    /** 以下是默认的命令实现 */
-
-    /** 文本命令 */
-    class TextCmd implements Cmd
-    {
-        public get subScope():boolean
-        {
-            return false;
-        }
-
-        public exec(target:HTMLElement, exp:string, scope:Scope):Updater
-        {
-            var expresion:Expresion = new Expresion(exp);
-            return {
-                update: ()=>{
-                    // 更新target节点的textContent
-                    target.innerText = expresion.run(scope);
-                }
-            };
-        }
-    }
-
-    /** HTML文本命令 */
-    class HtmlCmd implements Cmd
-    {
-        public get subScope():boolean
-        {
-            return false;
-        }
-
-        public exec(target:HTMLElement, exp:string, scope:Scope):Updater
-        {
-            var expresion:Expresion = new Expresion(exp);
-            return {
-                update: ()=>{
-                    // 更新target节点的textContent
-                    target.innerHTML = expresion.run(scope);
-                }
-            };
-        }
-    }
-
     export class Command
     {
         // 自定义的命令表
@@ -108,5 +47,25 @@ namespace core
             delete Command._customCmdMap[name];
             return dep;
         }
+    }
+
+    export interface Cmd
+    {
+        /** 表示该命令是否会对内容生成子域 */
+        subScope:boolean;
+
+        /**
+         * 根据依赖创建更新器
+         * @param target 依赖的DOM节点引用
+         * @param exp 依赖表达式
+         * @param scope 依赖的表达式所在的词法作用域
+         */
+        exec(target:HTMLElement, exp:string, scope:Scope):Updater;
+    }
+
+    export interface Updater
+    {
+        /** 更新渲染 */
+        update():void;
     }
 }

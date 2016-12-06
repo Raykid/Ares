@@ -14,13 +14,11 @@ var core;
     })();
     core.Expresion = Expresion;
 })(core || (core = {}));
-/// <reference path="Expresion.ts"/>
 /**
  * Created by Raykid on 2016/12/6.
  */
 var core;
 (function (core) {
-    /** 以下是默认的命令实现 */
     /** 文本命令 */
     var TextCmd = (function () {
         function TextCmd() {
@@ -43,6 +41,7 @@ var core;
         };
         return TextCmd;
     })();
+    core.TextCmd = TextCmd;
     /** HTML文本命令 */
     var HtmlCmd = (function () {
         function HtmlCmd() {
@@ -65,6 +64,15 @@ var core;
         };
         return HtmlCmd;
     })();
+    core.HtmlCmd = HtmlCmd;
+})(core || (core = {}));
+/// <reference path="Expresion.ts"/>
+/// <reference path="SystemCmd.ts"/>
+/**
+ * Created by Raykid on 2016/12/6.
+ */
+var core;
+(function (core) {
     var Command = (function () {
         function Command() {
         }
@@ -96,8 +104,8 @@ var core;
         Command._customCmdMap = {};
         // 系统默认的命令表
         Command._depMap = {
-            text: new TextCmd(),
-            html: new HtmlCmd()
+            text: new core.TextCmd(),
+            html: new core.HtmlCmd()
         };
         return Command;
     })();
