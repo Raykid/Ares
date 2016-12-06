@@ -8,18 +8,10 @@ Ares.create({
         fuck: 1,
         testRecFunc: function(y){return y+y;}
     },
-    testFunction: function(x){return x*x;}
+    testFunction: function(x){return x*x;},
+    testList: [{abc: 1},{abc: 2},{abc: 3}]
 }, "div_root", {
     initialized: function(vm)
     {
-        vm.testRecursion.fuck = "fuck you!!!";
-
-        setTimeout(function(){
-            vm.testVisible = true;
-        }, 1000);
-
-        setTimeout(function(){
-            vm.test = "fuck！！！！！！！";
-        }, 3000);
     }
 });

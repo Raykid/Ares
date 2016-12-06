@@ -14,7 +14,8 @@ namespace core
         private static _depMap:{[name:string]:Cmd} = {
             text: new TextCmd(),
             html: new HtmlCmd(),
-            visible: new VisibleCmd()
+            visible: new VisibleCmd(),
+            for: new ForCmd()
         };
 
         /** 获取命令对象 */
@@ -52,9 +53,8 @@ namespace core
 
     export interface Cmd
     {
-        /** 表示该命令是否会对内容生成子域 */
-        subScope:boolean;
-
+        /** 是否编译子节点，默认是编译 */
+        compileChildren?:boolean;
         /**
          * 根据依赖创建更新器
          * @param target 依赖的DOM节点引用
@@ -66,7 +66,10 @@ namespace core
 
     export interface Updater
     {
-        /** 更新渲染 */
-        update():void;
+        /**
+         * 更新渲染
+         * @param entity 实体对象
+         */
+        update(entity:AresEntity):void;
     }
 }

@@ -5,10 +5,19 @@ var core;
 (function (core) {
     var Expresion = (function () {
         function Expresion(exp) {
+            // 将exp中所有没有以$data开头的变量都加上$data
+            //var reg:RegExp = /(\$data\.)?([a-zA-Z0-9\.]+)/g;
+            //this._exp = exp.replace(reg, "$data.$2");
             this._exp = exp;
         }
         Expresion.prototype.run = function (scope) {
-            return new Function("$data", "$parent", "$root", "return " + this._exp)(scope, scope.$parent, scope.$root);
+            var keys = Object.keys(scope);
+            var values = [];
+            for (var i = 0, len = keys.length; i < len; i++) {
+                values.push(scope[keys[i]]);
+            }
+            keys.push("return " + this._exp);
+            return Function.apply(null, keys).apply(null, values);
         };
         return Expresion;
     })();
@@ -23,18 +32,11 @@ var core;
     var TextCmd = (function () {
         function TextCmd() {
         }
-        Object.defineProperty(TextCmd.prototype, "subScope", {
-            get: function () {
-                return false;
-            },
-            enumerable: true,
-            configurable: true
-        });
         TextCmd.prototype.exec = function (target, exp, scope) {
             var expresion = new core.Expresion(exp);
             return {
                 update: function () {
-                    // 更新target节点的textContent
+                    // 更新target节点的innerText
                     target.innerText = expresion.run(scope);
                 }
             };
@@ -46,18 +48,11 @@ var core;
     var HtmlCmd = (function () {
         function HtmlCmd() {
         }
-        Object.defineProperty(HtmlCmd.prototype, "subScope", {
-            get: function () {
-                return false;
-            },
-            enumerable: true,
-            configurable: true
-        });
         HtmlCmd.prototype.exec = function (target, exp, scope) {
             var expresion = new core.Expresion(exp);
             return {
                 update: function () {
-                    // 更新target节点的textContent
+                    // 更新target节点的innerHTML
                     target.innerHTML = expresion.run(scope);
                 }
             };
@@ -69,13 +64,6 @@ var core;
     var VisibleCmd = (function () {
         function VisibleCmd() {
         }
-        Object.defineProperty(VisibleCmd.prototype, "subScope", {
-            get: function () {
-                return false;
-            },
-            enumerable: true,
-            configurable: true
-        });
         VisibleCmd.prototype.exec = function (target, exp, scope) {
             var expresion = new core.Expresion(exp);
             return {
@@ -88,6 +76,64 @@ var core;
         return VisibleCmd;
     })();
     core.VisibleCmd = VisibleCmd;
+    /** for命令 */
+    var ForCmd = (function () {
+        function ForCmd() {
+        }
+        Object.defineProperty(ForCmd.prototype, "compileChildren", {
+            get: function () {
+                // for命令需要将所有子节点延迟到更新时再编译
+                return false;
+            },
+            enumerable: true,
+            configurable: true
+        });
+        ForCmd.prototype.exec = function (target, exp, scope) {
+            var _this = this;
+            var targets = [];
+            return {
+                update: function (entity) {
+                    // 首先清空当前已有的对象节点
+                    var len = targets.length;
+                    while (len--) {
+                        var child = targets.pop();
+                        child.parentElement.removeChild(child);
+                    }
+                    // 生成新对象
+                    var parent = target.parentElement;
+                    var list = new core.Expresion(exp).run(scope);
+                    for (var i = 0, len = list.length; i < len; i++) {
+                        // 构造一个新作用域
+                        var subScope;
+                        var item = list[i];
+                        if (typeof item == "object") {
+                            subScope = item;
+                            subScope.$data = item;
+                            subScope.$parent = scope;
+                            subScope.$root = scope.$root;
+                        }
+                        else {
+                            subScope = {
+                                $data: item,
+                                $parent: scope,
+                                $root: scope.$root
+                            };
+                        }
+                        // 构造一个新的节点，如果是第一个元素则直接使用target作为目标节点
+                        var newTarget = target.cloneNode(true);
+                        parent.appendChild(newTarget);
+                        targets.push(newTarget);
+                        // 用新的作用域遍历新节点
+                        var updaters = entity.compile(newTarget, subScope);
+                        // 立即更新
+                        updaters.map(function (updater) { return updater.update(entity); }, _this);
+                    }
+                }
+            };
+        };
+        return ForCmd;
+    })();
+    core.ForCmd = ForCmd;
 })(core || (core = {}));
 /// <reference path="Expresion.ts"/>
 /// <reference path="SystemCmd.ts"/>
@@ -129,7 +175,8 @@ var core;
         Command._depMap = {
             text: new core.TextCmd(),
             html: new core.HtmlCmd(),
-            visible: new core.VisibleCmd()
+            visible: new core.VisibleCmd(),
+            for: new core.ForCmd()
         };
         return Command;
     })();
@@ -143,15 +190,14 @@ var core;
 (function (core) {
     var AresEntity = (function () {
         function AresEntity(data, element) {
-            this._updaters = [];
             this._element = element;
             this._data = data;
             // 生成一个data的浅层拷贝对象，作为data原始值的保存
-            this._record = this.proxyData(data, []);
-            // 向data中加入$parent和$root参数，都是data本身，用以构建一个Scope对象
-            data.$parent = data.$root = data;
+            this.proxyData(data, []);
+            // 向data中加入$data、$parent和$root参数，都是data本身，用以构建一个Scope对象
+            data.$data = data.$parent = data.$root = data;
             // 开始解析整个element，用整个data作为当前词法作用域
-            this.walkThrough(element, data);
+            this._updaters = this.compile(element, data);
             // 进行一次全局更新
             this.update();
         }
@@ -159,10 +205,9 @@ var core;
          * 为对象安插代理，会篡改对象中的实例为getter和setter，并且返回原始对象的副本
          * @param data 要篡改的对象
          * @param path 当前路径数组
-         * @returns {any} 篡改前的对象副本
          */
         AresEntity.prototype.proxyData = function (data, path) {
-            var result = {};
+            var original = {};
             // 记录当前层次所有的属性，如果有复杂类型对象则递归之
             var keys = Object.keys(data);
             for (var i = 0, len = keys.length; i < len; i++) {
@@ -170,40 +215,56 @@ var core;
                 var value = data[key];
                 switch (typeof value) {
                     case "object":
-                        // 复杂类型，需要递归
-                        var temp = path.concat();
-                        temp.push(key);
-                        result[key] = this.proxyData(value, temp);
+                        //if(value instanceof Array)
+                        //{
+                        //    // 是数组，需要特殊处理
+                        //
+                        //}
+                        //else
+                        {
+                            // 复杂类型，需要递归
+                            var temp = path.concat();
+                            temp.push(key);
+                            original[key] = this.proxyData(value, temp);
+                        }
                         break;
                     case "function":
                         // 是方法，直接记录之
-                        result[key] = data[key];
+                        original[key] = data[key];
                         break;
                     default:
                         // 简单类型，记录一个默认值
-                        result[key] = data[key];
+                        original[key] = data[key];
                         // 篡改为getter和setter
                         Object.defineProperty(data, key, {
                             configurable: true,
                             enumerable: true,
-                            get: this.getProxy.bind(this, result, key),
-                            set: this.setProxy.bind(this, result, key)
+                            get: this.getProxy.bind(this, original, key),
+                            set: this.setProxy.bind(this, original, key)
                         });
                         break;
                 }
             }
-            return result;
+            data.$original = original;
         };
-        AresEntity.prototype.getProxy = function (result, key) {
-            return result[key];
+        AresEntity.prototype.getProxy = function (original, key) {
+            return original[key];
         };
-        AresEntity.prototype.setProxy = function (result, key, value) {
-            result[key] = value;
+        AresEntity.prototype.setProxy = function (original, key, value) {
+            original[key] = value;
             this.update();
         };
-        AresEntity.prototype.walkThrough = function (element, curScope) {
+        AresEntity.prototype.update = function () {
+            // TODO Raykid 现在是全局更新，要改为条件更新
+            for (var i = 0, len = this._updaters.length; i < len; i++) {
+                this._updaters[i].update(this);
+            }
+        };
+        AresEntity.prototype.compile = function (element, scope) {
+            var updaters = [];
             // 检查节点上面以data-a-或者a-开头的属性，将其认为是绑定属性
             var attrs = element.attributes;
+            var compileChildren = true;
             for (var i = 0, len = attrs.length; i < len; i++) {
                 var attr = attrs[i];
                 var name = attr.name;
@@ -215,19 +276,15 @@ var core;
                     // 用命令名取到命令依赖对象
                     var cmd = core.Command.getCmd(cmdName);
                     if (cmd) {
+                        // 更新编译子节点的属性
+                        if (cmd.compileChildren == false)
+                            compileChildren = false;
                         // 取到命令表达式
                         var cmdExp = attr.value;
-                        // 看是否需要生成子域
-                        if (cmd.subScope) {
-                            curScope = {
-                                $parent: curScope,
-                                $root: curScope.$root
-                            };
-                        }
                         // 生成一个更新项
-                        var updater = cmd.exec(element, cmdExp, curScope);
+                        var updater = cmd.exec(element, cmdExp, scope);
                         // TODO Raykid 现在是全局更新，要改为条件更新
-                        this._updaters.push(updater);
+                        updaters.push(updater);
                         // 从DOM节点上移除属性
                         attr.ownerElement.removeAttributeNode(attr);
                         i--;
@@ -236,17 +293,16 @@ var core;
                 }
             }
             // 遍历子节点
-            var children = element.children;
-            for (var i = 0, len = children.length; i < len; i++) {
-                var child = children[i];
-                this.walkThrough(child, curScope);
+            if (compileChildren) {
+                var children = element.children;
+                for (var i = 0, len = children.length; i < len; i++) {
+                    var child = children[i];
+                    var temp = this.compile(child, scope);
+                    updaters = updaters.concat(temp);
+                }
             }
-        };
-        AresEntity.prototype.update = function () {
-            // TODO Raykid 现在是全局更新，要改为条件更新
-            for (var i = 0, len = this._updaters.length; i < len; i++) {
-                this._updaters[i].update();
-            }
+            // 返回Updater
+            return updaters;
         };
         return AresEntity;
     })();
