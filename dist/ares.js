@@ -21,65 +21,89 @@ var core;
 var core;
 (function (core) {
     /** 以下是默认的命令实现 */
-    var TextDep = (function () {
-        function TextDep() {
+    /** 文本命令 */
+    var TextCmd = (function () {
+        function TextCmd() {
         }
-        Object.defineProperty(TextDep.prototype, "subScope", {
+        Object.defineProperty(TextCmd.prototype, "subScope", {
             get: function () {
                 return false;
             },
             enumerable: true,
             configurable: true
         });
-        TextDep.prototype.depend = function (target, exp, scope) {
+        TextCmd.prototype.exec = function (target, exp, scope) {
             var expresion = new core.Expresion(exp);
             return {
                 update: function () {
                     // 更新target节点的textContent
-                    target.textContent = expresion.run(scope);
+                    target.innerText = expresion.run(scope);
                 }
             };
         };
-        return TextDep;
+        return TextCmd;
     })();
-    var Dependent = (function () {
-        function Dependent() {
+    /** HTML文本命令 */
+    var HtmlCmd = (function () {
+        function HtmlCmd() {
         }
-        /** 获取依赖项 */
-        Dependent.getDep = function (name) {
+        Object.defineProperty(HtmlCmd.prototype, "subScope", {
+            get: function () {
+                return false;
+            },
+            enumerable: true,
+            configurable: true
+        });
+        HtmlCmd.prototype.exec = function (target, exp, scope) {
+            var expresion = new core.Expresion(exp);
+            return {
+                update: function () {
+                    // 更新target节点的textContent
+                    target.innerHTML = expresion.run(scope);
+                }
+            };
+        };
+        return HtmlCmd;
+    })();
+    var Command = (function () {
+        function Command() {
+        }
+        /** 获取命令对象 */
+        Command.getCmd = function (name) {
             // 优先查找系统命令，找不到再去自定义命令表查找
-            return (Dependent._depMap[name] ||
-                Dependent._customDepMap[name]);
+            return (Command._depMap[name] ||
+                Command._customCmdMap[name]);
         };
         /**
-         * 添加依赖项
-         * @param name 依赖项命令名
-         * @param dep 依赖项实现对象
+         * 添加命令对象
+         * @param name 命令对象名字
+         * @param dep 命令对象实现对象
          */
-        Dependent.addDep = function (name, dep) {
-            Dependent._customDepMap[name] = dep;
+        Command.addCmd = function (name, dep) {
+            Command._customCmdMap[name] = dep;
         };
         /**
-         * 移除依赖项
-         * @param name 依赖项命令名
-         * @returns {Dep} 被移除的依赖项
+         * 移除命令对象
+         * @param name 命令对象名字
+         * @returns {Cmd} 被移除的命令对象
          */
-        Dependent.removeDep = function (name) {
-            var dep = Dependent._customDepMap[name];
-            delete Dependent._customDepMap[name];
+        Command.removeCmd = function (name) {
+            var dep = Command._customCmdMap[name];
+            delete Command._customCmdMap[name];
             return dep;
         };
         // 自定义的命令表
-        Dependent._customDepMap = {};
+        Command._customCmdMap = {};
         // 系统默认的命令表
-        Dependent._depMap = {
-            text: new TextDep()
+        Command._depMap = {
+            text: new TextCmd(),
+            html: new HtmlCmd()
         };
-        return Dependent;
+        return Command;
     })();
-    core.Dependent = Dependent;
+    core.Command = Command;
 })(core || (core = {}));
-/// <reference path="Dependent.ts"/>
+/// <reference path="Command.ts"/>
 /**
  * Created by Raykid on 2016/12/5.
  */
@@ -157,21 +181,23 @@ var core;
                     // 取到命令名
                     var cmdName = name.substr(index);
                     // 用命令名取到命令依赖对象
-                    var dep = core.Dependent.getDep(cmdName);
-                    if (dep) {
+                    var cmd = core.Command.getCmd(cmdName);
+                    if (cmd) {
                         // 取到命令表达式
                         var cmdExp = attr.value;
                         // 看是否需要生成子域
-                        if (dep.subScope) {
+                        if (cmd.subScope) {
                             curScope = {
                                 $parent: curScope,
                                 $root: curScope.$root
                             };
                         }
                         // 生成一个更新项
-                        var updater = dep.depend(element, cmdExp, curScope);
+                        var updater = cmd.exec(element, cmdExp, curScope);
                         // TODO Raykid 现在是全局更新，要改为条件更新
                         this._updaters.push(updater);
+                        // 从DOM节点上移除属性
+                        attr.ownerElement.removeAttributeNode(attr);
                     }
                 }
             }

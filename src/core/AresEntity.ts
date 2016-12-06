@@ -1,4 +1,4 @@
-/// <reference path="Dependent.ts"/>
+/// <reference path="Command.ts"/>
 
 /**
  * Created by Raykid on 2016/12/5.
@@ -96,13 +96,13 @@ namespace core
                     // 取到命令名
                     var cmdName:string = name.substr(index);
                     // 用命令名取到命令依赖对象
-                    var dep:Dep = Dependent.getDep(cmdName);
-                    if(dep)
+                    var cmd:Cmd = Command.getCmd(cmdName);
+                    if(cmd)
                     {
                         // 取到命令表达式
                         var cmdExp:string = attr.value;
                         // 看是否需要生成子域
-                        if(dep.subScope)
+                        if(cmd.subScope)
                         {
                             curScope = {
                                 $parent: curScope,
@@ -110,9 +110,11 @@ namespace core
                             };
                         }
                         // 生成一个更新项
-                        var updater:Updater = dep.depend(element, cmdExp, curScope);
+                        var updater:Updater = cmd.exec(element, cmdExp, curScope);
                         // TODO Raykid 现在是全局更新，要改为条件更新
                         this._updaters.push(updater);
+                        // 从DOM节点上移除属性
+                        attr.ownerElement.removeAttributeNode(attr);
                     }
                 }
             }
