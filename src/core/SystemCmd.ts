@@ -75,23 +75,19 @@ namespace core
                     for(var i:number = 0, len:number = list.length; i < len; i++)
                     {
                         // 构造一个新作用域
-                        var subScope:Scope;
                         var item:any = list[i];
-                        if(typeof item == "object")
+                        var subScope:Scope = {
+                            $data: null,
+                            $parent: scope,
+                            $root: scope.$root,
+                            $original: item
+                        };
+                        // 如果是复杂类型，则需要将所有子对象赋值过来
+                        for(var key in item)
                         {
-                            subScope = item;
-                            subScope.$data = item;
-                            subScope.$parent = scope;
-                            subScope.$root = scope.$root;
+                            subScope[key] = item[key];
                         }
-                        else
-                        {
-                            subScope = {
-                                $data: item,
-                                $parent: scope,
-                                $root: scope.$root
-                            };
-                        }
+                        subScope.$data = subScope;
                         // 构造一个新的节点，如果是第一个元素则直接使用target作为目标节点
                         var newTarget:HTMLElement = target.cloneNode(true) as HTMLElement;
                         parent.appendChild(newTarget);

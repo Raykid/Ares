@@ -5,9 +5,6 @@ var core;
 (function (core) {
     var Expresion = (function () {
         function Expresion(exp) {
-            // 将exp中所有没有以$data开头的变量都加上$data
-            //var reg:RegExp = /(\$data\.)?([a-zA-Z0-9\.]+)/g;
-            //this._exp = exp.replace(reg, "$data.$2");
             this._exp = exp;
         }
         Expresion.prototype.run = function (scope) {
@@ -104,21 +101,18 @@ var core;
                     var list = new core.Expresion(exp).run(scope);
                     for (var i = 0, len = list.length; i < len; i++) {
                         // 构造一个新作用域
-                        var subScope;
                         var item = list[i];
-                        if (typeof item == "object") {
-                            subScope = item;
-                            subScope.$data = item;
-                            subScope.$parent = scope;
-                            subScope.$root = scope.$root;
+                        var subScope = {
+                            $data: null,
+                            $parent: scope,
+                            $root: scope.$root,
+                            $original: item
+                        };
+                        // 如果是复杂类型，则需要将所有子对象赋值过来
+                        for (var key in item) {
+                            subScope[key] = item[key];
                         }
-                        else {
-                            subScope = {
-                                $data: item,
-                                $parent: scope,
-                                $root: scope.$root
-                            };
-                        }
+                        subScope.$data = subScope;
                         // 构造一个新的节点，如果是第一个元素则直接使用target作为目标节点
                         var newTarget = target.cloneNode(true);
                         parent.appendChild(newTarget);
@@ -215,13 +209,27 @@ var core;
                 var value = data[key];
                 switch (typeof value) {
                     case "object":
-                        //if(value instanceof Array)
-                        //{
-                        //    // 是数组，需要特殊处理
-                        //
-                        //}
-                        //else
-                        {
+                        if (value instanceof Array) {
+                            // 是数组，对于其自身要和简单类型一样处理
+                            original[key] = value;
+                            Object.defineProperty(data, key, {
+                                configurable: true,
+                                enumerable: true,
+                                get: this.getProxy.bind(this, original, key),
+                                set: this.setProxy.bind(this, original, key)
+                            });
+                            // 篡改数组的特定方法
+                            var self = this;
+                            AresEntity._arrayMethods.map(function (method) {
+                                value[method] = function () {
+                                    // 调用原始方法
+                                    Array.prototype[method].apply(this, arguments);
+                                    // 更新
+                                    self.update();
+                                };
+                            }, this);
+                        }
+                        else {
                             // 复杂类型，需要递归
                             var temp = path.concat();
                             temp.push(key);
@@ -230,11 +238,11 @@ var core;
                         break;
                     case "function":
                         // 是方法，直接记录之
-                        original[key] = data[key];
+                        original[key] = value;
                         break;
                     default:
                         // 简单类型，记录一个默认值
-                        original[key] = data[key];
+                        original[key] = value;
                         // 篡改为getter和setter
                         Object.defineProperty(data, key, {
                             configurable: true,
@@ -304,6 +312,15 @@ var core;
             // 返回Updater
             return updaters;
         };
+        AresEntity._arrayMethods = [
+            'push',
+            'pop',
+            'shift',
+            'unshift',
+            'splice',
+            'sort',
+            'reverse'
+        ];
         return AresEntity;
     })();
     core.AresEntity = AresEntity;

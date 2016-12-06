@@ -9,9 +9,6 @@ namespace core
 
         public constructor(exp:string)
         {
-            // 将exp中所有没有以$data开头的变量都加上$data
-            //var reg:RegExp = /(\$data\.)?([a-zA-Z0-9\.]+)/g;
-            //this._exp = exp.replace(reg, "$data.$2");
             this._exp = exp;
         }
 

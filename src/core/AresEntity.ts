@@ -7,6 +7,16 @@ namespace core
 {
     export class AresEntity
     {
+        private static _arrayMethods:string[] = [
+            'push',
+            'pop',
+            'shift',
+            'unshift',
+            'splice',
+            'sort',
+            'reverse'
+        ];
+
         private _data:any;
         private _element:HTMLElement;
 
@@ -43,12 +53,29 @@ namespace core
                 switch(typeof value)
                 {
                     case "object":
-                        //if(value instanceof Array)
-                        //{
-                        //    // 是数组，需要特殊处理
-                        //
-                        //}
-                        //else
+                        if(value instanceof Array)
+                        {
+                            // 是数组，对于其自身要和简单类型一样处理
+                            original[key] = value;
+                            Object.defineProperty(data, key, {
+                                configurable: true,
+                                enumerable: true,
+                                get: this.getProxy.bind(this, original, key),
+                                set: this.setProxy.bind(this, original, key)
+                            });
+                            // 篡改数组的特定方法
+                            var self:AresEntity = this;
+                            AresEntity._arrayMethods.map((method:string)=>{
+                                value[method] = function()
+                                {
+                                    // 调用原始方法
+                                    Array.prototype[method].apply(this, arguments);
+                                    // 更新
+                                    self.update();
+                                };
+                            }, this);
+                        }
+                        else
                         {
                             // 复杂类型，需要递归
                             var temp:string[] = path.concat();
@@ -58,11 +85,11 @@ namespace core
                         break;
                     case "function":
                         // 是方法，直接记录之
-                        original[key] = data[key];
+                        original[key] = value;
                         break;
                     default:
                         // 简单类型，记录一个默认值
-                        original[key] = data[key];
+                        original[key] = value;
                         // 篡改为getter和setter
                         Object.defineProperty(data, key, {
                             configurable: true,
