@@ -8,7 +8,9 @@
 </head>
 <body>
 <div id="div_root">
-    <div a-html="'<a href=\'http://www.baidu.com\'>1234</a>'" a-for="item in testList"></div>
+    <div a-for="item in testList" a-if="item.abc > 1">
+        <a href="http://www.baidu.com" a-text="`asdf ${1 + item.abc} 1234`"></a>
+    </div>
 </div>
 </body>
 </html>

@@ -93,7 +93,7 @@ namespace core
             else
             {
                 // 啥都没有，使用正则表达式匹配
-                exp = exp.replace(/[\w\.\$]+/g, (str:string)=>{
+                exp = exp.replace(/[a-z\.\$][\w\.\$]*/ig, (str:string)=>{
                     if(str.indexOf("$data.") != 0)
                     {
                         str = "$data." + str;
@@ -110,9 +110,8 @@ namespace core
             var res:ContentResult = this.getContentBetween(exp, "\\$\\{", "\\}");
             if(res)
             {
-                var temp:string = res.value;
-                if(temp.indexOf("$data.") != 0) temp = "$data." + temp;
-                exp = exp.substr(0, res.begin) + temp + "}" + this.parseTempExp(exp.substr(res.end + 1));
+                // ${}内部是正规的js表达式，所以用常规方式解析，左边直接截取即可，右面递归解析模板方式
+                exp = exp.substr(0, res.begin) + this.parseOriExp(res.value) + "}" + this.parseTempExp(exp.substr(res.end + 1));
             }
             return exp;
         }

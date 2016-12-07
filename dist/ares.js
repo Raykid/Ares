@@ -79,7 +79,7 @@ var core;
             }
             else {
                 // 啥都没有，使用正则表达式匹配
-                exp = exp.replace(/[\w\.\$]+/g, function (str) {
+                exp = exp.replace(/[a-z\.\$][\w\.\$]*/ig, function (str) {
                     if (str.indexOf("$data.") != 0) {
                         str = "$data." + str;
                     }
@@ -93,10 +93,8 @@ var core;
                 return exp;
             var res = this.getContentBetween(exp, "\\$\\{", "\\}");
             if (res) {
-                var temp = res.value;
-                if (temp.indexOf("$data.") != 0)
-                    temp = "$data." + temp;
-                exp = exp.substr(0, res.begin) + temp + "}" + this.parseTempExp(exp.substr(res.end + 1));
+                // ${}内部是正规的js表达式，所以用常规方式解析，左边直接截取即可，右面递归解析模板方式
+                exp = exp.substr(0, res.begin) + this.parseOriExp(res.value) + "}" + this.parseTempExp(exp.substr(res.end + 1));
             }
             return exp;
         };
