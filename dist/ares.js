@@ -243,6 +243,11 @@ var core;
             var parent = target.parentElement;
             var firstElement = target;
             target = target.cloneNode(true);
+            // 去掉target中的a-for属性
+            target.removeAttribute("data-a-for");
+            target.removeAttribute("a-for");
+            // 记录下所有target剩余的属性，否则firstElement之后无法被正确编译，因为缺少属性
+            var firstAttrs = target.attributes;
             return {
                 update: function (entity) {
                     // 首先清空当前已有的对象节点
@@ -275,7 +280,18 @@ var core;
             };
             function update(index, entity, subScope, next) {
                 // 构造一个新的节点，如果是第一个元素则直接使用firstElement作为目标节点
-                var newTarget = (index == 0 ? firstElement : target.cloneNode(true));
+                var newTarget;
+                if (index == 0) {
+                    newTarget = firstElement;
+                    // 为首个节点赋属性值
+                    for (var i = 0, len = firstAttrs.length; i < len; i++) {
+                        var attr = firstAttrs[i];
+                        firstElement.setAttribute(attr.name, attr.value);
+                    }
+                }
+                else {
+                    newTarget = target.cloneNode(true);
+                }
                 if (parent.contains(next))
                     parent.insertBefore(newTarget, next);
                 else
@@ -476,12 +492,12 @@ var core;
             var updaters = [];
             for (var i = 0, len = bundles.length; i < len; i++) {
                 var bundle = bundles[i];
-                // 从DOM节点上移除属性
-                bundle.attr.ownerElement.removeAttributeNode(attr);
                 // 生成一个更新项
                 var updater = bundle.cmd.exec(element, bundle.attr.value, scope);
                 // TODO Raykid 现在是全局更新，要改为条件更新
                 updaters.push(updater);
+                // 从DOM节点上移除属性
+                bundle.attr.ownerElement.removeAttributeNode(attr);
             }
             // 遍历子节点
             if (!stopCompile) {

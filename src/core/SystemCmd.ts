@@ -117,6 +117,11 @@ namespace core
             var parent:HTMLElement = target.parentElement;
             var firstElement:HTMLElement = target;
             target = target.cloneNode(true) as HTMLElement;
+            // 去掉target中的a-for属性
+            target.removeAttribute("data-a-for");
+            target.removeAttribute("a-for");
+            // 记录下所有target剩余的属性，否则firstElement之后无法被正确编译，因为缺少属性
+            var firstAttrs:NamedNodeMap = target.attributes;
             return {
                 update: (entity:AresEntity)=>{
                     // 首先清空当前已有的对象节点
@@ -156,7 +161,21 @@ namespace core
             function update(index:number, entity:AresEntity, subScope:Scope, next:HTMLElement):void
             {
                 // 构造一个新的节点，如果是第一个元素则直接使用firstElement作为目标节点
-                var newTarget:HTMLElement = (index == 0 ? firstElement : target.cloneNode(true) as HTMLElement);
+                var newTarget:HTMLElement;
+                if(index == 0)
+                {
+                    newTarget = firstElement;
+                    // 为首个节点赋属性值
+                    for(var i:number = 0, len:number = firstAttrs.length; i < len; i++)
+                    {
+                        var attr:Attr = firstAttrs[i];
+                        firstElement.setAttribute(attr.name, attr.value);
+                    }
+                }
+                else
+                {
+                    newTarget = target.cloneNode(true) as HTMLElement;
+                }
                 if(parent.contains(next)) parent.insertBefore(newTarget, next);
                 else parent.appendChild(newTarget);
                 targets.push(newTarget);
