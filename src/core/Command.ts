@@ -15,6 +15,7 @@ namespace core
             text: new TextCmd(),
             html: new HtmlCmd(),
             css: new CssCmd(),
+            attr: new AttrCmd(),
             if: new IfCmd(),
             for: new ForCmd()
         };

@@ -33,7 +33,7 @@ namespace core
         }
     }
 
-    /** CSS文本命令 */
+    /** CSS类型命令 */
     export class CssCmd implements Cmd
     {
         public exec(target:HTMLElement, exp:string, scope:Scope):Updater
@@ -52,6 +52,25 @@ namespace core
                     }
                     // 更新target节点的class属性
                     if(arr.length > 0) target.setAttribute("class", arr.join(" "));
+                }
+            };
+        }
+    }
+
+    /** 修改任意属性命令 */
+    export class AttrCmd implements Cmd
+    {
+        public exec(target:HTMLElement, exp:string, scope:Scope):Updater
+        {
+            return {
+                update: ()=>{
+                    var params:any = new Expresion(exp).run(scope);
+                    // 遍历所有params的key，如果其表达式值为true则添加其类型
+                    for(var name in params)
+                    {
+                        var value:any = params[name];
+                        target.setAttribute(name, value);
+                    }
                 }
             };
         }

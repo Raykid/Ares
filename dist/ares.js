@@ -152,7 +152,7 @@ var core;
         return HtmlCmd;
     })();
     core.HtmlCmd = HtmlCmd;
-    /** CSS文本命令 */
+    /** CSS类型命令 */
     var CssCmd = (function () {
         function CssCmd() {
         }
@@ -179,6 +179,25 @@ var core;
         return CssCmd;
     })();
     core.CssCmd = CssCmd;
+    /** 修改任意属性命令 */
+    var AttrCmd = (function () {
+        function AttrCmd() {
+        }
+        AttrCmd.prototype.exec = function (target, exp, scope) {
+            return {
+                update: function () {
+                    var params = new core.Expresion(exp).run(scope);
+                    // 遍历所有params的key，如果其表达式值为true则添加其类型
+                    for (var name in params) {
+                        var value = params[name];
+                        target.setAttribute(name, value);
+                    }
+                }
+            };
+        };
+        return AttrCmd;
+    })();
+    core.AttrCmd = AttrCmd;
     /** if命令 */
     var IfCmd = (function () {
         function IfCmd() {
@@ -294,6 +313,7 @@ var core;
             text: new core.TextCmd(),
             html: new core.HtmlCmd(),
             css: new core.CssCmd(),
+            attr: new core.AttrCmd(),
             if: new core.IfCmd(),
             for: new core.ForCmd()
         };
