@@ -55,9 +55,10 @@ var core;
                 exp = exp.replace(/[a-z\.\$][\w\.\$]*/ig, function (str, index, exp) {
                     if (str.indexOf("$data.") != 0) {
                         // 如果str和冒号:之间都是空白字符或者没有字符，则不替换$data
-                        var i = exp.indexOf(":");
+                        var end = index + str.length;
+                        var i = exp.indexOf(":", end);
                         if (i > index) {
-                            var temp = exp.substring(index + str.length, i);
+                            var temp = exp.substring(end, i);
                             if (/^\s*$/.test(temp))
                                 return str;
                         }

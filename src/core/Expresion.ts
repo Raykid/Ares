@@ -65,10 +65,11 @@ namespace core
                     if(str.indexOf("$data.") != 0)
                     {
                         // 如果str和冒号:之间都是空白字符或者没有字符，则不替换$data
-                        var i:number = exp.indexOf(":");
+                        var end:number = index + str.length;
+                        var i:number = exp.indexOf(":", end);
                         if(i > index)
                         {
-                            var temp:string = exp.substring(index + str.length, i);
+                            var temp:string = exp.substring(end, i);
                             if(/^\s*$/.test(temp)) return str;
                         }
                         str = "$data." + str;

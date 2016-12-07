@@ -7,7 +7,10 @@ Ares.create({
     initialized: function(vm)
     {
         setTimeout(function(){
-            vm.cls = "test";
+            vm.cls = 1;
         }, 2000);
+        setTimeout(function(){
+            vm.cls = 2;
+        }, 4000);
     }
 });

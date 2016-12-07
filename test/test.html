@@ -7,13 +7,14 @@
     <script src="test.js"></script>
 
     <style type="text/css">
-        .test {background-color: #00ff00}
+        .test1 {background-color: #00ffff}
+        .test2 {background-color: #00ff00}
     </style>
 </head>
 <body>
 <div id="div_root">
     <a>abc</a>
-    <div a-css='{test: cls=="test"}'>abc</div>
+    <div a-css='{test1: cls==1, test2: cls==2}'>abc</div>
 </div>
 </body>
 </html>
