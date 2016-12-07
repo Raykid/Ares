@@ -58,39 +58,7 @@ namespace core
             var first1:ContentResult = this.getFirst(exp, "'");
             var first2:ContentResult = this.getFirst(exp, '"');
             var first:ContentResult, second:ContentResult;
-            if(first1 && first2)
-            {
-                // 单双引号都有，取第一个出现的符号
-                if(first1.begin < first2.begin)
-                {
-                    // 单引号
-                    first = first1;
-                    second = this.getFirst(exp, first.value, first.end);
-                    exp = this.parseOriExp(exp.substr(0, first.begin)) + exp.substring(first.begin, second.end) + this.parseOriExp(exp.substr(second.end));
-                }
-                else
-                {
-                    // 双引号
-                    first = first2;
-                    second = this.getFirst(exp, first.value, first.end);
-                    exp = this.parseOriExp(exp.substr(0, first.begin)) + exp.substring(first.begin, second.end) + this.parseOriExp(exp.substr(second.end));
-                }
-            }
-            else if(first1)
-            {
-                // 只有单引号
-                first = first1;
-                second = this.getFirst(exp, first.value, first.end);
-                exp = this.parseOriExp(exp.substr(0, first.begin)) + exp.substring(first.begin, second.end) + this.parseOriExp(exp.substr(second.end));
-            }
-            else if(first2)
-            {
-                // 只有双引号
-                first = first2;
-                second = this.getFirst(exp, first.value, first.end);
-                exp = this.parseOriExp(exp.substr(0, first.begin)) + exp.substring(first.begin, second.end) + this.parseOriExp(exp.substr(second.end));
-            }
-            else
+            if(!first1 && !first2)
             {
                 // 啥都没有，使用正则表达式匹配
                 exp = exp.replace(/[a-z\.\$][\w\.\$]*/ig, (str:string)=>{
@@ -100,6 +68,16 @@ namespace core
                     }
                     return str;
                 });
+            }
+            else
+            {
+                if(first1 && first2)
+                    if(first1.begin < first2.begin) first = first1;
+                    else first = first2;
+                else if(first1) first = first1;
+                else if(first2) first = first2;
+                second = this.getFirst(exp, first.value, first.end);
+                exp = this.parseOriExp(exp.substr(0, first.begin)) + exp.substring(first.begin, second.end) + this.parseOriExp(exp.substr(second.end));
             }
             return exp;
         }
