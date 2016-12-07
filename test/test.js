@@ -4,13 +4,15 @@
 Ares.create({
     cls: null,
     clsName: null,
-    href: "javascript:void"
+    href: "javascript:void",
+    testNum: 1
 }, "div_root", {
     initialized: function(vm)
     {
         setTimeout(function(){
             vm.cls = 1;
             vm.clsName = "test1";
+            vm.testNum = 3;
         }, 2000);
         setTimeout(function(){
             vm.cls = 2;

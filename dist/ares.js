@@ -235,11 +235,14 @@ var core;
             configurable: true
         });
         ForCmd.prototype.exec = function (target, exp, scope) {
-            var _this = this;
+            var next = target.nextElementSibling;
             var targets = [];
             var res = this._reg.exec(exp);
             var subName = res[1];
             var listName = res[2];
+            var parent = target.parentElement;
+            var firstElement = target;
+            target = target.cloneNode(true);
             return {
                 update: function (entity) {
                     // 首先清空当前已有的对象节点
@@ -249,24 +252,40 @@ var core;
                         child.parentElement.removeChild(child);
                     }
                     // 生成新对象
-                    var parent = target.parentElement;
                     var list = new core.Expresion(listName).run(scope);
-                    var subScope = {};
-                    subScope.__proto__ = scope;
-                    for (var i = 0, len = list.length; i < len; i++) {
-                        // 构造一个新作用域
-                        subScope[subName] = list[i];
-                        // 构造一个新的节点，如果是第一个元素则直接使用target作为目标节点
-                        var newTarget = target.cloneNode(true);
-                        parent.appendChild(newTarget);
-                        targets.push(newTarget);
-                        // 用新的作用域遍历新节点
-                        var updaters = entity.compile(newTarget, subScope);
-                        // 立即更新
-                        updaters.map(function (updater) { return updater.update(entity); }, _this);
+                    if (typeof list == "number") {
+                        var subScope = {};
+                        subScope.__proto__ = scope;
+                        for (var i = 0; i < list; i++) {
+                            // 构造一个新作用域
+                            subScope[subName] = i;
+                            update(i, entity, subScope, next);
+                        }
+                    }
+                    else {
+                        var subScope = {};
+                        subScope.__proto__ = scope;
+                        for (var i = 0, len = list.length; i < len; i++) {
+                            // 构造一个新作用域
+                            subScope[subName] = list[i];
+                            update(i, entity, subScope, next);
+                        }
                     }
                 }
             };
+            function update(index, entity, subScope, next) {
+                // 构造一个新的节点，如果是第一个元素则直接使用firstElement作为目标节点
+                var newTarget = (index == 0 ? firstElement : target.cloneNode(true));
+                if (parent.contains(next))
+                    parent.insertBefore(newTarget, next);
+                else
+                    parent.appendChild(newTarget);
+                targets.push(newTarget);
+                // 用新的作用域遍历新节点
+                var updaters = entity.compile(newTarget, subScope);
+                // 立即更新
+                updaters.map(function (updater) { return updater.update(entity); }, this);
+            }
         };
         return ForCmd;
     })();
@@ -457,12 +476,12 @@ var core;
             var updaters = [];
             for (var i = 0, len = bundles.length; i < len; i++) {
                 var bundle = bundles[i];
+                // 从DOM节点上移除属性
+                bundle.attr.ownerElement.removeAttributeNode(attr);
                 // 生成一个更新项
                 var updater = bundle.cmd.exec(element, bundle.attr.value, scope);
                 // TODO Raykid 现在是全局更新，要改为条件更新
                 updaters.push(updater);
-                // 从DOM节点上移除属性
-                bundle.attr.ownerElement.removeAttributeNode(attr);
             }
             // 遍历子节点
             if (!stopCompile) {

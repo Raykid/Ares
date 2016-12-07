@@ -174,12 +174,12 @@ namespace core
             for(var i:number = 0, len:number = bundles.length; i < len; i++)
             {
                 var bundle:{cmd:Cmd, attr:Attr} = bundles[i];
+                // 从DOM节点上移除属性
+                bundle.attr.ownerElement.removeAttributeNode(attr);
                 // 生成一个更新项
                 var updater:Updater = bundle.cmd.exec(element, bundle.attr.value, scope);
                 // TODO Raykid 现在是全局更新，要改为条件更新
                 updaters.push(updater);
-                // 从DOM节点上移除属性
-                bundle.attr.ownerElement.removeAttributeNode(attr);
             }
             // 遍历子节点
             if(!stopCompile)

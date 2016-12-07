@@ -109,10 +109,14 @@ namespace core
 
         public exec(target:HTMLElement, exp:string, scope:Scope):Updater
         {
+            var next:HTMLElement = target.nextElementSibling as HTMLElement;
             var targets:HTMLElement[] = [];
             var res:RegExpExecArray = this._reg.exec(exp);
             var subName:string = res[1];
             var listName:string = res[2];
+            var parent:HTMLElement = target.parentElement;
+            var firstElement:HTMLElement = target;
+            target = target.cloneNode(true) as HTMLElement;
             return {
                 update: (entity:AresEntity)=>{
                     // 首先清空当前已有的对象节点
@@ -123,25 +127,44 @@ namespace core
                         child.parentElement.removeChild(child);
                     }
                     // 生成新对象
-                    var parent:HTMLElement = target.parentElement;
-                    var list:any[] = new Expresion(listName).run(scope);
-                    var subScope:any = {};
-                    subScope.__proto__ = scope;
-                    for(var i:number = 0, len:number = list.length; i < len; i++)
+                    var list:any = new Expresion(listName).run(scope);
+                    if(typeof list == "number")
                     {
-                        // 构造一个新作用域
-                        subScope[subName] = list[i];
-                        // 构造一个新的节点，如果是第一个元素则直接使用target作为目标节点
-                        var newTarget:HTMLElement = target.cloneNode(true) as HTMLElement;
-                        parent.appendChild(newTarget);
-                        targets.push(newTarget);
-                        // 用新的作用域遍历新节点
-                        var updaters:Updater[] = entity.compile(newTarget, subScope);
-                        // 立即更新
-                        updaters.map(updater=>updater.update(entity), this);
+                        var subScope:any = {};
+                        subScope.__proto__ = scope;
+                        for(var i:number = 0; i < list; i++)
+                        {
+                            // 构造一个新作用域
+                            subScope[subName] = i;
+                            update(i, entity, subScope, next);
+                        }
+                    }
+                    else
+                    {
+                        var subScope:any = {};
+                        subScope.__proto__ = scope;
+                        for(var i:number = 0, len:number = list.length; i < len; i++)
+                        {
+                            // 构造一个新作用域
+                            subScope[subName] = list[i];
+                            update(i, entity, subScope, next);
+                        }
                     }
                 }
             };
+
+            function update(index:number, entity:AresEntity, subScope:Scope, next:HTMLElement):void
+            {
+                // 构造一个新的节点，如果是第一个元素则直接使用firstElement作为目标节点
+                var newTarget:HTMLElement = (index == 0 ? firstElement : target.cloneNode(true) as HTMLElement);
+                if(parent.contains(next)) parent.insertBefore(newTarget, next);
+                else parent.appendChild(newTarget);
+                targets.push(newTarget);
+                // 用新的作用域遍历新节点
+                var updaters:Updater[] = entity.compile(newTarget, subScope);
+                // 立即更新
+                updaters.map(updater=>updater.update(entity), this);
+            }
         }
     }
 }
