@@ -53,32 +53,42 @@ namespace core
 
         private parseOriExp(exp:string):string
         {
+            if(exp == "") return exp;
             // 分别将""和''找出来，然后将其两边的字符串递归处理，最后再用正则表达式匹配
             var first1:ContentResult = this.getFirst(exp, "'");
             var first2:ContentResult = this.getFirst(exp, '"');
+            var first:ContentResult, second:ContentResult;
             if(first1 && first2)
             {
                 // 单双引号都有，取第一个出现的符号
                 if(first1.begin < first2.begin)
                 {
                     // 单引号
-                    exp = this.parseOriExp(exp.substr(0, first1.begin)) + first1.value + this.parseOriExp(exp.substr(first1.end));
+                    first = first1;
+                    second = this.getFirst(exp, first.value, first.end);
+                    exp = this.parseOriExp(exp.substr(0, first.begin)) + exp.substring(first.begin, second.end) + this.parseOriExp(exp.substr(second.end));
                 }
                 else
                 {
                     // 双引号
-                    exp = this.parseOriExp(exp.substr(0, first2.begin)) + first2.value + this.parseOriExp(exp.substr(first2.end));
+                    first = first2;
+                    second = this.getFirst(exp, first.value, first.end);
+                    exp = this.parseOriExp(exp.substr(0, first.begin)) + exp.substring(first.begin, second.end) + this.parseOriExp(exp.substr(second.end));
                 }
             }
             else if(first1)
             {
                 // 只有单引号
-                exp = this.parseOriExp(exp.substr(0, first1.begin)) + first1.value + this.parseOriExp(exp.substr(first1.end));
+                first = first1;
+                second = this.getFirst(exp, first.value, first.end);
+                exp = this.parseOriExp(exp.substr(0, first.begin)) + exp.substring(first.begin, second.end) + this.parseOriExp(exp.substr(second.end));
             }
             else if(first2)
             {
                 // 只有双引号
-                exp = this.parseOriExp(exp.substr(0, first2.begin)) + first2.value + this.parseOriExp(exp.substr(first2.end));
+                first = first2;
+                second = this.getFirst(exp, first.value, first.end);
+                exp = this.parseOriExp(exp.substr(0, first.begin)) + exp.substring(first.begin, second.end) + this.parseOriExp(exp.substr(second.end));
             }
             else
             {
@@ -96,6 +106,7 @@ namespace core
 
         private parseTempExp(exp:string):string
         {
+            if(exp == "") return exp;
             var res:ContentResult = this.getContentBetween(exp, "\\$\\{", "\\}");
             if(res)
             {
@@ -122,6 +133,7 @@ namespace core
             // 用普通字符串方式处理模板字符串前面的部分，用模板字符串方式处理模板字符串部分，然后递归处理剩余部分
             var res:ContentResult = this.getContentBetween(exp, "`", "`");
             if(res) exp = this.parseOriExp(exp.substr(0, res.begin - 1)) + "`" + this.parseTempExp(res.value) + "`" + this.changeParamNames(exp.substr(res.end + 1));
+            else exp = this.parseOriExp(exp);
             return exp;
         }
     }

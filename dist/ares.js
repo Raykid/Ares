@@ -44,27 +44,38 @@ var core;
             };
         };
         Expresion.prototype.parseOriExp = function (exp) {
+            if (exp == "")
+                return exp;
             // 分别将""和''找出来，然后将其两边的字符串递归处理，最后再用正则表达式匹配
             var first1 = this.getFirst(exp, "'");
             var first2 = this.getFirst(exp, '"');
+            var first, second;
             if (first1 && first2) {
                 // 单双引号都有，取第一个出现的符号
                 if (first1.begin < first2.begin) {
                     // 单引号
-                    exp = this.parseOriExp(exp.substr(0, first1.begin)) + first1.value + this.parseOriExp(exp.substr(first1.end));
+                    first = first1;
+                    second = this.getFirst(exp, first.value, first.end);
+                    exp = this.parseOriExp(exp.substr(0, first.begin)) + exp.substring(first.begin, second.end) + this.parseOriExp(exp.substr(second.end));
                 }
                 else {
                     // 双引号
-                    exp = this.parseOriExp(exp.substr(0, first2.begin)) + first2.value + this.parseOriExp(exp.substr(first2.end));
+                    first = first2;
+                    second = this.getFirst(exp, first.value, first.end);
+                    exp = this.parseOriExp(exp.substr(0, first.begin)) + exp.substring(first.begin, second.end) + this.parseOriExp(exp.substr(second.end));
                 }
             }
             else if (first1) {
                 // 只有单引号
-                exp = this.parseOriExp(exp.substr(0, first1.begin)) + first1.value + this.parseOriExp(exp.substr(first1.end));
+                first = first1;
+                second = this.getFirst(exp, first.value, first.end);
+                exp = this.parseOriExp(exp.substr(0, first.begin)) + exp.substring(first.begin, second.end) + this.parseOriExp(exp.substr(second.end));
             }
             else if (first2) {
                 // 只有双引号
-                exp = this.parseOriExp(exp.substr(0, first2.begin)) + first2.value + this.parseOriExp(exp.substr(first2.end));
+                first = first2;
+                second = this.getFirst(exp, first.value, first.end);
+                exp = this.parseOriExp(exp.substr(0, first.begin)) + exp.substring(first.begin, second.end) + this.parseOriExp(exp.substr(second.end));
             }
             else {
                 // 啥都没有，使用正则表达式匹配
@@ -78,6 +89,8 @@ var core;
             return exp;
         };
         Expresion.prototype.parseTempExp = function (exp) {
+            if (exp == "")
+                return exp;
             var res = this.getContentBetween(exp, "\\$\\{", "\\}");
             if (res) {
                 var temp = res.value;
@@ -102,6 +115,8 @@ var core;
             var res = this.getContentBetween(exp, "`", "`");
             if (res)
                 exp = this.parseOriExp(exp.substr(0, res.begin - 1)) + "`" + this.parseTempExp(res.value) + "`" + this.changeParamNames(exp.substr(res.end + 1));
+            else
+                exp = this.parseOriExp(exp);
             return exp;
         };
         return Expresion;
@@ -145,11 +160,11 @@ var core;
         return HtmlCmd;
     })();
     core.HtmlCmd = HtmlCmd;
-    /** visible命令 */
-    var VisibleCmd = (function () {
-        function VisibleCmd() {
+    /** if命令 */
+    var IfCmd = (function () {
+        function IfCmd() {
         }
-        VisibleCmd.prototype.exec = function (target, exp, scope) {
+        IfCmd.prototype.exec = function (target, exp, scope) {
             var expresion = new core.Expresion(exp);
             return {
                 update: function () {
@@ -158,17 +173,25 @@ var core;
                 }
             };
         };
-        return VisibleCmd;
+        return IfCmd;
     })();
-    core.VisibleCmd = VisibleCmd;
+    core.IfCmd = IfCmd;
     /** for命令 */
     var ForCmd = (function () {
         function ForCmd() {
+            this._reg = /([\w\.\$]+)\s+in\s+([\w\.\$]+)/;
         }
-        Object.defineProperty(ForCmd.prototype, "compileChildren", {
+        Object.defineProperty(ForCmd.prototype, "priority", {
+            get: function () {
+                return 1000;
+            },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(ForCmd.prototype, "stopCompile", {
             get: function () {
                 // for命令需要将所有子节点延迟到更新时再编译
-                return false;
+                return true;
             },
             enumerable: true,
             configurable: true
@@ -176,6 +199,9 @@ var core;
         ForCmd.prototype.exec = function (target, exp, scope) {
             var _this = this;
             var targets = [];
+            var res = this._reg.exec(exp);
+            var subName = res[1];
+            var listName = res[2];
             return {
                 update: function (entity) {
                     // 首先清空当前已有的对象节点
@@ -186,21 +212,12 @@ var core;
                     }
                     // 生成新对象
                     var parent = target.parentElement;
-                    var list = new core.Expresion(exp).run(scope);
+                    var list = new core.Expresion(listName).run(scope);
+                    var subScope = {};
+                    subScope.__proto__ = scope;
                     for (var i = 0, len = list.length; i < len; i++) {
                         // 构造一个新作用域
-                        var item = list[i];
-                        var subScope = {
-                            $data: null,
-                            $parent: scope,
-                            $root: scope.$root,
-                            $original: item
-                        };
-                        // 如果是复杂类型，则需要将所有子对象赋值过来
-                        for (var key in item) {
-                            subScope[key] = item[key];
-                        }
-                        subScope.$data = subScope;
+                        subScope[subName] = list[i];
                         // 构造一个新的节点，如果是第一个元素则直接使用target作为目标节点
                         var newTarget = target.cloneNode(true);
                         parent.appendChild(newTarget);
@@ -257,7 +274,7 @@ var core;
         Command._depMap = {
             text: new core.TextCmd(),
             html: new core.HtmlCmd(),
-            visible: new core.VisibleCmd(),
+            if: new core.IfCmd(),
             for: new core.ForCmd()
         };
         return Command;
@@ -357,10 +374,10 @@ var core;
             }
         };
         AresEntity.prototype.compile = function (element, scope) {
-            var updaters = [];
             // 检查节点上面以data-a-或者a-开头的属性，将其认为是绑定属性
             var attrs = element.attributes;
-            var compileChildren = true;
+            var bundles = [];
+            var stopCompile = false;
             for (var i = 0, len = attrs.length; i < len; i++) {
                 var attr = attrs[i];
                 var name = attr.name;
@@ -372,24 +389,32 @@ var core;
                     // 用命令名取到命令依赖对象
                     var cmd = core.Command.getCmd(cmdName);
                     if (cmd) {
+                        bundles.push({ cmd: cmd, attr: attr });
                         // 更新编译子节点的属性
-                        if (cmd.compileChildren == false)
-                            compileChildren = false;
-                        // 取到命令表达式
-                        var cmdExp = attr.value;
-                        // 生成一个更新项
-                        var updater = cmd.exec(element, cmdExp, scope);
-                        // TODO Raykid 现在是全局更新，要改为条件更新
-                        updaters.push(updater);
-                        // 从DOM节点上移除属性
-                        attr.ownerElement.removeAttributeNode(attr);
-                        i--;
-                        len--;
+                        if (cmd.stopCompile) {
+                            stopCompile = true;
+                            // 只剩下这一个命令
+                            bundles.splice(0, bundles.length - 1);
+                            break;
+                        }
                     }
                 }
             }
+            // 排序cmd
+            bundles.sort(function (a, b) { return (b.cmd.priority || 0) - (a.cmd.priority || 0); });
+            // 开始执行cmd
+            var updaters = [];
+            for (var i = 0, len = bundles.length; i < len; i++) {
+                var bundle = bundles[i];
+                // 生成一个更新项
+                var updater = bundle.cmd.exec(element, bundle.attr.value, scope);
+                // TODO Raykid 现在是全局更新，要改为条件更新
+                updaters.push(updater);
+                // 从DOM节点上移除属性
+                bundle.attr.ownerElement.removeAttributeNode(attr);
+            }
             // 遍历子节点
-            if (compileChildren) {
+            if (!stopCompile) {
                 var children = element.children;
                 for (var i = 0, len = children.length; i < len; i++) {
                     var child = children[i];

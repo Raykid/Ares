@@ -14,7 +14,7 @@ namespace core
         private static _depMap:{[name:string]:Cmd} = {
             text: new TextCmd(),
             html: new HtmlCmd(),
-            visible: new VisibleCmd(),
+            if: new IfCmd(),
             for: new ForCmd()
         };
 
@@ -53,8 +53,10 @@ namespace core
 
     export interface Cmd
     {
-        /** 是否编译子节点，默认是编译 */
-        compileChildren?:boolean;
+        /** 编译优先级，数字越大越先被编译 */
+        priority?:number;
+        /** 是否要中断当前节点及其子节点的编译 */
+        stopCompile?:boolean;
         /**
          * 根据依赖创建更新器
          * @param target 依赖的DOM节点引用

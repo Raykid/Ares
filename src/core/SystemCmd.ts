@@ -33,8 +33,8 @@ namespace core
         }
     }
 
-    /** visible命令 */
-    export class VisibleCmd implements Cmd
+    /** if命令 */
+    export class IfCmd implements Cmd
     {
         public exec(target:HTMLElement, exp:string, scope:Scope):Updater
         {
@@ -51,15 +51,25 @@ namespace core
     /** for命令 */
     export class ForCmd implements Cmd
     {
-        public get compileChildren():boolean
+        private _reg:RegExp = /([\w\.\$]+)\s+in\s+([\w\.\$]+)/;
+
+        public get priority():number
+        {
+            return 1000;
+        }
+
+        public get stopCompile():boolean
         {
             // for命令需要将所有子节点延迟到更新时再编译
-            return false;
+            return true;
         }
 
         public exec(target:HTMLElement, exp:string, scope:Scope):Updater
         {
             var targets:HTMLElement[] = [];
+            var res:RegExpExecArray = this._reg.exec(exp);
+            var subName:string = res[1];
+            var listName:string = res[2];
             return {
                 update: (entity:AresEntity)=>{
                     // 首先清空当前已有的对象节点
@@ -71,23 +81,13 @@ namespace core
                     }
                     // 生成新对象
                     var parent:HTMLElement = target.parentElement;
-                    var list:any[] = new Expresion(exp).run(scope);
+                    var list:any[] = new Expresion(listName).run(scope);
+                    var subScope:any = {};
+                    subScope.__proto__ = scope;
                     for(var i:number = 0, len:number = list.length; i < len; i++)
                     {
                         // 构造一个新作用域
-                        var item:any = list[i];
-                        var subScope:Scope = {
-                            $data: null,
-                            $parent: scope,
-                            $root: scope.$root,
-                            $original: item
-                        };
-                        // 如果是复杂类型，则需要将所有子对象赋值过来
-                        for(var key in item)
-                        {
-                            subScope[key] = item[key];
-                        }
-                        subScope.$data = subScope;
+                        subScope[subName] = list[i];
                         // 构造一个新的节点，如果是第一个元素则直接使用target作为目标节点
                         var newTarget:HTMLElement = target.cloneNode(true) as HTMLElement;
                         parent.appendChild(newTarget);

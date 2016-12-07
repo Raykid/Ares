@@ -125,10 +125,10 @@ namespace core
 
         public compile(element:HTMLElement, scope:Scope):Updater[]
         {
-            var updaters:Updater[] = [];
             // 检查节点上面以data-a-或者a-开头的属性，将其认为是绑定属性
             var attrs:NamedNodeMap = element.attributes;
-            var compileChildren:boolean = true;
+            var bundles:{cmd:Cmd, attr:Attr}[] = [];
+            var stopCompile:boolean = false;
             for(var i:number = 0, len:number = attrs.length; i < len; i++)
             {
                 var attr:Attr = attrs[i];
@@ -143,23 +143,34 @@ namespace core
                     var cmd:Cmd = Command.getCmd(cmdName);
                     if(cmd)
                     {
+                        bundles.push({cmd: cmd, attr: attr});
                         // 更新编译子节点的属性
-                        if(cmd.compileChildren == false) compileChildren = false;
-                        // 取到命令表达式
-                        var cmdExp:string = attr.value;
-                        // 生成一个更新项
-                        var updater:Updater = cmd.exec(element, cmdExp, scope);
-                        // TODO Raykid 现在是全局更新，要改为条件更新
-                        updaters.push(updater);
-                        // 从DOM节点上移除属性
-                        attr.ownerElement.removeAttributeNode(attr);
-                        i --;
-                        len --;
+                        if(cmd.stopCompile)
+                        {
+                            stopCompile = true;
+                            // 只剩下这一个命令
+                            bundles.splice(0, bundles.length - 1);
+                            break;
+                        }
                     }
                 }
             }
+            // 排序cmd
+            bundles.sort((a:{cmd:Cmd, attr:Attr}, b:{cmd:Cmd, attr:Attr})=>(b.cmd.priority || 0) - (a.cmd.priority || 0));
+            // 开始执行cmd
+            var updaters:Updater[] = [];
+            for(var i:number = 0, len:number = bundles.length; i < len; i++)
+            {
+                var bundle:{cmd:Cmd, attr:Attr} = bundles[i];
+                // 生成一个更新项
+                var updater:Updater = bundle.cmd.exec(element, bundle.attr.value, scope);
+                // TODO Raykid 现在是全局更新，要改为条件更新
+                updaters.push(updater);
+                // 从DOM节点上移除属性
+                bundle.attr.ownerElement.removeAttributeNode(attr);
+            }
             // 遍历子节点
-            if(compileChildren)
+            if(!stopCompile)
             {
                 var children:HTMLCollection = element.children;
                 for(var i:number = 0, len:number = children.length; i < len; i++)
