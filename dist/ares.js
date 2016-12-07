@@ -52,8 +52,15 @@ var core;
             var first, second;
             if (!first1 && !first2) {
                 // 啥都没有，使用正则表达式匹配
-                exp = exp.replace(/[a-z\.\$][\w\.\$]*/ig, function (str) {
+                exp = exp.replace(/[a-z\.\$][\w\.\$]*/ig, function (str, index, exp) {
                     if (str.indexOf("$data.") != 0) {
+                        // 如果str和冒号:之间都是空白字符或者没有字符，则不替换$data
+                        var i = exp.indexOf(":");
+                        if (i > index) {
+                            var temp = exp.substring(index + str.length, i);
+                            if (/^\s*$/.test(temp))
+                                return str;
+                        }
                         str = "$data." + str;
                     }
                     return str;
@@ -144,6 +151,33 @@ var core;
         return HtmlCmd;
     })();
     core.HtmlCmd = HtmlCmd;
+    /** CSS文本命令 */
+    var CssCmd = (function () {
+        function CssCmd() {
+        }
+        CssCmd.prototype.exec = function (target, exp, scope) {
+            // 记录原始class值
+            var oriCls = target.getAttribute("class");
+            return {
+                update: function () {
+                    var params = new core.Expresion(exp).run(scope);
+                    var arr = [];
+                    if (oriCls)
+                        arr.push(oriCls);
+                    // 遍历所有params的key，如果其表达式值为true则添加其类型
+                    for (var cls in params) {
+                        if (params[cls] == true)
+                            arr.push(cls);
+                    }
+                    // 更新target节点的class属性
+                    if (arr.length > 0)
+                        target.setAttribute("class", arr.join(" "));
+                }
+            };
+        };
+        return CssCmd;
+    })();
+    core.CssCmd = CssCmd;
     /** if命令 */
     var IfCmd = (function () {
         function IfCmd() {
@@ -258,6 +292,7 @@ var core;
         Command._depMap = {
             text: new core.TextCmd(),
             html: new core.HtmlCmd(),
+            css: new core.CssCmd(),
             if: new core.IfCmd(),
             for: new core.ForCmd()
         };
@@ -317,6 +352,17 @@ var core;
                                     self.update();
                                 };
                             }, this);
+                        }
+                        else if (value == null) {
+                            // null和简单类型一样处理
+                            original[key] = value;
+                            // 篡改为getter和setter
+                            Object.defineProperty(data, key, {
+                                configurable: true,
+                                enumerable: true,
+                                get: this.getProxy.bind(this, original, key),
+                                set: this.setProxy.bind(this, original, key)
+                            });
                         }
                         else {
                             // 复杂类型，需要递归

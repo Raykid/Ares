@@ -33,6 +33,30 @@ namespace core
         }
     }
 
+    /** CSS文本命令 */
+    export class CssCmd implements Cmd
+    {
+        public exec(target:HTMLElement, exp:string, scope:Scope):Updater
+        {
+            // 记录原始class值
+            var oriCls:string = target.getAttribute("class");
+            return {
+                update: ()=>{
+                    var params:any = new Expresion(exp).run(scope);
+                    var arr:string[] = [];
+                    if(oriCls) arr.push(oriCls);
+                    // 遍历所有params的key，如果其表达式值为true则添加其类型
+                    for(var cls in params)
+                    {
+                        if(params[cls] == true) arr.push(cls);
+                    }
+                    // 更新target节点的class属性
+                    if(arr.length > 0) target.setAttribute("class", arr.join(" "));
+                }
+            };
+        }
+    }
+
     /** if命令 */
     export class IfCmd implements Cmd
     {

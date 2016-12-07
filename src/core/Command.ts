@@ -14,6 +14,7 @@ namespace core
         private static _depMap:{[name:string]:Cmd} = {
             text: new TextCmd(),
             html: new HtmlCmd(),
+            css: new CssCmd(),
             if: new IfCmd(),
             for: new ForCmd()
         };

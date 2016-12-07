@@ -5,12 +5,15 @@
     <title>Test</title>
     <script src="../dist/ares.js"></script>
     <script src="test.js"></script>
+
+    <style type="text/css">
+        .test {background-color: #00ff00}
+    </style>
 </head>
 <body>
 <div id="div_root">
-    <div a-for="item in testList" a-if="item.abc > 1">
-        <a href="http://www.baidu.com" a-text="`asdf ${1 + item.abc} 1234`"></a>
-    </div>
+    <a>abc</a>
+    <div a-css='{test: cls=="test"}'>abc</div>
 </div>
 </body>
 </html>

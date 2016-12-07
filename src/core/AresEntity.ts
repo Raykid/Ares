@@ -75,6 +75,18 @@ namespace core
                                 };
                             }, this);
                         }
+                        else if(value == null)
+                        {
+                            // null和简单类型一样处理
+                            original[key] = value;
+                            // 篡改为getter和setter
+                            Object.defineProperty(data, key, {
+                                configurable: true,
+                                enumerable: true,
+                                get: this.getProxy.bind(this, original, key),
+                                set: this.setProxy.bind(this, original, key)
+                            });
+                        }
                         else
                         {
                             // 复杂类型，需要递归

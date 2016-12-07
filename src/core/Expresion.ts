@@ -61,9 +61,16 @@ namespace core
             if(!first1 && !first2)
             {
                 // 啥都没有，使用正则表达式匹配
-                exp = exp.replace(/[a-z\.\$][\w\.\$]*/ig, (str:string)=>{
+                exp = exp.replace(/[a-z\.\$][\w\.\$]*/ig, (str:string, index:number, exp:string)=>{
                     if(str.indexOf("$data.") != 0)
                     {
+                        // 如果str和冒号:之间都是空白字符或者没有字符，则不替换$data
+                        var i:number = exp.indexOf(":");
+                        if(i > index)
+                        {
+                            var temp:string = exp.substring(index + str.length, i);
+                            if(/^\s*$/.test(temp)) return str;
+                        }
                         str = "$data." + str;
                     }
                     return str;
