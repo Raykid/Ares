@@ -5,16 +5,104 @@ var core;
 (function (core) {
     var Expresion = (function () {
         function Expresion(exp) {
-            this._exp = exp;
+            this._exp = this.changeParamNames(exp);
         }
-        Expresion.prototype.run = function (scope) {
-            var keys = Object.keys(scope);
-            var values = [];
-            for (var i = 0, len = keys.length; i < len; i++) {
-                values.push(scope[keys[i]]);
+        Expresion.prototype.getFirst = function (exp, flag, from) {
+            if (from === void 0) { from = 0; }
+            var reg = new RegExp("(\\\\*)" + flag, "g");
+            reg.lastIndex = from;
+            for (var res = reg.exec(exp); res != null; res = reg.exec(exp)) {
+                // 如果字符前面的\是奇数个，表示这个字符是被转义的，不是目标字符
+                if (res[1].length % 2 == 0) {
+                    return {
+                        begin: res.index,
+                        end: res.index + res[0].length,
+                        value: res[0]
+                    };
+                }
             }
-            keys.push("return " + this._exp);
-            return Function.apply(null, keys).apply(null, values);
+            return null;
+        };
+        /**
+         * 获取flag表示的字符之间所有的字符，该字符前面如果有\则会当做普通字符，而不会作为flag字符
+         * @param exp 原始表达式
+         * @param begin 边界开始字符串
+         * @param end 边界结束字符串
+         * @returns {ContentResult} 内容结构体
+         */
+        Expresion.prototype.getContentBetween = function (exp, begin, end) {
+            var bRes = this.getFirst(exp, begin);
+            if (!bRes)
+                return null;
+            var eRes = this.getFirst(exp, end, bRes.end);
+            if (!eRes)
+                return null;
+            return {
+                begin: bRes.end,
+                end: eRes.begin,
+                value: exp.substring(bRes.end, eRes.begin)
+            };
+        };
+        Expresion.prototype.parseOriExp = function (exp) {
+            // 分别将""和''找出来，然后将其两边的字符串递归处理，最后再用正则表达式匹配
+            var first1 = this.getFirst(exp, "'");
+            var first2 = this.getFirst(exp, '"');
+            if (first1 && first2) {
+                // 单双引号都有，取第一个出现的符号
+                if (first1.begin < first2.begin) {
+                    // 单引号
+                    exp = this.parseOriExp(exp.substr(0, first1.begin)) + first1.value + this.parseOriExp(exp.substr(first1.end));
+                }
+                else {
+                    // 双引号
+                    exp = this.parseOriExp(exp.substr(0, first2.begin)) + first2.value + this.parseOriExp(exp.substr(first2.end));
+                }
+            }
+            else if (first1) {
+                // 只有单引号
+                exp = this.parseOriExp(exp.substr(0, first1.begin)) + first1.value + this.parseOriExp(exp.substr(first1.end));
+            }
+            else if (first2) {
+                // 只有双引号
+                exp = this.parseOriExp(exp.substr(0, first2.begin)) + first2.value + this.parseOriExp(exp.substr(first2.end));
+            }
+            else {
+                // 啥都没有，使用正则表达式匹配
+                exp = exp.replace(/[\w\.\$]+/g, function (str) {
+                    if (str.indexOf("$data.") != 0) {
+                        str = "$data." + str;
+                    }
+                    return str;
+                });
+            }
+            return exp;
+        };
+        Expresion.prototype.parseTempExp = function (exp) {
+            var res = this.getContentBetween(exp, "\\$\\{", "\\}");
+            if (res) {
+                var temp = res.value;
+                if (temp.indexOf("$data.") != 0)
+                    temp = "$data." + temp;
+                exp = exp.substr(0, res.begin) + temp + "}" + this.parseTempExp(exp.substr(res.end + 1));
+            }
+            return exp;
+        };
+        Expresion.prototype.run = function (scope) {
+            return new Function("$data", "return " + this._exp)(scope);
+        };
+        /**
+         * 将表达式中所有不以$data.开头的变量都加上$data.，以防找不到变量
+         * @param exp 字符串表达式
+         * @returns {string} 处理后的表达式
+         */
+        Expresion.prototype.changeParamNames = function (exp) {
+            if (exp == null || exp == "")
+                return exp;
+            // 用普通字符串方式处理模板字符串前面的部分，用模板字符串方式处理模板字符串部分，然后递归处理剩余部分
+            var res = this.getContentBetween(exp, "`", "`");
+            if (res)
+                exp = this.parseOriExp(exp.substr(0, res.begin - 1)) + "`" + this.parseTempExp(res.value) + "`" + this.changeParamNames(exp.substr(res.end + 1));
+            return exp;
         };
         return Expresion;
     })();
@@ -278,7 +366,7 @@ var core;
                 var name = attr.name;
                 // 所有ares属性必须以data-a-或者a-开头
                 if (name.indexOf("a-") == 0 || name.indexOf("data-a-") == 0) {
-                    var index = name.indexOf("a-") + 2;
+                    var index = (name.charAt(0) == "d" ? 7 : 2);
                     // 取到命令名
                     var cmdName = name.substr(index);
                     // 用命令名取到命令依赖对象

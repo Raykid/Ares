@@ -2,7 +2,8 @@
  * Created by Raykid on 2016/12/5.
  */
 Ares.create({
-    test: "<h1>fuck</h1>",
+    test: "<h1>fuck</h1>aaa",
+    test2: {text: "fuck you text"},
     testList: [{abc: 1},{abc: 2},{abc: 3}]
 }, "div_root", {
     initialized: function(vm)

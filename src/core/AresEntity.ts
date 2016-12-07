@@ -136,7 +136,7 @@ namespace core
                 // 所有ares属性必须以data-a-或者a-开头
                 if(name.indexOf("a-") == 0 || name.indexOf("data-a-") == 0)
                 {
-                    var index:number = name.indexOf("a-") + 2;
+                    var index:number = (name.charAt(0) == "d" ? 7 : 2);
                     // 取到命令名
                     var cmdName:string = name.substr(index);
                     // 用命令名取到命令依赖对象
