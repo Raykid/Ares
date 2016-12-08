@@ -297,11 +297,11 @@ namespace core
                         var list:any = tempExp.run(scope);
                         if(typeof list == "number")
                         {
-                            var subScope:any = {};
-                            subScope.__proto__ = scope;
                             for(var i:number = 0; i < list; i++)
                             {
                                 // 构造一个新作用域
+                                var subScope:any = {};
+                                subScope.__proto__ = scope;
                                 subScope[subName] = i;
                                 var tempUpdaters:Updater[] = update(i, entity, subScope, next);
                                 subUpdaters.push.apply(subUpdaters, tempUpdaters);
@@ -309,11 +309,11 @@ namespace core
                         }
                         else
                         {
-                            var subScope:any = {};
-                            subScope.__proto__ = scope;
                             for(var i:number = 0, len:number = list.length; i < len; i++)
                             {
                                 // 构造一个新作用域
+                                var subScope:any = {};
+                                subScope.__proto__ = scope;
                                 subScope[subName] = list[i];
                                 var tempUpdaters:Updater[] = update(i, entity, subScope, next);
                                 subUpdaters.push.apply(subUpdaters, tempUpdaters);

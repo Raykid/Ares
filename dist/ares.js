@@ -479,20 +479,20 @@ var core;
                             names = tempExp.names;
                         var list = tempExp.run(scope);
                         if (typeof list == "number") {
-                            var subScope = {};
-                            subScope.__proto__ = scope;
                             for (var i = 0; i < list; i++) {
                                 // 构造一个新作用域
+                                var subScope = {};
+                                subScope.__proto__ = scope;
                                 subScope[subName] = i;
                                 var tempUpdaters = update(i, entity, subScope, next);
                                 subUpdaters.push.apply(subUpdaters, tempUpdaters);
                             }
                         }
                         else {
-                            var subScope = {};
-                            subScope.__proto__ = scope;
                             for (var i = 0, len = list.length; i < len; i++) {
                                 // 构造一个新作用域
+                                var subScope = {};
+                                subScope.__proto__ = scope;
                                 subScope[subName] = list[i];
                                 var tempUpdaters = update(i, entity, subScope, next);
                                 subUpdaters.push.apply(subUpdaters, tempUpdaters);
