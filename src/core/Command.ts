@@ -11,7 +11,7 @@ namespace core
         // 自定义的命令表
         private static _customCmdMap:{[name:string]:Cmd} = {};
         // 系统默认的命令表
-        private static _depMap:{[name:string]:Cmd} = {
+        private static _cmdMap:{[name:string]:Cmd} = {
             text: new TextCmd(),
             html: new HtmlCmd(),
             css: new CssCmd(),
@@ -26,7 +26,7 @@ namespace core
         {
             // 优先查找系统命令，找不到再去自定义命令表查找
             return (
-                Command._depMap[name] ||
+                Command._cmdMap[name] ||
                 Command._customCmdMap[name]
             );
         }
@@ -34,11 +34,11 @@ namespace core
         /**
          * 添加命令对象
          * @param name 命令对象名字
-         * @param dep 命令对象实现对象
+         * @param cmd 命令对象实现对象
          */
-        public static addCmd(name:string, dep:Cmd):void
+        public static addCmd(name:string, cmd:Cmd):void
         {
-            Command._customCmdMap[name] = dep;
+            Command._customCmdMap[name] = cmd;
         }
 
         /**
@@ -48,9 +48,9 @@ namespace core
          */
         public static removeCmd(name:string):Cmd
         {
-            var dep:Cmd = Command._customCmdMap[name];
+            var cmd:Cmd = Command._customCmdMap[name];
             delete Command._customCmdMap[name];
-            return dep;
+            return cmd;
         }
     }
 

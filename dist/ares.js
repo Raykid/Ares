@@ -547,16 +547,16 @@ var core;
         /** 获取命令对象 */
         Command.getCmd = function (name) {
             // 优先查找系统命令，找不到再去自定义命令表查找
-            return (Command._depMap[name] ||
+            return (Command._cmdMap[name] ||
                 Command._customCmdMap[name]);
         };
         /**
          * 添加命令对象
          * @param name 命令对象名字
-         * @param dep 命令对象实现对象
+         * @param cmd 命令对象实现对象
          */
-        Command.addCmd = function (name, dep) {
-            Command._customCmdMap[name] = dep;
+        Command.addCmd = function (name, cmd) {
+            Command._customCmdMap[name] = cmd;
         };
         /**
          * 移除命令对象
@@ -564,14 +564,14 @@ var core;
          * @returns {Cmd} 被移除的命令对象
          */
         Command.removeCmd = function (name) {
-            var dep = Command._customCmdMap[name];
+            var cmd = Command._customCmdMap[name];
             delete Command._customCmdMap[name];
-            return dep;
+            return cmd;
         };
         // 自定义的命令表
         Command._customCmdMap = {};
         // 系统默认的命令表
-        Command._depMap = {
+        Command._cmdMap = {
             text: new core.TextCmd(),
             html: new core.HtmlCmd(),
             css: new core.CssCmd(),
