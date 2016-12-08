@@ -261,6 +261,8 @@ namespace core
                 if(parent.contains(next)) parent.insertBefore(newTarget, next);
                 else parent.appendChild(newTarget);
                 targets.push(newTarget);
+                // 为for循环的scope添加$index属性
+                subScope["$index"] = index;
                 // 用新的作用域遍历新节点
                 var updaters:Updater[] = entity.compile(newTarget, subScope);
                 // 立即更新
