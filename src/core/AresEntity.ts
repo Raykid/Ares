@@ -183,11 +183,20 @@ namespace core
                 // TODO Raykid 现在是全局更新，要改为条件更新
                 updaters.push(updater);
                 // 从DOM节点上移除属性
-                bundle.attr.ownerElement.removeAttributeNode(bundle.attr);
+                if(bundle.attr) bundle.attr.ownerElement.removeAttributeNode(bundle.attr);
             }
-            // 遍历子节点
+            // 判断是否停止编译
             if(!stopCompile)
             {
+                // 执行文本域命令
+                var tcCmd:TextContentCmd = TextContentCmd.getInstance();
+                var tcExp:string = element.innerText;
+                if(tcCmd.needParse(element, tcExp))
+                {
+                    // 添加文本域命令
+                    updaters.push(tcCmd.exec(element, tcExp, scope));
+                }
+                // 遍历子节点
                 var children:HTMLCollection = element.children;
                 for(var i:number = 0, len:number = children.length; i < len; i++)
                 {

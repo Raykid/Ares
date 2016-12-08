@@ -3,6 +3,40 @@
  */
 namespace core
 {
+    /** 文本内容命令 */
+    export class TextContentCmd implements Cmd
+    {
+        private static _instance:TextContentCmd = new TextContentCmd();
+        public static getInstance():TextContentCmd
+        {
+            return TextContentCmd._instance;
+        }
+
+        public exec(target:HTMLElement, exp:string, scope:Scope):Updater
+        {
+            return {
+                update: ()=>{
+                    var temp:string = exp;
+                    // 依序将{{}}计算出来
+                    for(var res:ContentResult = Expresion.getContentBetween(temp, "{{", "}}"); res != null; res = Expresion.getContentBetween(temp, "{{", "}}"))
+                    {
+                        temp = temp.substr(0, res.begin - 2) + new Expresion(res.value).run(scope) + temp.substr(res.end + 2);
+                    }
+                    // 更新target节点的innerText
+                    target.innerText = temp;
+                }
+            };
+        }
+
+        public needParse(target:HTMLElement, exp:string):boolean
+        {
+            // 不是叶子节点不给转换
+            if(target.children.length > 0) return false;
+            // 看看有没有被{{}}包围的内容
+            var res:ContentResult = Expresion.getContentBetween(exp, "{{", "}}");
+            return (res != null);
+        }
+    }
     /** 文本命令 */
     export class TextCmd implements Cmd
     {

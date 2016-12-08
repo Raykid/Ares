@@ -5,50 +5,14 @@ var core;
 (function (core) {
     var Expresion = (function () {
         function Expresion(exp) {
-            this._exp = this.changeParamNames(exp);
+            this._exp = Expresion.changeParamNames(exp);
         }
-        Expresion.prototype.getFirst = function (exp, flag, from) {
-            if (from === void 0) { from = 0; }
-            var reg = new RegExp("(\\\\*)" + flag, "g");
-            reg.lastIndex = from;
-            for (var res = reg.exec(exp); res != null; res = reg.exec(exp)) {
-                // 如果字符前面的\是奇数个，表示这个字符是被转义的，不是目标字符
-                if (res[1].length % 2 == 0) {
-                    return {
-                        begin: res.index,
-                        end: res.index + res[0].length,
-                        value: res[0]
-                    };
-                }
-            }
-            return null;
-        };
-        /**
-         * 获取flag表示的字符之间所有的字符，该字符前面如果有\则会当做普通字符，而不会作为flag字符
-         * @param exp 原始表达式
-         * @param begin 边界开始字符串
-         * @param end 边界结束字符串
-         * @returns {ContentResult} 内容结构体
-         */
-        Expresion.prototype.getContentBetween = function (exp, begin, end) {
-            var bRes = this.getFirst(exp, begin);
-            if (!bRes)
-                return null;
-            var eRes = this.getFirst(exp, end, bRes.end);
-            if (!eRes)
-                return null;
-            return {
-                begin: bRes.end,
-                end: eRes.begin,
-                value: exp.substring(bRes.end, eRes.begin)
-            };
-        };
-        Expresion.prototype.parseOriExp = function (exp) {
+        Expresion.parseOriExp = function (exp) {
             if (exp == "")
                 return exp;
             // 分别将""和''找出来，然后将其两边的字符串递归处理，最后再用正则表达式匹配
-            var first1 = this.getFirst(exp, "'");
-            var first2 = this.getFirst(exp, '"');
+            var first1 = Expresion.getFirst(exp, "'");
+            var first2 = Expresion.getFirst(exp, '"');
             var first, second;
             if (!first1 && !first2) {
                 // 啥都没有，使用正则表达式匹配
@@ -91,39 +55,82 @@ var core;
                     first = first1;
                 else if (first2)
                     first = first2;
-                second = this.getFirst(exp, first.value, first.end);
-                exp = this.parseOriExp(exp.substr(0, first.begin)) + exp.substring(first.begin, second.end) + this.parseOriExp(exp.substr(second.end));
+                second = Expresion.getFirst(exp, first.value, first.end);
+                exp = Expresion.parseOriExp(exp.substr(0, first.begin)) + exp.substring(first.begin, second.end) + Expresion.parseOriExp(exp.substr(second.end));
             }
             return exp;
         };
-        Expresion.prototype.parseTempExp = function (exp) {
+        Expresion.parseTempExp = function (exp) {
             if (exp == "")
                 return exp;
-            var res = this.getContentBetween(exp, "\\$\\{", "\\}");
+            var res = Expresion.getContentBetween(exp, "\\$\\{", "\\}");
             if (res) {
                 // ${}内部是正规的js表达式，所以用常规方式解析，左边直接截取即可，右面递归解析模板方式
-                exp = exp.substr(0, res.begin) + this.parseOriExp(res.value) + "}" + this.parseTempExp(exp.substr(res.end + 1));
+                exp = exp.substr(0, res.begin) + Expresion.parseOriExp(res.value) + "}" + Expresion.parseTempExp(exp.substr(res.end + 1));
             }
             return exp;
         };
-        Expresion.prototype.run = function (scope) {
-            return new Function("$data", "return " + this._exp)(scope);
+        /**
+         * 获取第一个出现的指定标识的数据
+         * @param exp 原始表达式
+         * @param flag 指定标识
+         * @param from 起始索引
+         * @returns {ContentResult} 在exp中首次出现flag的数据
+         */
+        Expresion.getFirst = function (exp, flag, from) {
+            if (from === void 0) { from = 0; }
+            var reg = new RegExp("(\\\\*)" + flag, "g");
+            reg.lastIndex = from;
+            for (var res = reg.exec(exp); res != null; res = reg.exec(exp)) {
+                // 如果字符前面的\是奇数个，表示这个字符是被转义的，不是目标字符
+                if (res[1].length % 2 == 0) {
+                    return {
+                        begin: res.index,
+                        end: res.index + res[0].length,
+                        value: res[0]
+                    };
+                }
+            }
+            return null;
+        };
+        /**
+         * 获取flag表示的字符之间所有的字符，该字符前面如果有\则会当做普通字符，而不会作为flag字符
+         * @param exp 原始表达式
+         * @param begin 边界开始字符串
+         * @param end 边界结束字符串
+         * @returns {ContentResult} 内容结构体
+         */
+        Expresion.getContentBetween = function (exp, begin, end) {
+            var bRes = Expresion.getFirst(exp, begin);
+            if (!bRes)
+                return null;
+            var eRes = Expresion.getFirst(exp, end, bRes.end);
+            if (!eRes)
+                return null;
+            return {
+                begin: bRes.end,
+                end: eRes.begin,
+                value: exp.substring(bRes.end, eRes.begin)
+            };
         };
         /**
          * 将表达式中所有不以$data.开头的变量都加上$data.，以防找不到变量
          * @param exp 字符串表达式
          * @returns {string} 处理后的表达式
          */
-        Expresion.prototype.changeParamNames = function (exp) {
+        Expresion.changeParamNames = function (exp) {
             if (exp == null || exp == "")
                 return exp;
             // 用普通字符串方式处理模板字符串前面的部分，用模板字符串方式处理模板字符串部分，然后递归处理剩余部分
-            var res = this.getContentBetween(exp, "`", "`");
+            var res = Expresion.getContentBetween(exp, "`", "`");
             if (res)
-                exp = this.parseOriExp(exp.substr(0, res.begin - 1)) + "`" + this.parseTempExp(res.value) + "`" + this.changeParamNames(exp.substr(res.end + 1));
+                exp = Expresion.parseOriExp(exp.substr(0, res.begin - 1)) + "`" + Expresion.parseTempExp(res.value) + "`" + Expresion.changeParamNames(exp.substr(res.end + 1));
             else
-                exp = this.parseOriExp(exp);
+                exp = Expresion.parseOriExp(exp);
             return exp;
+        };
+        Expresion.prototype.run = function (scope) {
+            return new Function("$data", "return " + this._exp)(scope);
         };
         return Expresion;
     })();
@@ -134,6 +141,38 @@ var core;
  */
 var core;
 (function (core) {
+    /** 文本内容命令 */
+    var TextContentCmd = (function () {
+        function TextContentCmd() {
+        }
+        TextContentCmd.getInstance = function () {
+            return TextContentCmd._instance;
+        };
+        TextContentCmd.prototype.exec = function (target, exp, scope) {
+            return {
+                update: function () {
+                    var temp = exp;
+                    // 依序将{{}}计算出来
+                    for (var res = core.Expresion.getContentBetween(temp, "{{", "}}"); res != null; res = core.Expresion.getContentBetween(temp, "{{", "}}")) {
+                        temp = temp.substr(0, res.begin - 2) + new core.Expresion(res.value).run(scope) + temp.substr(res.end + 2);
+                    }
+                    // 更新target节点的innerText
+                    target.innerText = temp;
+                }
+            };
+        };
+        TextContentCmd.prototype.needParse = function (target, exp) {
+            // 不是叶子节点不给转换
+            if (target.children.length > 0)
+                return false;
+            // 看看有没有被{{}}包围的内容
+            var res = core.Expresion.getContentBetween(exp, "{{", "}}");
+            return (res != null);
+        };
+        TextContentCmd._instance = new TextContentCmd();
+        return TextContentCmd;
+    })();
+    core.TextContentCmd = TextContentCmd;
     /** 文本命令 */
     var TextCmd = (function () {
         function TextCmd() {
@@ -593,10 +632,19 @@ var core;
                 // TODO Raykid 现在是全局更新，要改为条件更新
                 updaters.push(updater);
                 // 从DOM节点上移除属性
-                bundle.attr.ownerElement.removeAttributeNode(bundle.attr);
+                if (bundle.attr)
+                    bundle.attr.ownerElement.removeAttributeNode(bundle.attr);
             }
-            // 遍历子节点
+            // 判断是否停止编译
             if (!stopCompile) {
+                // 执行文本域命令
+                var tcCmd = core.TextContentCmd.getInstance();
+                var tcExp = element.innerText;
+                if (tcCmd.needParse(element, tcExp)) {
+                    // 添加文本域命令
+                    updaters.push(tcCmd.exec(element, tcExp, scope));
+                }
+                // 遍历子节点
                 var children = element.children;
                 for (var i = 0, len = children.length; i < len; i++) {
                     var child = children[i];
