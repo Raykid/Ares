@@ -212,14 +212,22 @@ var core;
     var AttrCmd = (function () {
         function AttrCmd() {
         }
-        AttrCmd.prototype.exec = function (target, exp, scope) {
+        AttrCmd.prototype.exec = function (target, exp, scope, subCmd) {
             return {
                 update: function () {
-                    var params = new core.Expresion(exp).run(scope);
-                    // 遍历所有params的key，如果其表达式值为true则添加其类型
-                    for (var name in params) {
-                        var value = params[name];
-                        target.setAttribute(name, value);
+                    if (subCmd != "") {
+                        // 子命令形式
+                        var res = new core.Expresion(exp).run(scope);
+                        target.setAttribute(subCmd, res);
+                    }
+                    else {
+                        // 集成形式
+                        var params = new core.Expresion(exp).run(scope);
+                        // 遍历所有params的key，如果其表达式值为true则添加其类型
+                        for (var name in params) {
+                            var value = params[name];
+                            target.setAttribute(name, value);
+                        }
                     }
                 }
             };

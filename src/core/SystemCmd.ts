@@ -86,16 +86,26 @@ namespace core
     /** 修改任意属性命令 */
     export class AttrCmd implements Cmd
     {
-        public exec(target:HTMLElement, exp:string, scope:Scope):Updater
+        public exec(target:HTMLElement, exp:string, scope:Scope, subCmd:string):Updater
         {
             return {
                 update: ()=>{
-                    var params:any = new Expresion(exp).run(scope);
-                    // 遍历所有params的key，如果其表达式值为true则添加其类型
-                    for(var name in params)
+                    if(subCmd != "")
                     {
-                        var value:any = params[name];
-                        target.setAttribute(name, value);
+                        // 子命令形式
+                        var res:any = new Expresion(exp).run(scope);
+                        target.setAttribute(subCmd, res);
+                    }
+                    else
+                    {
+                        // 集成形式
+                        var params:any = new Expresion(exp).run(scope);
+                        // 遍历所有params的key，如果其表达式值为true则添加其类型
+                        for(var name in params)
+                        {
+                            var value:any = params[name];
+                            target.setAttribute(name, value);
+                        }
                     }
                 }
             };

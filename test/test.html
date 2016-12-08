@@ -7,13 +7,13 @@
     <script src="test.js"></script>
 
     <style type="text/css">
-        .test1 {background-color: #00ffff}
+        .test1 {background-color: #ff0000}
         .test2 {background-color: #00ff00}
     </style>
 </head>
 <body>
 <div id="div_root">
-    <a href="javascript:void(0)" a-css="testCls" a-on="{click:testFunc(1, $root, 2)}">点我！</a>
+    <a href="javascript:void(0)" a-attr:class="testCls" a-on="{click:testFunc(1, $root, 2)}">点我！</a>
 </div>
 </body>
 </html>
