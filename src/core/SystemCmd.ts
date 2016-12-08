@@ -76,6 +76,42 @@ namespace core
         }
     }
 
+    /** 监听事件命令 */
+    export class OnCmd implements Cmd
+    {
+        public exec(target:HTMLElement, exp:string, scope:Scope):Updater
+        {
+            // 将表达式中方法的括号去掉，因为要的是方法引用，而不是执行方法
+            var reg:RegExp = /([\w\$\.]+)\(([^\)]*)\)/g;
+            for(var res:RegExpExecArray = reg.exec(exp); res != null; res = reg.exec(exp))
+            {
+                // 将参数中的空白符都去掉
+                var argStr:string = res[2].replace(/\s+/g, "");
+                if(argStr.length > 0) argStr = "," + argStr;
+                // 解析所有的参数，用bind方法绑定到方法参数里
+                var part1:string = exp.substr(0, res.index) + res[1] + ".bind(scope" + argStr + ")";
+                var part2:string = exp.substr(res.index + res[0].length);
+                exp = part1 + part2;
+                reg.lastIndex = part1.length;
+            }
+            return {
+                update: ()=>{
+                    var params:any = new Expresion(exp).run(scope);
+                    // 遍历所有params的key，在target上监听该事件
+                    for(var name in params)
+                    {
+                        target.addEventListener(name, this.handler.bind(this, params[name]));
+                    }
+                }
+            };
+        }
+
+        private handler(callback:Function, evt:Event):void
+        {
+            callback(evt);
+        }
+    }
+
     /** if命令 */
     export class IfCmd implements Cmd
     {

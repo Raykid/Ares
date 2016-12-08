@@ -2,10 +2,8 @@
  * Created by Raykid on 2016/12/5.
  */
 Ares.create({
-    cls: null,
-    clsName: null,
-    href: "javascript:void",
-    testNum: 3
+    testFunc: testFunc,
+    testArg: "fuck"
 }, "div_root", {
     initialized: function(vm)
     {
@@ -20,3 +18,8 @@ Ares.create({
         }, 4000);
     }
 });
+
+
+function testFunc()
+{
+}

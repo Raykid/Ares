@@ -16,6 +16,7 @@ namespace core
             html: new HtmlCmd(),
             css: new CssCmd(),
             attr: new AttrCmd(),
+            on: new OnCmd(),
             if: new IfCmd(),
             for: new ForCmd()
         };
@@ -64,8 +65,9 @@ namespace core
          * @param target 依赖的DOM节点引用
          * @param exp 依赖表达式
          * @param scope 依赖的表达式所在的词法作用域
+         * @param subCmd 跟在"a-xxx:"后面的属性，可能为""
          */
-        exec(target:HTMLElement, exp:string, scope:Scope):Updater;
+        exec(target:HTMLElement, exp:string, scope:Scope, subCmd?:string):Updater;
     }
 
     export interface Updater

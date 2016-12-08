@@ -198,6 +198,41 @@ var core;
         return AttrCmd;
     })();
     core.AttrCmd = AttrCmd;
+    /** 监听事件命令 */
+    var OnCmd = (function () {
+        function OnCmd() {
+        }
+        OnCmd.prototype.exec = function (target, exp, scope) {
+            var _this = this;
+            // 将表达式中方法的括号去掉，因为要的是方法引用，而不是执行方法
+            var reg = /([\w\$\.]+)\(([^\)]*)\)/g;
+            for (var res = reg.exec(exp); res != null; res = reg.exec(exp)) {
+                // 将参数中的空白符都去掉
+                var argStr = res[2].replace(/\s+/g, "");
+                if (argStr.length > 0)
+                    argStr = "," + argStr;
+                // 解析所有的参数，用bind方法绑定到方法参数里
+                var part1 = exp.substr(0, res.index) + res[1] + ".bind(scope" + argStr + ")";
+                var part2 = exp.substr(res.index + res[0].length);
+                exp = part1 + part2;
+                reg.lastIndex = part1.length;
+            }
+            return {
+                update: function () {
+                    var params = new core.Expresion(exp).run(scope);
+                    // 遍历所有params的key，在target上监听该事件
+                    for (var name in params) {
+                        target.addEventListener(name, _this.handler.bind(_this, params[name]));
+                    }
+                }
+            };
+        };
+        OnCmd.prototype.handler = function (callback, evt) {
+            callback(evt);
+        };
+        return OnCmd;
+    })();
+    core.OnCmd = OnCmd;
     /** if命令 */
     var IfCmd = (function () {
         function IfCmd() {
@@ -349,6 +384,7 @@ var core;
             html: new core.HtmlCmd(),
             css: new core.CssCmd(),
             attr: new core.AttrCmd(),
+            on: new core.OnCmd(),
             if: new core.IfCmd(),
             for: new core.ForCmd()
         };
@@ -469,13 +505,18 @@ var core;
                 var name = attr.name;
                 // 所有ares属性必须以data-a-或者a-开头
                 if (name.indexOf("a-") == 0 || name.indexOf("data-a-") == 0) {
-                    var index = (name.charAt(0) == "d" ? 7 : 2);
+                    var bIndex = (name.charAt(0) == "d" ? 7 : 2);
+                    var eIndex = name.indexOf(":");
+                    if (eIndex < 0)
+                        eIndex = name.length;
                     // 取到命令名
-                    var cmdName = name.substr(index);
+                    var cmdName = name.substr(bIndex, eIndex);
+                    // 取到子命令名
+                    var subCmd = name.substr(eIndex + 1);
                     // 用命令名取到命令依赖对象
                     var cmd = core.Command.getCmd(cmdName);
                     if (cmd) {
-                        bundles.push({ cmd: cmd, attr: attr });
+                        bundles.push({ cmd: cmd, attr: attr, subCmd: subCmd });
                         // 更新编译子节点的属性
                         if (cmd.stopCompile) {
                             stopCompile = true;
@@ -493,7 +534,7 @@ var core;
             for (var i = 0, len = bundles.length; i < len; i++) {
                 var bundle = bundles[i];
                 // 生成一个更新项
-                var updater = bundle.cmd.exec(element, bundle.attr.value, scope);
+                var updater = bundle.cmd.exec(element, bundle.attr.value, scope, subCmd);
                 // TODO Raykid 现在是全局更新，要改为条件更新
                 updaters.push(updater);
                 // 从DOM节点上移除属性

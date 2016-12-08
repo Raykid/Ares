@@ -139,7 +139,7 @@ namespace core
         {
             // 检查节点上面以data-a-或者a-开头的属性，将其认为是绑定属性
             var attrs:NamedNodeMap = element.attributes;
-            var bundles:{cmd:Cmd, attr:Attr}[] = [];
+            var bundles:{cmd:Cmd, attr:Attr, subCmd:string}[] = [];
             var stopCompile:boolean = false;
             for(var i:number = 0, len:number = attrs.length; i < len; i++)
             {
@@ -148,14 +148,18 @@ namespace core
                 // 所有ares属性必须以data-a-或者a-开头
                 if(name.indexOf("a-") == 0 || name.indexOf("data-a-") == 0)
                 {
-                    var index:number = (name.charAt(0) == "d" ? 7 : 2);
+                    var bIndex:number = (name.charAt(0) == "d" ? 7 : 2);
+                    var eIndex:number = name.indexOf(":");
+                    if(eIndex < 0) eIndex = name.length;
                     // 取到命令名
-                    var cmdName:string = name.substr(index);
+                    var cmdName:string = name.substr(bIndex, eIndex);
+                    // 取到子命令名
+                    var subCmd:string = name.substr(eIndex + 1);
                     // 用命令名取到命令依赖对象
                     var cmd:Cmd = Command.getCmd(cmdName);
                     if(cmd)
                     {
-                        bundles.push({cmd: cmd, attr: attr});
+                        bundles.push({cmd: cmd, attr: attr, subCmd: subCmd});
                         // 更新编译子节点的属性
                         if(cmd.stopCompile)
                         {
@@ -168,14 +172,14 @@ namespace core
                 }
             }
             // 排序cmd
-            bundles.sort((a:{cmd:Cmd, attr:Attr}, b:{cmd:Cmd, attr:Attr})=>(b.cmd.priority || 0) - (a.cmd.priority || 0));
+            bundles.sort((a:{cmd:Cmd, attr:Attr, subCmd:string}, b:{cmd:Cmd, attr:Attr, subCmd:string})=>(b.cmd.priority || 0) - (a.cmd.priority || 0));
             // 开始执行cmd
             var updaters:Updater[] = [];
             for(var i:number = 0, len:number = bundles.length; i < len; i++)
             {
-                var bundle:{cmd:Cmd, attr:Attr} = bundles[i];
+                var bundle:{cmd:Cmd, attr:Attr, subCmd:string} = bundles[i];
                 // 生成一个更新项
-                var updater:Updater = bundle.cmd.exec(element, bundle.attr.value, scope);
+                var updater:Updater = bundle.cmd.exec(element, bundle.attr.value, scope, subCmd);
                 // TODO Raykid 现在是全局更新，要改为条件更新
                 updaters.push(updater);
                 // 从DOM节点上移除属性
