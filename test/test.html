@@ -13,7 +13,10 @@
 </head>
 <body>
 <div id="div_root">
-    <div href="javascript:void(0)" a-attr:class="testCls" a-on="{click:testFunc(1, $root, 2)}" a-for="a in 4">{{JSON.stringify($original) + $index}}</div>
+    <div a-on:click="testFunc(1, $root, 2)">阿斯蒂芬{{JSON.stringify($original)}}:::{{testCls.aaa}}</div>
+    <div a-on:click="testFunc(1, $root, 2)" a-attr:class="testCls.aaa">{{testArg}}</div>
+    <div a-on:click="testFunc(1, $root, 2)" a-css="testCls.aaa" a-for="n in 4">没有绑定</div>
+    <div a-if="testCls.aaa=='test2'">if</div>
 </div>
 </body>
 </html>

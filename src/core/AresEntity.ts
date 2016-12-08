@@ -21,27 +21,35 @@ namespace core
         private _element:HTMLElement;
 
         private _updaters:Updater[];
+        private _dirtyMap:{[name:string]:any} = {};
+        private _dirtyId:number = 0;
+        private _forceUpdate:boolean = false;
 
         public constructor(data:any, element:HTMLElement)
         {
             this._element = element;
             this._data = data;
-            // 生成一个data的浅层拷贝对象，作为data原始值的保存
-            this.proxyData(data, []);
             // 向data中加入$data、$parent和$root参数，都是data本身，用以构建一个Scope对象
-            data.$data = data.$parent = data.$root = data;
+            var func:()=>any = ()=>data;
+            Object.defineProperties(data, {
+                $data: {get: func},
+                $parent: {get: func},
+                $root: {get: func},
+                $path: {get: ()=>""}
+            });
+            // 生成一个data的浅层拷贝对象，作为data原始值的保存
+            this.proxyData(data);
             // 开始解析整个element，用整个data作为当前词法作用域
             this._updaters = this.compile(element, data);
             // 进行一次全局更新
-            this.update();
+            this.update(true);
         }
 
         /**
          * 为对象安插代理，会篡改对象中的实例为getter和setter，并且返回原始对象的副本
          * @param data 要篡改的对象
-         * @param path 当前路径数组
          */
-        private proxyData(data:any, path:string[]):void
+        private proxyData(data:any):void
         {
             var original:any = {};
             // 记录当前层次所有的属性，如果有复杂类型对象则递归之
@@ -60,8 +68,8 @@ namespace core
                             Object.defineProperty(data, key, {
                                 configurable: true,
                                 enumerable: true,
-                                get: this.getProxy.bind(this, original, key),
-                                set: this.setProxy.bind(this, original, key)
+                                get: this.getProxy.bind(this, data, key),
+                                set: this.setProxy.bind(this, data, key)
                             });
                             // 篡改数组的特定方法
                             var self:AresEntity = this;
@@ -71,7 +79,7 @@ namespace core
                                     // 调用原始方法
                                     Array.prototype[method].apply(this, arguments);
                                     // 更新
-                                    self.update();
+                                    self.setDirty(data.$path, key);
                                 };
                             }, this);
                         }
@@ -83,16 +91,20 @@ namespace core
                             Object.defineProperty(data, key, {
                                 configurable: true,
                                 enumerable: true,
-                                get: this.getProxy.bind(this, original, key),
-                                set: this.setProxy.bind(this, original, key)
+                                get: this.getProxy.bind(this, data, key),
+                                set: this.setProxy.bind(this, data, key)
                             });
                         }
                         else
                         {
                             // 复杂类型，需要递归
-                            var temp:string[] = path.concat();
-                            temp.push(key);
-                            original[key] = this.proxyData(value, temp);
+                            Object.defineProperties(value, {
+                                $data: {get: ()=>value},
+                                $parent: {get: ()=>data},
+                                $root: {get: ()=>data.$root},
+                                $path: {get: ()=>(data === data.$root ? key : data.$path + "." + key)}
+                            });
+                            original[key] = this.proxyData(value);
                         }
                         break;
                     case "function":
@@ -106,33 +118,71 @@ namespace core
                         Object.defineProperty(data, key, {
                             configurable: true,
                             enumerable: true,
-                            get: this.getProxy.bind(this, original, key),
-                            set: this.setProxy.bind(this, original, key)
+                            get: this.getProxy.bind(this, data, key),
+                            set: this.setProxy.bind(this, data, key)
                         });
                         break;
                 }
             }
-            data.$original = original;
+            Object.defineProperty(data, "$original", {get: ()=>original});
         }
 
-        private getProxy(original:any, key:string):any
+        private getProxy(scope:Scope, key:string):any
         {
-            return original[key];
+            return scope.$original[key];
         }
 
-        private setProxy(original:any, key:string, value:any):void
+        private setProxy(scope:Scope, key:string, value:any):void
         {
-            original[key] = value;
-            this.update();
+            // 相等的话则不进行任何处理
+            if(value == scope.$original[key]) return;
+            scope.$original[key] = value;
+            this.setDirty(scope.$path, key);
         }
 
-        private update():void
+        private setDirty(path:string, name:string):void
         {
-            // TODO Raykid 现在是全局更新，要改为条件更新
-            for(var i:number = 0, len:number = this._updaters.length; i < len; i++)
+            if(path != "") name = path + "." + name;
+            this._dirtyMap[name] = true;
+            // 计划渲染
+            if(this._dirtyId == 0) this._dirtyId = setTimeout(this.render, 0, this);
+        }
+
+        private render(entity:AresEntity):void
+        {
+            entity._dirtyId = 0;
+            entity.update();
+        }
+
+        private update(force?:boolean):void
+        {
+            this._forceUpdate = (force == true);
+            var updaters:Updater[] = this._updaters;
+            for(var i:number = 0, len:number = updaters.length; i < len; i++)
             {
-                this._updaters[i].update(this);
+                updaters[i].update(this);
             }
+            // 清空dirtyMap
+            for(var key in this._dirtyMap)
+            {
+                delete this._dirtyMap[key];
+            }
+            this._forceUpdate = false;
+        }
+
+        /**
+         * 判断依赖项是否脏了
+         * @param names 依赖项名字数组
+         * @returns {boolean} 是否脏了
+         */
+        public dependDirty(names:string[]):boolean
+        {
+            if(this._forceUpdate) return true;
+            for(var i:number = 0, len:number = names.length; i < len; i++)
+            {
+                if(this._dirtyMap[names[i]]) return true;
+            }
+            return false;
         }
 
         public compile(element:HTMLElement, scope:Scope):Updater[]
@@ -180,7 +230,6 @@ namespace core
                 var bundle:{cmd:Cmd, attr:Attr, subCmd:string} = bundles[i];
                 // 生成一个更新项
                 var updater:Updater = bundle.cmd.exec(element, bundle.attr.value, scope, bundle.subCmd);
-                // TODO Raykid 现在是全局更新，要改为条件更新
                 updaters.push(updater);
                 // 从DOM节点上移除属性
                 if(bundle.attr) bundle.attr.ownerElement.removeAttributeNode(bundle.attr);

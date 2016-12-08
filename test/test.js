@@ -4,7 +4,9 @@
 Ares.create({
     testFunc: testFunc,
     testArg: "fuck",
-    testCls: "test1"
+    testCls: {
+        aaa: "test1"
+    }
 }, "div_root", {
     initialized: function(vm)
     {
@@ -14,5 +16,5 @@ Ares.create({
 
 function testFunc()
 {
-    this.testCls = "test2";
+    this.testCls.aaa = "test2";
 }

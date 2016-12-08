@@ -14,16 +14,24 @@ namespace core
 
         public exec(target:HTMLElement, exp:string, scope:Scope):Updater
         {
+            var names:string[];
             return {
-                update: ()=>{
-                    var temp:string = exp;
-                    // 依序将{{}}计算出来
-                    for(var res:ContentResult = Expresion.getContentBetween(temp, "{{", "}}"); res != null; res = Expresion.getContentBetween(temp, "{{", "}}"))
+                update: (entity:AresEntity)=>{
+                    var first:boolean = (names == null);
+                    if(first || entity.dependDirty(names))
                     {
-                        temp = temp.substr(0, res.begin - 2) + new Expresion(res.value).run(scope) + temp.substr(res.end + 2);
+                        if(first) names = [];
+                        var temp:string = exp;
+                        // 依序将{{}}计算出来
+                        for(var res:ContentResult = Expresion.getContentBetween(temp, "{{", "}}"); res != null; res = Expresion.getContentBetween(temp, "{{", "}}"))
+                        {
+                            var tempExp:Expresion = new Expresion(res.value);
+                            temp = temp.substr(0, res.begin - 2) + tempExp.run(scope) + temp.substr(res.end + 2);
+                            if(first) names.push.apply(names, tempExp.names);
+                        }
+                        // 更新target节点的innerText
+                        target.innerText = temp;
                     }
-                    // 更新target节点的innerText
-                    target.innerText = temp;
                 }
             };
         }
@@ -44,9 +52,12 @@ namespace core
         {
             var expresion:Expresion = new Expresion(exp);
             return {
-                update: ()=>{
-                    // 更新target节点的innerText
-                    target.innerText = expresion.run(scope);
+                update: (entity:AresEntity)=>{
+                    if(entity.dependDirty(expresion.names))
+                    {
+                        // 更新target节点的innerText
+                        target.innerText = expresion.run(scope);
+                    }
                 }
             };
         }
@@ -59,9 +70,12 @@ namespace core
         {
             var expresion:Expresion = new Expresion(exp);
             return {
-                update: ()=>{
-                    // 更新target节点的innerHTML
-                    target.innerHTML = expresion.run(scope);
+                update: (entity:AresEntity)=>{
+                    if(entity.dependDirty(expresion.names))
+                    {
+                        // 更新target节点的innerHTML
+                        target.innerHTML = expresion.run(scope);
+                    }
                 }
             };
         }
@@ -72,44 +86,53 @@ namespace core
     {
         public exec(target:HTMLElement, exp:string, scope:Scope, subCmd:string):Updater
         {
+            var names:string[] = null;
             // 记录原始class值
             var oriCls:string = target.getAttribute("class");
             return {
-                update: ()=>{
-                    if(subCmd != "")
+                update: (entity:AresEntity)=>{
+                    var first:boolean = (names == null);
+                    if(first || entity.dependDirty(names))
                     {
-                        // 子命令形式
-                        var match:boolean = new Expresion(exp).run(scope);
-                        if(match == true)
+                        if(subCmd != "")
                         {
-                            var newCls:string = subCmd;
-                            if(oriCls) newCls = oriCls + " " + newCls;
-                            // 更新target节点的class属性
-                            target.setAttribute("class", newCls);
-                        }
-                    }
-                    else
-                    {
-                        var params:any = new Expresion(exp).run(scope);
-                        if(typeof params == "string")
-                        {
-                            // 直接赋值形式
-                            if(oriCls) params = oriCls + " " + params;
-                            // 更新target节点的class属性
-                            target.setAttribute("class", params);
+                            // 子命令形式
+                            var tempExp:Expresion = new Expresion(exp);
+                            if(first) names = tempExp.names;
+                            var match:boolean = tempExp.run(scope);
+                            if(match == true)
+                            {
+                                var newCls:string = subCmd;
+                                if(oriCls) newCls = oriCls + " " + newCls;
+                                // 更新target节点的class属性
+                                target.setAttribute("class", newCls);
+                            }
                         }
                         else
                         {
-                            // 集成形式
-                            var arr:string[] = [];
-                            if(oriCls) arr.push(oriCls);
-                            // 遍历所有params的key，如果其表达式值为true则添加其类型
-                            for(var cls in params)
+                            var tempExp:Expresion = new Expresion(exp);
+                            if(first) names = tempExp.names;
+                            var params:any = tempExp.run(scope);
+                            if(typeof params == "string")
                             {
-                                if(params[cls] == true) arr.push(cls);
+                                // 直接赋值形式
+                                if(oriCls) params = oriCls + " " + params;
+                                // 更新target节点的class属性
+                                target.setAttribute("class", params);
                             }
-                            // 更新target节点的class属性
-                            if(arr.length > 0) target.setAttribute("class", arr.join(" "));
+                            else
+                            {
+                                // 集成形式
+                                var arr:string[] = [];
+                                if(oriCls) arr.push(oriCls);
+                                // 遍历所有params的key，如果其表达式值为true则添加其类型
+                                for(var cls in params)
+                                {
+                                    if(params[cls] == true) arr.push(cls);
+                                }
+                                // 更新target节点的class属性
+                                if(arr.length > 0) target.setAttribute("class", arr.join(" "));
+                            }
                         }
                     }
                 }
@@ -122,23 +145,32 @@ namespace core
     {
         public exec(target:HTMLElement, exp:string, scope:Scope, subCmd:string):Updater
         {
+            var names:string[] = null;
             return {
-                update: ()=>{
-                    if(subCmd != "")
+                update: (entity:AresEntity)=>{
+                    var first:boolean = (names == null);
+                    if(first || entity.dependDirty(names))
                     {
-                        // 子命令形式
-                        var res:any = new Expresion(exp).run(scope);
-                        target.setAttribute(subCmd, res);
-                    }
-                    else
-                    {
-                        // 集成形式
-                        var params:any = new Expresion(exp).run(scope);
-                        // 遍历所有params的key，如果其表达式值为true则添加其类型
-                        for(var name in params)
+                        if(subCmd != "")
                         {
-                            var value:any = params[name];
-                            target.setAttribute(name, value);
+                            // 子命令形式
+                            var tempExp:Expresion = new Expresion(exp);
+                            if(first) names = tempExp.names;
+                            var res:any = tempExp.run(scope);
+                            target.setAttribute(subCmd, res);
+                        }
+                        else
+                        {
+                            // 集成形式
+                            var tempExp:Expresion = new Expresion(exp);
+                            if(first) names = tempExp.names;
+                            var params:any = tempExp.run(scope);
+                            // 遍历所有params的key，如果其表达式值为true则添加其类型
+                            for(var name in params)
+                            {
+                                var value:any = params[name];
+                                target.setAttribute(name, value);
+                            }
                         }
                     }
                 }
@@ -151,6 +183,7 @@ namespace core
     {
         public exec(target:HTMLElement, exp:string, scope:Scope, subCmd:string):Updater
         {
+            var names:string[] = null;
             // 将表达式中方法的括号去掉，因为要的是方法引用，而不是执行方法
             var reg:RegExp = /([\w\$\.]+)\(([^\)]*)\)/g;
             for(var res:RegExpExecArray = reg.exec(exp); res != null; res = reg.exec(exp))
@@ -165,30 +198,32 @@ namespace core
                 reg.lastIndex = part1.length;
             }
             return {
-                update: ()=>{
-                    if(subCmd != "")
+                update: (entity:AresEntity)=>{
+                    var first:boolean = (names == null);
+                    if(first || entity.dependDirty(names))
                     {
-                        // 子命令形式
-                        var handler:Function = new Expresion(exp).run(scope);
-                        target.addEventListener(subCmd, this.handler.bind(this, handler));
-                    }
-                    else
-                    {
-                        // 集成形式
-                        var params:any = new Expresion(exp).run(scope);
-                        // 遍历所有params的key，在target上监听该事件
-                        for(var name in params)
+                        if(subCmd != "")
                         {
-                            target.addEventListener(name, this.handler.bind(this, params[name]));
+                            // 子命令形式
+                            var tempExp:Expresion = new Expresion(exp);
+                            if(first) names = tempExp.names;
+                            target.addEventListener(subCmd, tempExp.run(scope));
+                        }
+                        else
+                        {
+                            // 集成形式
+                            var tempExp:Expresion = new Expresion(exp);
+                            if(first) names = tempExp.names;
+                            var params:any = tempExp.run(scope);
+                            // 遍历所有params的key，在target上监听该事件
+                            for(var name in params)
+                            {
+                                target.addEventListener(name, params[name]);
+                            }
                         }
                     }
                 }
             };
-        }
-
-        private handler(callback:Function, evt:Event):void
-        {
-            callback(evt);
         }
     }
 
@@ -199,9 +234,12 @@ namespace core
         {
             var expresion:Expresion = new Expresion(exp);
             return {
-                update: ()=>{
-                    var condition:boolean = expresion.run(scope);
-                    target.style.display = (condition ? "" : "none");
+                update: (entity:AresEntity)=>{
+                    if(entity.dependDirty(expresion.names))
+                    {
+                        var condition:boolean = expresion.run(scope);
+                        target.style.display = (condition ? "" : "none");
+                    }
                 }
             };
         }
@@ -225,6 +263,9 @@ namespace core
 
         public exec(target:HTMLElement, exp:string, scope:Scope):Updater
         {
+            var names:string[] = null;
+            var subUpdaters:Updater[] = [];
+
             var next:HTMLElement = target.nextElementSibling as HTMLElement;
             var targets:HTMLElement[] = [];
             var res:RegExpExecArray = this._reg.exec(exp);
@@ -240,41 +281,54 @@ namespace core
             var firstAttrs:NamedNodeMap = target.attributes;
             return {
                 update: (entity:AresEntity)=>{
-                    // 首先清空当前已有的对象节点
-                    var len:number = targets.length;
-                    while(len --)
+                    var first:boolean = (names == null);
+                    if(first || entity.dependDirty(names))
                     {
-                        var child:HTMLElement = targets.pop();
-                        child.parentElement.removeChild(child);
-                    }
-                    // 生成新对象
-                    var list:any = new Expresion(listName).run(scope);
-                    if(typeof list == "number")
-                    {
-                        var subScope:any = {};
-                        subScope.__proto__ = scope;
-                        for(var i:number = 0; i < list; i++)
+                        // 首先清空当前已有的对象节点
+                        var len:number = targets.length;
+                        while(len --)
                         {
-                            // 构造一个新作用域
-                            subScope[subName] = i;
-                            update(i, entity, subScope, next);
+                            var child:HTMLElement = targets.pop();
+                            child.parentElement.removeChild(child);
+                        }
+                        // 生成新对象
+                        var tempExp:Expresion = new Expresion(listName);
+                        if(first) names = tempExp.names;
+                        var list:any = tempExp.run(scope);
+                        if(typeof list == "number")
+                        {
+                            var subScope:any = {};
+                            subScope.__proto__ = scope;
+                            for(var i:number = 0; i < list; i++)
+                            {
+                                // 构造一个新作用域
+                                subScope[subName] = i;
+                                var tempUpdaters:Updater[] = update(i, entity, subScope, next);
+                                subUpdaters.push.apply(subUpdaters, tempUpdaters);
+                            }
+                        }
+                        else
+                        {
+                            var subScope:any = {};
+                            subScope.__proto__ = scope;
+                            for(var i:number = 0, len:number = list.length; i < len; i++)
+                            {
+                                // 构造一个新作用域
+                                subScope[subName] = list[i];
+                                var tempUpdaters:Updater[] = update(i, entity, subScope, next);
+                                subUpdaters.push.apply(subUpdaters, tempUpdaters);
+                            }
                         }
                     }
-                    else
+                    // 无论如何一定要更新一下子列表
+                    for(var i:number = 0, len:number = subUpdaters.length; i < len; i++)
                     {
-                        var subScope:any = {};
-                        subScope.__proto__ = scope;
-                        for(var i:number = 0, len:number = list.length; i < len; i++)
-                        {
-                            // 构造一个新作用域
-                            subScope[subName] = list[i];
-                            update(i, entity, subScope, next);
-                        }
+                        subUpdaters[i].update(entity);
                     }
                 }
             };
 
-            function update(index:number, entity:AresEntity, subScope:Scope, next:HTMLElement):void
+            function update(index:number, entity:AresEntity, subScope:Scope, next:HTMLElement):Updater[]
             {
                 // 构造一个新的节点，如果是第一个元素则直接使用firstElement作为目标节点
                 var newTarget:HTMLElement;
@@ -298,9 +352,7 @@ namespace core
                 // 为for循环的scope添加$index属性
                 subScope["$index"] = index;
                 // 用新的作用域遍历新节点
-                var updaters:Updater[] = entity.compile(newTarget, subScope);
-                // 立即更新
-                updaters.map(updater=>updater.update(entity), this);
+                return entity.compile(newTarget, subScope);
             }
         }
     }

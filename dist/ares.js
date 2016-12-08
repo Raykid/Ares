@@ -5,11 +5,24 @@ var core;
 (function (core) {
     var Expresion = (function () {
         function Expresion(exp) {
-            this._exp = Expresion.changeParamNames(exp);
+            var res = Expresion.changeParamNames(exp);
+            this._exp = res.exp;
+            this._names = res.names;
         }
+        Object.defineProperty(Expresion.prototype, "names", {
+            get: function () {
+                return this._names;
+            },
+            enumerable: true,
+            configurable: true
+        });
+        Expresion.prototype.run = function (scope) {
+            return new Function("$data", "return " + this._exp)(scope);
+        };
         Expresion.parseOriExp = function (exp) {
+            var names = [];
             if (exp == "")
-                return exp;
+                return { exp: exp, names: names };
             // 分别将""和''找出来，然后将其两边的字符串递归处理，最后再用正则表达式匹配
             var first1 = Expresion.getFirst(exp, "'");
             var first2 = Expresion.getFirst(exp, '"');
@@ -39,7 +52,8 @@ var core;
                         var argName = str.substr(0, iDot);
                         if (window[argName])
                             return str;
-                        // 否则添加$data前缀
+                        // 否则记录名字并添加$data前缀
+                        names.push(str);
                         str = "$data." + str;
                     }
                     return str;
@@ -56,19 +70,32 @@ var core;
                 else if (first2)
                     first = first2;
                 second = Expresion.getFirst(exp, first.value, first.end);
-                exp = Expresion.parseOriExp(exp.substr(0, first.begin)) + exp.substring(first.begin, second.end) + Expresion.parseOriExp(exp.substr(second.end));
+                var part1 = Expresion.parseOriExp(exp.substr(0, first.begin));
+                var part2 = exp.substring(first.begin, second.end);
+                var part3 = Expresion.parseOriExp(exp.substr(second.end));
+                exp = part1.exp + part2 + part3.exp;
+                // 记录名字
+                names.push.apply(names, part1.names);
+                names.push.apply(names, part3.names);
             }
-            return exp;
+            return { exp: exp, names: names };
         };
         Expresion.parseTempExp = function (exp) {
+            var names = [];
             if (exp == "")
-                return exp;
+                return { exp: exp, names: names };
             var res = Expresion.getContentBetween(exp, "\\$\\{", "\\}");
             if (res) {
                 // ${}内部是正规的js表达式，所以用常规方式解析，左边直接截取即可，右面递归解析模板方式
-                exp = exp.substr(0, res.begin) + Expresion.parseOriExp(res.value) + "}" + Expresion.parseTempExp(exp.substr(res.end + 1));
+                var part1 = exp.substr(0, res.begin);
+                var part2 = Expresion.parseOriExp(res.value);
+                var part3 = Expresion.parseTempExp(exp.substr(res.end + 1));
+                exp = part1 + part2.exp + "}" + part3.exp;
+                // 记录名字
+                names.push.apply(names, part2.names);
+                names.push.apply(names, part3.names);
             }
-            return exp;
+            return { exp: exp, names: names };
         };
         /**
          * 获取第一个出现的指定标识的数据
@@ -119,18 +146,37 @@ var core;
          * @returns {string} 处理后的表达式
          */
         Expresion.changeParamNames = function (exp) {
+            var names = [];
             if (exp == null || exp == "")
-                return exp;
+                return { exp: exp, names: names };
             // 用普通字符串方式处理模板字符串前面的部分，用模板字符串方式处理模板字符串部分，然后递归处理剩余部分
             var res = Expresion.getContentBetween(exp, "`", "`");
-            if (res)
-                exp = Expresion.parseOriExp(exp.substr(0, res.begin - 1)) + "`" + Expresion.parseTempExp(res.value) + "`" + Expresion.changeParamNames(exp.substr(res.end + 1));
-            else
-                exp = Expresion.parseOriExp(exp);
-            return exp;
-        };
-        Expresion.prototype.run = function (scope) {
-            return new Function("$data", "return " + this._exp)(scope);
+            if (res) {
+                var part1 = Expresion.parseOriExp(exp.substr(0, res.begin - 1));
+                var part2 = Expresion.parseTempExp(res.value);
+                var part3 = Expresion.changeParamNames(exp.substr(res.end + 1));
+                exp = part1.exp + "`" + part2.exp + "`" + part3.exp;
+                // 记录名字
+                names.push.apply(names, part1.names);
+                names.push.apply(names, part2.names);
+                names.push.apply(names, part3.names);
+            }
+            else {
+                var temp = Expresion.parseOriExp(exp);
+                exp = temp.exp;
+                // 记录名字
+                names.push.apply(names, temp.names);
+            }
+            // 为names去重
+            var tempMap = {};
+            names = names.filter(function (name) {
+                if (!tempMap[name]) {
+                    tempMap[name] = true;
+                    return true;
+                }
+                return false;
+            }, this);
+            return { exp: exp, names: names };
         };
         return Expresion;
     })();
@@ -149,15 +195,24 @@ var core;
             return TextContentCmd._instance;
         };
         TextContentCmd.prototype.exec = function (target, exp, scope) {
+            var names;
             return {
-                update: function () {
-                    var temp = exp;
-                    // 依序将{{}}计算出来
-                    for (var res = core.Expresion.getContentBetween(temp, "{{", "}}"); res != null; res = core.Expresion.getContentBetween(temp, "{{", "}}")) {
-                        temp = temp.substr(0, res.begin - 2) + new core.Expresion(res.value).run(scope) + temp.substr(res.end + 2);
+                update: function (entity) {
+                    var first = (names == null);
+                    if (first || entity.dependDirty(names)) {
+                        if (first)
+                            names = [];
+                        var temp = exp;
+                        // 依序将{{}}计算出来
+                        for (var res = core.Expresion.getContentBetween(temp, "{{", "}}"); res != null; res = core.Expresion.getContentBetween(temp, "{{", "}}")) {
+                            var tempExp = new core.Expresion(res.value);
+                            temp = temp.substr(0, res.begin - 2) + tempExp.run(scope) + temp.substr(res.end + 2);
+                            if (first)
+                                names.push.apply(names, tempExp.names);
+                        }
+                        // 更新target节点的innerText
+                        target.innerText = temp;
                     }
-                    // 更新target节点的innerText
-                    target.innerText = temp;
                 }
             };
         };
@@ -180,9 +235,11 @@ var core;
         TextCmd.prototype.exec = function (target, exp, scope) {
             var expresion = new core.Expresion(exp);
             return {
-                update: function () {
-                    // 更新target节点的innerText
-                    target.innerText = expresion.run(scope);
+                update: function (entity) {
+                    if (entity.dependDirty(expresion.names)) {
+                        // 更新target节点的innerText
+                        target.innerText = expresion.run(scope);
+                    }
                 }
             };
         };
@@ -196,9 +253,11 @@ var core;
         HtmlCmd.prototype.exec = function (target, exp, scope) {
             var expresion = new core.Expresion(exp);
             return {
-                update: function () {
-                    // 更新target节点的innerHTML
-                    target.innerHTML = expresion.run(scope);
+                update: function (entity) {
+                    if (entity.dependDirty(expresion.names)) {
+                        // 更新target节点的innerHTML
+                        target.innerHTML = expresion.run(scope);
+                    }
                 }
             };
         };
@@ -210,43 +269,53 @@ var core;
         function CssCmd() {
         }
         CssCmd.prototype.exec = function (target, exp, scope, subCmd) {
+            var names = null;
             // 记录原始class值
             var oriCls = target.getAttribute("class");
             return {
-                update: function () {
-                    if (subCmd != "") {
-                        // 子命令形式
-                        var match = new core.Expresion(exp).run(scope);
-                        if (match == true) {
-                            var newCls = subCmd;
-                            if (oriCls)
-                                newCls = oriCls + " " + newCls;
-                            // 更新target节点的class属性
-                            target.setAttribute("class", newCls);
-                        }
-                    }
-                    else {
-                        var params = new core.Expresion(exp).run(scope);
-                        if (typeof params == "string") {
-                            // 直接赋值形式
-                            if (oriCls)
-                                params = oriCls + " " + params;
-                            // 更新target节点的class属性
-                            target.setAttribute("class", params);
+                update: function (entity) {
+                    var first = (names == null);
+                    if (first || entity.dependDirty(names)) {
+                        if (subCmd != "") {
+                            // 子命令形式
+                            var tempExp = new core.Expresion(exp);
+                            if (first)
+                                names = tempExp.names;
+                            var match = tempExp.run(scope);
+                            if (match == true) {
+                                var newCls = subCmd;
+                                if (oriCls)
+                                    newCls = oriCls + " " + newCls;
+                                // 更新target节点的class属性
+                                target.setAttribute("class", newCls);
+                            }
                         }
                         else {
-                            // 集成形式
-                            var arr = [];
-                            if (oriCls)
-                                arr.push(oriCls);
-                            // 遍历所有params的key，如果其表达式值为true则添加其类型
-                            for (var cls in params) {
-                                if (params[cls] == true)
-                                    arr.push(cls);
+                            var tempExp = new core.Expresion(exp);
+                            if (first)
+                                names = tempExp.names;
+                            var params = tempExp.run(scope);
+                            if (typeof params == "string") {
+                                // 直接赋值形式
+                                if (oriCls)
+                                    params = oriCls + " " + params;
+                                // 更新target节点的class属性
+                                target.setAttribute("class", params);
                             }
-                            // 更新target节点的class属性
-                            if (arr.length > 0)
-                                target.setAttribute("class", arr.join(" "));
+                            else {
+                                // 集成形式
+                                var arr = [];
+                                if (oriCls)
+                                    arr.push(oriCls);
+                                // 遍历所有params的key，如果其表达式值为true则添加其类型
+                                for (var cls in params) {
+                                    if (params[cls] == true)
+                                        arr.push(cls);
+                                }
+                                // 更新target节点的class属性
+                                if (arr.length > 0)
+                                    target.setAttribute("class", arr.join(" "));
+                            }
                         }
                     }
                 }
@@ -260,20 +329,30 @@ var core;
         function AttrCmd() {
         }
         AttrCmd.prototype.exec = function (target, exp, scope, subCmd) {
+            var names = null;
             return {
-                update: function () {
-                    if (subCmd != "") {
-                        // 子命令形式
-                        var res = new core.Expresion(exp).run(scope);
-                        target.setAttribute(subCmd, res);
-                    }
-                    else {
-                        // 集成形式
-                        var params = new core.Expresion(exp).run(scope);
-                        // 遍历所有params的key，如果其表达式值为true则添加其类型
-                        for (var name in params) {
-                            var value = params[name];
-                            target.setAttribute(name, value);
+                update: function (entity) {
+                    var first = (names == null);
+                    if (first || entity.dependDirty(names)) {
+                        if (subCmd != "") {
+                            // 子命令形式
+                            var tempExp = new core.Expresion(exp);
+                            if (first)
+                                names = tempExp.names;
+                            var res = tempExp.run(scope);
+                            target.setAttribute(subCmd, res);
+                        }
+                        else {
+                            // 集成形式
+                            var tempExp = new core.Expresion(exp);
+                            if (first)
+                                names = tempExp.names;
+                            var params = tempExp.run(scope);
+                            // 遍历所有params的key，如果其表达式值为true则添加其类型
+                            for (var name in params) {
+                                var value = params[name];
+                                target.setAttribute(name, value);
+                            }
                         }
                     }
                 }
@@ -287,7 +366,7 @@ var core;
         function OnCmd() {
         }
         OnCmd.prototype.exec = function (target, exp, scope, subCmd) {
-            var _this = this;
+            var names = null;
             // 将表达式中方法的括号去掉，因为要的是方法引用，而不是执行方法
             var reg = /([\w\$\.]+)\(([^\)]*)\)/g;
             for (var res = reg.exec(exp); res != null; res = reg.exec(exp)) {
@@ -302,25 +381,30 @@ var core;
                 reg.lastIndex = part1.length;
             }
             return {
-                update: function () {
-                    if (subCmd != "") {
-                        // 子命令形式
-                        var handler = new core.Expresion(exp).run(scope);
-                        target.addEventListener(subCmd, _this.handler.bind(_this, handler));
-                    }
-                    else {
-                        // 集成形式
-                        var params = new core.Expresion(exp).run(scope);
-                        // 遍历所有params的key，在target上监听该事件
-                        for (var name in params) {
-                            target.addEventListener(name, _this.handler.bind(_this, params[name]));
+                update: function (entity) {
+                    var first = (names == null);
+                    if (first || entity.dependDirty(names)) {
+                        if (subCmd != "") {
+                            // 子命令形式
+                            var tempExp = new core.Expresion(exp);
+                            if (first)
+                                names = tempExp.names;
+                            target.addEventListener(subCmd, tempExp.run(scope));
+                        }
+                        else {
+                            // 集成形式
+                            var tempExp = new core.Expresion(exp);
+                            if (first)
+                                names = tempExp.names;
+                            var params = tempExp.run(scope);
+                            // 遍历所有params的key，在target上监听该事件
+                            for (var name in params) {
+                                target.addEventListener(name, params[name]);
+                            }
                         }
                     }
                 }
             };
-        };
-        OnCmd.prototype.handler = function (callback, evt) {
-            callback(evt);
         };
         return OnCmd;
     })();
@@ -332,9 +416,11 @@ var core;
         IfCmd.prototype.exec = function (target, exp, scope) {
             var expresion = new core.Expresion(exp);
             return {
-                update: function () {
-                    var condition = expresion.run(scope);
-                    target.style.display = (condition ? "" : "none");
+                update: function (entity) {
+                    if (entity.dependDirty(expresion.names)) {
+                        var condition = expresion.run(scope);
+                        target.style.display = (condition ? "" : "none");
+                    }
                 }
             };
         };
@@ -362,6 +448,8 @@ var core;
             configurable: true
         });
         ForCmd.prototype.exec = function (target, exp, scope) {
+            var names = null;
+            var subUpdaters = [];
             var next = target.nextElementSibling;
             var targets = [];
             var res = this._reg.exec(exp);
@@ -377,31 +465,43 @@ var core;
             var firstAttrs = target.attributes;
             return {
                 update: function (entity) {
-                    // 首先清空当前已有的对象节点
-                    var len = targets.length;
-                    while (len--) {
-                        var child = targets.pop();
-                        child.parentElement.removeChild(child);
-                    }
-                    // 生成新对象
-                    var list = new core.Expresion(listName).run(scope);
-                    if (typeof list == "number") {
-                        var subScope = {};
-                        subScope.__proto__ = scope;
-                        for (var i = 0; i < list; i++) {
-                            // 构造一个新作用域
-                            subScope[subName] = i;
-                            update(i, entity, subScope, next);
+                    var first = (names == null);
+                    if (first || entity.dependDirty(names)) {
+                        // 首先清空当前已有的对象节点
+                        var len = targets.length;
+                        while (len--) {
+                            var child = targets.pop();
+                            child.parentElement.removeChild(child);
+                        }
+                        // 生成新对象
+                        var tempExp = new core.Expresion(listName);
+                        if (first)
+                            names = tempExp.names;
+                        var list = tempExp.run(scope);
+                        if (typeof list == "number") {
+                            var subScope = {};
+                            subScope.__proto__ = scope;
+                            for (var i = 0; i < list; i++) {
+                                // 构造一个新作用域
+                                subScope[subName] = i;
+                                var tempUpdaters = update(i, entity, subScope, next);
+                                subUpdaters.push.apply(subUpdaters, tempUpdaters);
+                            }
+                        }
+                        else {
+                            var subScope = {};
+                            subScope.__proto__ = scope;
+                            for (var i = 0, len = list.length; i < len; i++) {
+                                // 构造一个新作用域
+                                subScope[subName] = list[i];
+                                var tempUpdaters = update(i, entity, subScope, next);
+                                subUpdaters.push.apply(subUpdaters, tempUpdaters);
+                            }
                         }
                     }
-                    else {
-                        var subScope = {};
-                        subScope.__proto__ = scope;
-                        for (var i = 0, len = list.length; i < len; i++) {
-                            // 构造一个新作用域
-                            subScope[subName] = list[i];
-                            update(i, entity, subScope, next);
-                        }
+                    // 无论如何一定要更新一下子列表
+                    for (var i = 0, len = subUpdaters.length; i < len; i++) {
+                        subUpdaters[i].update(entity);
                     }
                 }
             };
@@ -427,9 +527,7 @@ var core;
                 // 为for循环的scope添加$index属性
                 subScope["$index"] = index;
                 // 用新的作用域遍历新节点
-                var updaters = entity.compile(newTarget, subScope);
-                // 立即更新
-                updaters.map(function (updater) { return updater.update(entity); }, this);
+                return entity.compile(newTarget, subScope);
             }
         };
         return ForCmd;
@@ -494,23 +592,31 @@ var core;
 (function (core) {
     var AresEntity = (function () {
         function AresEntity(data, element) {
+            this._dirtyMap = {};
+            this._dirtyId = 0;
+            this._forceUpdate = false;
             this._element = element;
             this._data = data;
-            // 生成一个data的浅层拷贝对象，作为data原始值的保存
-            this.proxyData(data, []);
             // 向data中加入$data、$parent和$root参数，都是data本身，用以构建一个Scope对象
-            data.$data = data.$parent = data.$root = data;
+            var func = function () { return data; };
+            Object.defineProperties(data, {
+                $data: { get: func },
+                $parent: { get: func },
+                $root: { get: func },
+                $path: { get: function () { return ""; } }
+            });
+            // 生成一个data的浅层拷贝对象，作为data原始值的保存
+            this.proxyData(data);
             // 开始解析整个element，用整个data作为当前词法作用域
             this._updaters = this.compile(element, data);
             // 进行一次全局更新
-            this.update();
+            this.update(true);
         }
         /**
          * 为对象安插代理，会篡改对象中的实例为getter和setter，并且返回原始对象的副本
          * @param data 要篡改的对象
-         * @param path 当前路径数组
          */
-        AresEntity.prototype.proxyData = function (data, path) {
+        AresEntity.prototype.proxyData = function (data) {
             var original = {};
             // 记录当前层次所有的属性，如果有复杂类型对象则递归之
             var keys = Object.keys(data);
@@ -525,8 +631,8 @@ var core;
                             Object.defineProperty(data, key, {
                                 configurable: true,
                                 enumerable: true,
-                                get: this.getProxy.bind(this, original, key),
-                                set: this.setProxy.bind(this, original, key)
+                                get: this.getProxy.bind(this, data, key),
+                                set: this.setProxy.bind(this, data, key)
                             });
                             // 篡改数组的特定方法
                             var self = this;
@@ -535,7 +641,7 @@ var core;
                                     // 调用原始方法
                                     Array.prototype[method].apply(this, arguments);
                                     // 更新
-                                    self.update();
+                                    self.setDirty(data.$path, key);
                                 };
                             }, this);
                         }
@@ -546,15 +652,19 @@ var core;
                             Object.defineProperty(data, key, {
                                 configurable: true,
                                 enumerable: true,
-                                get: this.getProxy.bind(this, original, key),
-                                set: this.setProxy.bind(this, original, key)
+                                get: this.getProxy.bind(this, data, key),
+                                set: this.setProxy.bind(this, data, key)
                             });
                         }
                         else {
                             // 复杂类型，需要递归
-                            var temp = path.concat();
-                            temp.push(key);
-                            original[key] = this.proxyData(value, temp);
+                            Object.defineProperties(value, {
+                                $data: { get: function () { return value; } },
+                                $parent: { get: function () { return data; } },
+                                $root: { get: function () { return data.$root; } },
+                                $path: { get: function () { return (data === data.$root ? key : data.$path + "." + key); } }
+                            });
+                            original[key] = this.proxyData(value);
                         }
                         break;
                     case "function":
@@ -568,26 +678,61 @@ var core;
                         Object.defineProperty(data, key, {
                             configurable: true,
                             enumerable: true,
-                            get: this.getProxy.bind(this, original, key),
-                            set: this.setProxy.bind(this, original, key)
+                            get: this.getProxy.bind(this, data, key),
+                            set: this.setProxy.bind(this, data, key)
                         });
                         break;
                 }
             }
-            data.$original = original;
+            Object.defineProperty(data, "$original", { get: function () { return original; } });
         };
-        AresEntity.prototype.getProxy = function (original, key) {
-            return original[key];
+        AresEntity.prototype.getProxy = function (scope, key) {
+            return scope.$original[key];
         };
-        AresEntity.prototype.setProxy = function (original, key, value) {
-            original[key] = value;
-            this.update();
+        AresEntity.prototype.setProxy = function (scope, key, value) {
+            // 相等的话则不进行任何处理
+            if (value == scope.$original[key])
+                return;
+            scope.$original[key] = value;
+            this.setDirty(scope.$path, key);
         };
-        AresEntity.prototype.update = function () {
-            // TODO Raykid 现在是全局更新，要改为条件更新
-            for (var i = 0, len = this._updaters.length; i < len; i++) {
-                this._updaters[i].update(this);
+        AresEntity.prototype.setDirty = function (path, name) {
+            if (path != "")
+                name = path + "." + name;
+            this._dirtyMap[name] = true;
+            // 计划渲染
+            if (this._dirtyId == 0)
+                this._dirtyId = setTimeout(this.render, 0, this);
+        };
+        AresEntity.prototype.render = function (entity) {
+            entity._dirtyId = 0;
+            entity.update();
+        };
+        AresEntity.prototype.update = function (force) {
+            this._forceUpdate = (force == true);
+            var updaters = this._updaters;
+            for (var i = 0, len = updaters.length; i < len; i++) {
+                updaters[i].update(this);
             }
+            // 清空dirtyMap
+            for (var key in this._dirtyMap) {
+                delete this._dirtyMap[key];
+            }
+            this._forceUpdate = false;
+        };
+        /**
+         * 判断依赖项是否脏了
+         * @param names 依赖项名字数组
+         * @returns {boolean} 是否脏了
+         */
+        AresEntity.prototype.dependDirty = function (names) {
+            if (this._forceUpdate)
+                return true;
+            for (var i = 0, len = names.length; i < len; i++) {
+                if (this._dirtyMap[names[i]])
+                    return true;
+            }
+            return false;
         };
         AresEntity.prototype.compile = function (element, scope) {
             // 检查节点上面以data-a-或者a-开头的属性，将其认为是绑定属性
@@ -629,7 +774,6 @@ var core;
                 var bundle = bundles[i];
                 // 生成一个更新项
                 var updater = bundle.cmd.exec(element, bundle.attr.value, scope, bundle.subCmd);
-                // TODO Raykid 现在是全局更新，要改为条件更新
                 updaters.push(updater);
                 // 从DOM节点上移除属性
                 if (bundle.attr)

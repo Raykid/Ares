@@ -6,15 +6,29 @@ namespace core
     export class Expresion
     {
         private _exp:string;
+        private _names:string[];
+
+        public get names():string[]
+        {
+            return this._names;
+        }
 
         public constructor(exp:string)
         {
-            this._exp = Expresion.changeParamNames(exp);
+            var res:NameResult = Expresion.changeParamNames(exp);
+            this._exp = res.exp;
+            this._names = res.names;
         }
 
-        private static parseOriExp(exp:string):string
+        public run(scope:Scope):any
         {
-            if(exp == "") return exp;
+            return new Function("$data", "return " + this._exp)(scope);
+        }
+
+        private static parseOriExp(exp:string):NameResult
+        {
+            var names:string[] = [];
+            if(exp == "") return {exp: exp, names: names};
             // 分别将""和''找出来，然后将其两边的字符串递归处理，最后再用正则表达式匹配
             var first1:ContentResult = Expresion.getFirst(exp, "'");
             var first2:ContentResult = Expresion.getFirst(exp, '"');
@@ -42,7 +56,8 @@ namespace core
                         if(iDot < 0) iDot = str.length;
                         var argName:string = str.substr(0, iDot);
                         if(window[argName]) return str;
-                        // 否则添加$data前缀
+                        // 否则记录名字并添加$data前缀
+                        names.push(str);
                         str = "$data." + str;
                     }
                     return str;
@@ -56,21 +71,34 @@ namespace core
                 else if(first1) first = first1;
                 else if(first2) first = first2;
                 second = Expresion.getFirst(exp, first.value, first.end);
-                exp = Expresion.parseOriExp(exp.substr(0, first.begin)) + exp.substring(first.begin, second.end) + Expresion.parseOriExp(exp.substr(second.end));
+                var part1:NameResult = Expresion.parseOriExp(exp.substr(0, first.begin));
+                var part2:string = exp.substring(first.begin, second.end);
+                var part3:NameResult = Expresion.parseOriExp(exp.substr(second.end));
+                exp = part1.exp + part2 + part3.exp;
+                // 记录名字
+                names.push.apply(names, part1.names);
+                names.push.apply(names, part3.names);
             }
-            return exp;
+            return {exp: exp, names: names};
         }
 
-        private static parseTempExp(exp:string):string
+        private static parseTempExp(exp:string):NameResult
         {
-            if(exp == "") return exp;
+            var names:string[] = [];
+            if(exp == "") return {exp: exp, names: names};
             var res:ContentResult = Expresion.getContentBetween(exp, "\\$\\{", "\\}");
             if(res)
             {
                 // ${}内部是正规的js表达式，所以用常规方式解析，左边直接截取即可，右面递归解析模板方式
-                exp = exp.substr(0, res.begin) + Expresion.parseOriExp(res.value) + "}" + Expresion.parseTempExp(exp.substr(res.end + 1));
+                var part1:string = exp.substr(0, res.begin);
+                var part2:NameResult = Expresion.parseOriExp(res.value);
+                var part3:NameResult = Expresion.parseTempExp(exp.substr(res.end + 1));
+                exp = part1 + part2.exp + "}" + part3.exp;
+                // 记录名字
+                names.push.apply(names, part2.names);
+                names.push.apply(names, part3.names);
             }
-            return exp;
+            return {exp: exp, names: names};
         }
 
         /**
@@ -124,19 +152,41 @@ namespace core
          * @param exp 字符串表达式
          * @returns {string} 处理后的表达式
          */
-        public static changeParamNames(exp:string):string
+        public static changeParamNames(exp:string):NameResult
         {
-            if(exp == null || exp == "") return exp;
+            var names:string[] = [];
+            if(exp == null || exp == "") return {exp: exp, names: names};
             // 用普通字符串方式处理模板字符串前面的部分，用模板字符串方式处理模板字符串部分，然后递归处理剩余部分
             var res:ContentResult = Expresion.getContentBetween(exp, "`", "`");
-            if(res) exp = Expresion.parseOriExp(exp.substr(0, res.begin - 1)) + "`" + Expresion.parseTempExp(res.value) + "`" + Expresion.changeParamNames(exp.substr(res.end + 1));
-            else exp = Expresion.parseOriExp(exp);
-            return exp;
-        }
-
-        public run(scope:Scope):any
-        {
-            return new Function("$data", "return " + this._exp)(scope);
+            if(res)
+            {
+                var part1:NameResult = Expresion.parseOriExp(exp.substr(0, res.begin - 1));
+                var part2:NameResult = Expresion.parseTempExp(res.value);
+                var part3:NameResult = Expresion.changeParamNames(exp.substr(res.end + 1));
+                exp = part1.exp + "`" + part2.exp + "`" + part3.exp;
+                // 记录名字
+                names.push.apply(names, part1.names);
+                names.push.apply(names, part2.names);
+                names.push.apply(names, part3.names);
+            }
+            else
+            {
+                var temp:NameResult = Expresion.parseOriExp(exp);
+                exp = temp.exp;
+                // 记录名字
+                names.push.apply(names, temp.names);
+            }
+            // 为names去重
+            var tempMap:any = {};
+            names = names.filter((name:string)=>{
+                if(!tempMap[name])
+                {
+                    tempMap[name] = true;
+                    return true;
+                }
+                return false;
+            }, this);
+            return {exp: exp, names: names};
         }
     }
 
@@ -147,12 +197,19 @@ namespace core
         value:string;
     }
 
+    export interface NameResult
+    {
+        exp:string;
+        names:string[];
+    }
+
     export interface Scope
     {
         $original:any;
         $data:Scope;
         $parent:Scope;
         $root:Scope;
+        $path:string;
         [key:string]:any;
     }
 }
