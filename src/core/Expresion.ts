@@ -74,6 +74,8 @@ namespace core
                         }
                         // 如果是true或false则不进行替换
                         if(str == "true" || str == "false") return str;
+                        // 如果是$data、$parent、$root、$original之一则不进行替换
+                        if(str == "$data" || str == "$parent" || str == "$root" || str == "$original") return str;
                         str = "$data." + str;
                     }
                     return str;

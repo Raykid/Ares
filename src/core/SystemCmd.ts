@@ -115,7 +115,7 @@ namespace core
                 var argStr:string = res[2].replace(/\s+/g, "");
                 if(argStr.length > 0) argStr = "," + argStr;
                 // 解析所有的参数，用bind方法绑定到方法参数里
-                var part1:string = exp.substr(0, res.index) + res[1] + ".bind(scope" + argStr + ")";
+                var part1:string = exp.substr(0, res.index) + res[1] + ".bind($data" + argStr + ")";
                 var part2:string = exp.substr(res.index + res[0].length);
                 exp = part1 + part2;
                 reg.lastIndex = part1.length;

@@ -65,6 +65,9 @@ var core;
                         // 如果是true或false则不进行替换
                         if (str == "true" || str == "false")
                             return str;
+                        // 如果是$data、$parent、$root、$original之一则不进行替换
+                        if (str == "$data" || str == "$parent" || str == "$root" || str == "$original")
+                            return str;
                         str = "$data." + str;
                     }
                     return str;
@@ -238,7 +241,7 @@ var core;
                 if (argStr.length > 0)
                     argStr = "," + argStr;
                 // 解析所有的参数，用bind方法绑定到方法参数里
-                var part1 = exp.substr(0, res.index) + res[1] + ".bind(scope" + argStr + ")";
+                var part1 = exp.substr(0, res.index) + res[1] + ".bind($data" + argStr + ")";
                 var part2 = exp.substr(res.index + res[0].length);
                 exp = part1 + part2;
                 reg.lastIndex = part1.length;
