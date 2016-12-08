@@ -76,6 +76,12 @@ namespace core
                         if(str == "true" || str == "false") return str;
                         // 如果是$data本身则不进行替换
                         if(str == "$data") return str;
+                        // 如果window下存在这个变量，则不进行替换
+                        var iDot:number = str.indexOf(".");
+                        if(iDot < 0) iDot = str.length;
+                        var argName:string = str.substr(0, iDot);
+                        if(window[argName]) return str;
+                        // 否则添加$data前缀
                         str = "$data." + str;
                     }
                     return str;

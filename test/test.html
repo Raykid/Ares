@@ -13,7 +13,7 @@
 </head>
 <body>
 <div id="div_root">
-    <a href="javascript:void(0)" a-attr:class="testCls" a-on="{click:testFunc(1, $root, 2)}">点我！</a>
+    <a href="javascript:void(0)" a-attr:class="testCls" a-on="{click:testFunc(1, $root, 2)}" a-for="a in 4" a-text="JSON.stringify($original)">点我！</a>
 </div>
 </body>
 </html>
