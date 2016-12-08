@@ -152,7 +152,7 @@ namespace core
                     var eIndex:number = name.indexOf(":");
                     if(eIndex < 0) eIndex = name.length;
                     // 取到命令名
-                    var cmdName:string = name.substr(bIndex, eIndex);
+                    var cmdName:string = name.substring(bIndex, eIndex);
                     // 取到子命令名
                     var subCmd:string = name.substr(eIndex + 1);
                     // 用命令名取到命令依赖对象
@@ -179,11 +179,11 @@ namespace core
             {
                 var bundle:{cmd:Cmd, attr:Attr, subCmd:string} = bundles[i];
                 // 生成一个更新项
-                var updater:Updater = bundle.cmd.exec(element, bundle.attr.value, scope, subCmd);
+                var updater:Updater = bundle.cmd.exec(element, bundle.attr.value, scope, bundle.subCmd);
                 // TODO Raykid 现在是全局更新，要改为条件更新
                 updaters.push(updater);
                 // 从DOM节点上移除属性
-                bundle.attr.ownerElement.removeAttributeNode(attr);
+                bundle.attr.ownerElement.removeAttributeNode(bundle.attr);
             }
             // 遍历子节点
             if(!stopCompile)

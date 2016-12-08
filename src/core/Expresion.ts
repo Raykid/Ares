@@ -72,6 +72,8 @@ namespace core
                             var temp:string = exp.substring(end, i);
                             if(/^\s*$/.test(temp)) return str;
                         }
+                        // 如果是true或false则不进行替换
+                        if(str == "true" || str == "false") return str;
                         str = "$data." + str;
                     }
                     return str;

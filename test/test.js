@@ -3,18 +3,15 @@
  */
 Ares.create({
     testFunc: testFunc,
-    testArg: "fuck"
+    testArg: "fuck",
+    testCls: "test1"
 }, "div_root", {
     initialized: function(vm)
     {
         setTimeout(function(){
-            vm.cls = 1;
-            vm.clsName = "test1";
-            vm.testNum = 5;
+            vm.testCls = "test2";
         }, 2000);
         setTimeout(function(){
-            vm.cls = 2;
-            vm.href = "http://www.baidu.com";
         }, 4000);
     }
 });

@@ -62,6 +62,9 @@ var core;
                             if (/^\s*$/.test(temp))
                                 return str;
                         }
+                        // 如果是true或false则不进行替换
+                        if (str == "true" || str == "false")
+                            return str;
                         str = "$data." + str;
                     }
                     return str;
@@ -156,23 +159,46 @@ var core;
     var CssCmd = (function () {
         function CssCmd() {
         }
-        CssCmd.prototype.exec = function (target, exp, scope) {
+        CssCmd.prototype.exec = function (target, exp, scope, subCmd) {
             // 记录原始class值
             var oriCls = target.getAttribute("class");
             return {
                 update: function () {
-                    var params = new core.Expresion(exp).run(scope);
-                    var arr = [];
-                    if (oriCls)
-                        arr.push(oriCls);
-                    // 遍历所有params的key，如果其表达式值为true则添加其类型
-                    for (var cls in params) {
-                        if (params[cls] == true)
-                            arr.push(cls);
+                    if (subCmd != "") {
+                        // 子命令形式
+                        var match = new core.Expresion(exp).run(scope);
+                        if (match == true) {
+                            var newCls = subCmd;
+                            if (oriCls)
+                                newCls = oriCls + " " + newCls;
+                            // 更新target节点的class属性
+                            target.setAttribute("class", newCls);
+                        }
                     }
-                    // 更新target节点的class属性
-                    if (arr.length > 0)
-                        target.setAttribute("class", arr.join(" "));
+                    else {
+                        var params = new core.Expresion(exp).run(scope);
+                        if (typeof params == "string") {
+                            // 直接赋值形式
+                            if (oriCls)
+                                params = oriCls + " " + params;
+                            // 更新target节点的class属性
+                            target.setAttribute("class", params);
+                        }
+                        else {
+                            // 集成形式
+                            var arr = [];
+                            if (oriCls)
+                                arr.push(oriCls);
+                            // 遍历所有params的key，如果其表达式值为true则添加其类型
+                            for (var cls in params) {
+                                if (params[cls] == true)
+                                    arr.push(cls);
+                            }
+                            // 更新target节点的class属性
+                            if (arr.length > 0)
+                                target.setAttribute("class", arr.join(" "));
+                        }
+                    }
                 }
             };
         };
@@ -202,7 +228,7 @@ var core;
     var OnCmd = (function () {
         function OnCmd() {
         }
-        OnCmd.prototype.exec = function (target, exp, scope) {
+        OnCmd.prototype.exec = function (target, exp, scope, subCmd) {
             var _this = this;
             // 将表达式中方法的括号去掉，因为要的是方法引用，而不是执行方法
             var reg = /([\w\$\.]+)\(([^\)]*)\)/g;
@@ -219,10 +245,18 @@ var core;
             }
             return {
                 update: function () {
-                    var params = new core.Expresion(exp).run(scope);
-                    // 遍历所有params的key，在target上监听该事件
-                    for (var name in params) {
-                        target.addEventListener(name, _this.handler.bind(_this, params[name]));
+                    if (subCmd != "") {
+                        // 子命令形式
+                        var handler = new core.Expresion(exp).run(scope);
+                        target.addEventListener(subCmd, _this.handler.bind(_this, handler));
+                    }
+                    else {
+                        // 集成形式
+                        var params = new core.Expresion(exp).run(scope);
+                        // 遍历所有params的key，在target上监听该事件
+                        for (var name in params) {
+                            target.addEventListener(name, _this.handler.bind(_this, params[name]));
+                        }
                     }
                 }
             };
@@ -510,7 +544,7 @@ var core;
                     if (eIndex < 0)
                         eIndex = name.length;
                     // 取到命令名
-                    var cmdName = name.substr(bIndex, eIndex);
+                    var cmdName = name.substring(bIndex, eIndex);
                     // 取到子命令名
                     var subCmd = name.substr(eIndex + 1);
                     // 用命令名取到命令依赖对象
@@ -534,11 +568,11 @@ var core;
             for (var i = 0, len = bundles.length; i < len; i++) {
                 var bundle = bundles[i];
                 // 生成一个更新项
-                var updater = bundle.cmd.exec(element, bundle.attr.value, scope, subCmd);
+                var updater = bundle.cmd.exec(element, bundle.attr.value, scope, bundle.subCmd);
                 // TODO Raykid 现在是全局更新，要改为条件更新
                 updaters.push(updater);
                 // 从DOM节点上移除属性
-                bundle.attr.ownerElement.removeAttributeNode(attr);
+                bundle.attr.ownerElement.removeAttributeNode(bundle.attr);
             }
             // 遍历子节点
             if (!stopCompile) {

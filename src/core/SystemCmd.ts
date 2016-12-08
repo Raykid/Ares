@@ -36,22 +36,48 @@ namespace core
     /** CSS类型命令 */
     export class CssCmd implements Cmd
     {
-        public exec(target:HTMLElement, exp:string, scope:Scope):Updater
+        public exec(target:HTMLElement, exp:string, scope:Scope, subCmd:string):Updater
         {
             // 记录原始class值
             var oriCls:string = target.getAttribute("class");
             return {
                 update: ()=>{
-                    var params:any = new Expresion(exp).run(scope);
-                    var arr:string[] = [];
-                    if(oriCls) arr.push(oriCls);
-                    // 遍历所有params的key，如果其表达式值为true则添加其类型
-                    for(var cls in params)
+                    if(subCmd != "")
                     {
-                        if(params[cls] == true) arr.push(cls);
+                        // 子命令形式
+                        var match:boolean = new Expresion(exp).run(scope);
+                        if(match == true)
+                        {
+                            var newCls:string = subCmd;
+                            if(oriCls) newCls = oriCls + " " + newCls;
+                            // 更新target节点的class属性
+                            target.setAttribute("class", newCls);
+                        }
                     }
-                    // 更新target节点的class属性
-                    if(arr.length > 0) target.setAttribute("class", arr.join(" "));
+                    else
+                    {
+                        var params:any = new Expresion(exp).run(scope);
+                        if(typeof params == "string")
+                        {
+                            // 直接赋值形式
+                            if(oriCls) params = oriCls + " " + params;
+                            // 更新target节点的class属性
+                            target.setAttribute("class", params);
+                        }
+                        else
+                        {
+                            // 集成形式
+                            var arr:string[] = [];
+                            if(oriCls) arr.push(oriCls);
+                            // 遍历所有params的key，如果其表达式值为true则添加其类型
+                            for(var cls in params)
+                            {
+                                if(params[cls] == true) arr.push(cls);
+                            }
+                            // 更新target节点的class属性
+                            if(arr.length > 0) target.setAttribute("class", arr.join(" "));
+                        }
+                    }
                 }
             };
         }
@@ -79,7 +105,7 @@ namespace core
     /** 监听事件命令 */
     export class OnCmd implements Cmd
     {
-        public exec(target:HTMLElement, exp:string, scope:Scope):Updater
+        public exec(target:HTMLElement, exp:string, scope:Scope, subCmd:string):Updater
         {
             // 将表达式中方法的括号去掉，因为要的是方法引用，而不是执行方法
             var reg:RegExp = /([\w\$\.]+)\(([^\)]*)\)/g;
@@ -96,11 +122,21 @@ namespace core
             }
             return {
                 update: ()=>{
-                    var params:any = new Expresion(exp).run(scope);
-                    // 遍历所有params的key，在target上监听该事件
-                    for(var name in params)
+                    if(subCmd != "")
                     {
-                        target.addEventListener(name, this.handler.bind(this, params[name]));
+                        // 子命令形式
+                        var handler:Function = new Expresion(exp).run(scope);
+                        target.addEventListener(subCmd, this.handler.bind(this, handler));
+                    }
+                    else
+                    {
+                        // 集成形式
+                        var params:any = new Expresion(exp).run(scope);
+                        // 遍历所有params的key，在target上监听该事件
+                        for(var name in params)
+                        {
+                            target.addEventListener(name, this.handler.bind(this, params[name]));
+                        }
                     }
                 }
             };
