@@ -13,7 +13,7 @@
 </head>
 <body>
 <div id="div_root">
-    <div a-on:click="testFunc(1, $root, 2)" a-css="'test' + ($index % 2 + 1)" a-for="n in 4">
+    <div a-on:click="alert(testFunc().abc)" a-css="'test' + ($index % 2 + 1)" a-for="n in 4">
         <div a-for="n in 3">{{$index}}</div>
     </div>
     <div a-if="testCls.aaa=='test1'">if</div>

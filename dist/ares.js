@@ -28,9 +28,19 @@ var core;
             var first2 = Expresion.getFirst(exp, '"');
             var first, second;
             if (!first1 && !first2) {
+                var localVarMap = {};
                 // 啥都没有，使用正则表达式匹配
-                exp = exp.replace(/[a-z\.\$][\w\.\$]*/ig, function (str, index, exp) {
+                exp = exp.replace(/[a-z\$][\w\.\$]*/ig, function (str, index, exp) {
                     if (str.indexOf("$data.") != 0) {
+                        // 如果前面4个字符是var或者let或const则作为局部变量，不进行替换
+                        var tempVar = exp.substr(index - 4, 4);
+                        if (tempVar == "var " || tempVar == "let " || exp.substr(index - 6, 6) == "const ") {
+                            localVarMap[str] = true;
+                            return str;
+                        }
+                        // 如果是局部变量则不进行替换
+                        if (localVarMap[str])
+                            return str;
                         // 如果str和冒号:之间都是空白字符或者没有字符，则不替换$data
                         var end = index + str.length;
                         var i = exp.indexOf(":", end);
@@ -39,8 +49,17 @@ var core;
                             if (/^\s*$/.test(temp))
                                 return str;
                         }
+                        // 如果是)后面跟着个.则不替换，因为是方法执行后的取值操作
+                        if (exp.substr(index - 2, 2) == ").")
+                            return str;
                         // 如果是true或false则不进行替换
                         if (str == "true" || str == "false")
+                            return str;
+                        // 如果是js关键字则不替换
+                        if (Expresion._keyWords[str])
+                            return str;
+                        // 如果是在catch括号内部的变量不替换
+                        if (exp.substr(index - 6, 6) == "catch(")
                             return str;
                         // 如果是$data本身则不进行替换
                         if (str == "$data")
@@ -177,6 +196,16 @@ var core;
                 return false;
             }, this);
             return { exp: exp, names: names };
+        };
+        Expresion._keyWords = {
+            "function": true,
+            "var": true,
+            "let": true,
+            "const": true,
+            "try": true,
+            "catch": true,
+            "return": true,
+            "null": true
         };
         return Expresion;
     })();
@@ -367,19 +396,9 @@ var core;
         }
         OnCmd.prototype.exec = function (target, exp, scope, subCmd) {
             var names = null;
-            // 将表达式中方法的括号去掉，因为要的是方法引用，而不是执行方法
-            var reg = /([\w\$\.]+)\(([^\)]*)\)/g;
-            for (var res = reg.exec(exp); res != null; res = reg.exec(exp)) {
-                // 将参数中的空白符都去掉
-                var argStr = res[2].replace(/\s+/g, "");
-                if (argStr.length > 0)
-                    argStr = "," + argStr;
-                // 解析所有的参数，用bind方法绑定到方法参数里
-                var part1 = exp.substr(0, res.index) + res[1] + ".bind($data" + argStr + ")";
-                var part2 = exp.substr(res.index + res[0].length);
-                exp = part1 + part2;
-                reg.lastIndex = part1.length;
-            }
+            exp = this.transform(exp);
+            // 外面包一层function，因为要的是方法引用，而不是直接执行方法
+            exp = "function($data){" + exp + "}";
             return {
                 update: function (entity) {
                     var first = (names == null);
@@ -389,7 +408,9 @@ var core;
                             var tempExp = new core.Expresion(exp);
                             if (first)
                                 names = tempExp.names;
-                            target.addEventListener(subCmd, tempExp.run(scope));
+                            target.addEventListener(subCmd, function () {
+                                tempExp.run(scope)(scope);
+                            });
                         }
                         else {
                             // 集成形式
@@ -399,12 +420,51 @@ var core;
                             var params = tempExp.run(scope);
                             // 遍历所有params的key，在target上监听该事件
                             for (var name in params) {
-                                target.addEventListener(name, params[name]);
+                                target.addEventListener(name, params[name].bind(scope));
                             }
                         }
                     }
                 }
             };
+        };
+        OnCmd.prototype.transform = function (exp) {
+            var count = 0;
+            var reg = /[\(\)]/g;
+            var bIndex = -1;
+            var eIndex = -1;
+            for (var res = reg.exec(exp); res != null; res = reg.exec(exp)) {
+                if (res[0] == "(") {
+                    if (count == 0)
+                        bIndex = res.index + 1;
+                    count++;
+                }
+                else {
+                    count--;
+                    if (count == 0) {
+                        eIndex = res.index;
+                        break;
+                    }
+                }
+            }
+            if (bIndex >= 0 && eIndex >= 0) {
+                // 递归处理参数部分和后面的部分
+                var part2 = this.transform(exp.substring(bIndex, eIndex));
+                var part3 = this.transform(exp.substr(eIndex + 1));
+                // 处理方法名部分
+                var part1 = exp.substr(0, bIndex - 1);
+                var reg = /[\w\$][\w\$\.]+[\w\$]$/;
+                var res = reg.exec(part1);
+                if (res != null) {
+                    var funcName = res[0];
+                    var before = part1.substr(0, res.index);
+                    // 用call方法将$data绑定到方法参数里
+                    exp = before + "(function(){var temp = [" + part2 + "];try{return " + funcName + ".apply($data,temp)" + part3 + "}catch(err){return " + funcName + ".apply(null,temp)" + part3 + "}})()";
+                }
+                else {
+                    exp = part1 + "(" + part2 + ")" + part3;
+                }
+            }
+            return exp;
         };
         return OnCmd;
     })();

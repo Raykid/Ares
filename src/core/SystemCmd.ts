@@ -184,19 +184,9 @@ namespace core
         public exec(target:HTMLElement, exp:string, scope:Scope, subCmd:string):Updater
         {
             var names:string[] = null;
-            // 将表达式中方法的括号去掉，因为要的是方法引用，而不是执行方法
-            var reg:RegExp = /([\w\$\.]+)\(([^\)]*)\)/g;
-            for(var res:RegExpExecArray = reg.exec(exp); res != null; res = reg.exec(exp))
-            {
-                // 将参数中的空白符都去掉
-                var argStr:string = res[2].replace(/\s+/g, "");
-                if(argStr.length > 0) argStr = "," + argStr;
-                // 解析所有的参数，用bind方法绑定到方法参数里
-                var part1:string = exp.substr(0, res.index) + res[1] + ".bind($data" + argStr + ")";
-                var part2:string = exp.substr(res.index + res[0].length);
-                exp = part1 + part2;
-                reg.lastIndex = part1.length;
-            }
+            exp = this.transform(exp);
+            // 外面包一层function，因为要的是方法引用，而不是直接执行方法
+            exp = "function($data){" + exp + "}";
             return {
                 update: (entity:AresEntity)=>{
                     var first:boolean = (names == null);
@@ -207,7 +197,9 @@ namespace core
                             // 子命令形式
                             var tempExp:Expresion = new Expresion(exp);
                             if(first) names = tempExp.names;
-                            target.addEventListener(subCmd, tempExp.run(scope));
+                            target.addEventListener(subCmd, ()=>{
+                                tempExp.run(scope)(scope);
+                            });
                         }
                         else
                         {
@@ -218,12 +210,59 @@ namespace core
                             // 遍历所有params的key，在target上监听该事件
                             for(var name in params)
                             {
-                                target.addEventListener(name, params[name]);
+                                target.addEventListener(name, params[name].bind(scope));
                             }
                         }
                     }
                 }
             };
+        }
+
+        private transform(exp:string):string
+        {
+            var count:number = 0;
+            var reg:RegExp = /[\(\)]/g;
+            var bIndex:number = -1;
+            var eIndex:number = -1;
+            for(var res:RegExpExecArray = reg.exec(exp); res != null; res = reg.exec(exp))
+            {
+                if(res[0] == "(")
+                {
+                    if(count == 0) bIndex = res.index + 1;
+                    count ++;
+                }
+                else
+                {
+                    count --;
+                    if(count == 0)
+                    {
+                        eIndex = res.index;
+                        break;
+                    }
+                }
+            }
+            if(bIndex >= 0 && eIndex >= 0)
+            {
+                // 递归处理参数部分和后面的部分
+                var part2:string = this.transform(exp.substring(bIndex, eIndex));
+                var part3:string = this.transform(exp.substr(eIndex + 1));
+                // 处理方法名部分
+                var part1:string = exp.substr(0, bIndex - 1);
+                var reg:RegExp = /[\w\$][\w\$\.]+[\w\$]$/;
+                var res:RegExpExecArray = reg.exec(part1);
+                if(res != null)
+                {
+                    var funcName:string = res[0];
+                    var before:string = part1.substr(0, res.index);
+                    // 用call方法将$data绑定到方法参数里
+                    exp = `${before}(function(){var temp = [${part2}];try{return ${funcName}.apply($data,temp)${part3}}catch(err){return ${funcName}.apply(null,temp)${part3}}})()`;
+                }
+                else
+                {
+                    exp = part1 + "(" + part2 + ")" + part3;
+                }
+            }
+            return exp;
         }
     }
 

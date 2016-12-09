@@ -5,6 +5,17 @@ namespace core
 {
     export class Expresion
     {
+        private static _keyWords:any = {
+            "function": true,
+            "var": true,
+            "let": true,
+            "const": true,
+            "try": true,
+            "catch": true,
+            "return": true,
+            "null": true
+        };
+
         private _exp:string;
         private _names:string[];
 
@@ -35,10 +46,20 @@ namespace core
             var first:ContentResult, second:ContentResult;
             if(!first1 && !first2)
             {
+                var localVarMap:any = {};
                 // 啥都没有，使用正则表达式匹配
-                exp = exp.replace(/[a-z\.\$][\w\.\$]*/ig, (str:string, index:number, exp:string)=>{
+                exp = exp.replace(/[a-z\$][\w\.\$]*/ig, (str:string, index:number, exp:string)=>{
                     if(str.indexOf("$data.") != 0)
                     {
+                        // 如果前面4个字符是var或者let或const则作为局部变量，不进行替换
+                        var tempVar:string = exp.substr(index - 4, 4);
+                        if(tempVar == "var " || tempVar == "let " || exp.substr(index - 6, 6) == "const ")
+                        {
+                            localVarMap[str] = true;
+                            return str;
+                        }
+                        // 如果是局部变量则不进行替换
+                        if(localVarMap[str]) return str;
                         // 如果str和冒号:之间都是空白字符或者没有字符，则不替换$data
                         var end:number = index + str.length;
                         var i:number = exp.indexOf(":", end);
@@ -47,8 +68,14 @@ namespace core
                             var temp:string = exp.substring(end, i);
                             if(/^\s*$/.test(temp)) return str;
                         }
+                        // 如果是)后面跟着个.则不替换，因为是方法执行后的取值操作
+                        if(exp.substr(index - 2, 2) == ").") return str;
                         // 如果是true或false则不进行替换
                         if(str == "true" || str == "false") return str;
+                        // 如果是js关键字则不替换
+                        if(Expresion._keyWords[str]) return str;
+                        // 如果是在catch括号内部的变量不替换
+                        if(exp.substr(index - 6, 6) == "catch(") return str;
                         // 如果是$data本身则不进行替换
                         if(str == "$data") return str;
                         // 如果window下存在这个变量，则不进行替换

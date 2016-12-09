@@ -17,4 +17,5 @@ Ares.create({
 function testFunc()
 {
     this.testCls.aaa = "test2";
+    return {abc: "abcabc"};
 }
