@@ -239,7 +239,7 @@ var core;
             return {
                 update: function (entity) {
                     var first = (names == null);
-                    if (first || entity.dependDirty(names)) {
+                    if (first || entity.dependDirty(names, scope)) {
                         if (first)
                             names = [];
                         var nodes = TextContentCmd.getValidNodes(target);
@@ -288,7 +288,7 @@ var core;
             var expresion = new core.Expresion(exp);
             return {
                 update: function (entity) {
-                    if (entity.dependDirty(expresion.names)) {
+                    if (entity.dependDirty(expresion.names, scope)) {
                         // 更新target节点的innerText
                         target.innerText = expresion.run(scope);
                     }
@@ -306,7 +306,7 @@ var core;
             var expresion = new core.Expresion(exp);
             return {
                 update: function (entity) {
-                    if (entity.dependDirty(expresion.names)) {
+                    if (entity.dependDirty(expresion.names, scope)) {
                         // 更新target节点的innerHTML
                         target.innerHTML = expresion.run(scope);
                     }
@@ -327,7 +327,7 @@ var core;
             return {
                 update: function (entity) {
                     var first = (names == null);
-                    if (first || entity.dependDirty(names)) {
+                    if (first || entity.dependDirty(names, scope)) {
                         if (subCmd != "") {
                             // 子命令形式
                             var tempExp = new core.Expresion(exp);
@@ -385,7 +385,7 @@ var core;
             return {
                 update: function (entity) {
                     var first = (names == null);
-                    if (first || entity.dependDirty(names)) {
+                    if (first || entity.dependDirty(names, scope)) {
                         if (subCmd != "") {
                             // 子命令形式
                             var tempExp = new core.Expresion(exp);
@@ -423,21 +423,19 @@ var core;
             // 外面包一层function，因为要的是方法引用，而不是直接执行方法
             exp = "function($data){" + exp + "}";
             return {
-                update: function (entity) {
+                update: function () {
                     var first = (names == null);
-                    if (first || entity.dependDirty(names)) {
+                    if (first) {
                         if (subCmd != "") {
                             // 子命令形式
                             var tempExp = new core.Expresion(exp);
-                            if (first)
-                                names = tempExp.names;
+                            names = tempExp.names;
                             target.addEventListener(subCmd, tempExp.run(scope).bind(null, scope));
                         }
                         else {
                             // 集成形式
                             var tempExp = new core.Expresion(exp);
-                            if (first)
-                                names = tempExp.names;
+                            names = tempExp.names;
                             var params = tempExp.run(scope);
                             // 遍历所有params的key，在target上监听该事件
                             for (var name in params) {
@@ -498,7 +496,7 @@ var core;
             var expresion = new core.Expresion(exp);
             return {
                 update: function (entity) {
-                    if (entity.dependDirty(expresion.names)) {
+                    if (entity.dependDirty(expresion.names, scope)) {
                         var condition = expresion.run(scope);
                         target.style.display = (condition ? "" : "none");
                     }
@@ -538,6 +536,7 @@ var core;
             var listName = res[2];
             var parent = target.parentElement;
             var firstElement = target;
+            parent.removeChild(firstElement);
             target = target.cloneNode(true);
             // 去掉target中的a-for属性
             target.removeAttribute("data-a-for");
@@ -547,7 +546,7 @@ var core;
             return {
                 update: function (entity) {
                     var first = (names == null);
-                    if (first || entity.dependDirty(names)) {
+                    if (first || entity.dependDirty(names, scope)) {
                         // 首先清空当前已有的对象节点
                         var len = targets.length;
                         while (len--) {
@@ -562,9 +561,16 @@ var core;
                         if (typeof list == "number") {
                             for (var i = 0; i < list; i++) {
                                 // 构造一个新作用域
+                                var tempPath = listName + "[" + i + "]";
                                 var subScope = {};
                                 subScope.__proto__ = scope;
-                                subScope[subName] = i;
+                                Object.defineProperties(subScope, {
+                                    $data: { value: subScope, writable: false },
+                                    $parent: { value: scope, writable: false },
+                                    $root: { value: scope.$root, writable: false },
+                                    $path: { value: (scope === scope.$root ? tempPath : scope.$path + "." + tempPath), writable: false }
+                                });
+                                Object.defineProperty(subScope, subName, { value: i, writable: false });
                                 var tempUpdaters = update(i, entity, subScope, next);
                                 subUpdaters.push.apply(subUpdaters, tempUpdaters);
                             }
@@ -572,9 +578,17 @@ var core;
                         else if (list instanceof Array) {
                             for (var i = 0, len = list.length; i < len; i++) {
                                 // 构造一个新作用域
+                                var tempPath = listName + "[" + i + "]";
                                 var subScope = {};
                                 subScope.__proto__ = scope;
-                                subScope[subName] = list[i];
+                                Object.defineProperties(subScope, {
+                                    $data: { value: subScope, writable: false },
+                                    $parent: { value: scope, writable: false },
+                                    $root: { value: scope.$root, writable: false },
+                                    $path: { value: (scope === scope.$root ? tempPath : scope.$path + "." + tempPath), writable: false }
+                                });
+                                Object.defineProperty(subScope, subName, { value: entity.proxyData(list[i]), writable: false });
+                                Object.defineProperty(subScope[subName], "$path", { value: subScope.$path, writable: false });
                                 var tempUpdaters = update(i, entity, subScope, next);
                                 subUpdaters.push.apply(subUpdaters, tempUpdaters);
                             }
@@ -583,10 +597,17 @@ var core;
                             var index = 0;
                             for (var key in list) {
                                 // 构造一个新作用域
+                                var tempPath = listName + "[\"" + key + "\"]";
                                 var subScope = {};
                                 subScope.__proto__ = scope;
-                                subScope[subName] = list[key];
-                                subScope["$key"] = key;
+                                Object.defineProperties(subScope, {
+                                    $key: { value: key, writable: false },
+                                    $data: { value: subScope, writable: false },
+                                    $parent: { value: scope, writable: false },
+                                    $root: { value: scope.$root, writable: false },
+                                    $path: { value: (scope === scope.$root ? tempPath : scope.$path + "." + tempPath), writable: false }
+                                });
+                                Object.defineProperty(subScope, subName, { value: entity.proxyData(list[key]), writable: false });
                                 var tempUpdaters = update(index, entity, subScope, next);
                                 subUpdaters.push.apply(subUpdaters, tempUpdaters);
                                 index++;
@@ -685,19 +706,19 @@ var core;
 var core;
 (function (core) {
     var AresEntity = (function () {
-        function AresEntity(data, element) {
+        function AresEntity(data, element, path) {
+            if (path === void 0) { path = ""; }
             this._dirtyMap = {};
             this._dirtyId = 0;
             this._forceUpdate = false;
             this._element = element;
             this._data = data;
             // 向data中加入$data、$parent和$root参数，都是data本身，用以构建一个Scope对象
-            var func = function () { return data; };
             Object.defineProperties(data, {
-                $data: { get: func },
-                $parent: { get: func },
-                $root: { get: func },
-                $path: { get: function () { return ""; } }
+                $data: { value: data, writable: false },
+                $parent: { value: data, writable: false },
+                $root: { value: data, writable: false },
+                $path: { value: path, writable: false }
             });
             // 生成一个data的浅层拷贝对象，作为data原始值的保存
             this.proxyData(data);
@@ -706,80 +727,6 @@ var core;
             // 进行一次全局更新
             this.update(true);
         }
-        /**
-         * 为对象安插代理，会篡改对象中的实例为getter和setter，并且返回原始对象的副本
-         * @param data 要篡改的对象
-         */
-        AresEntity.prototype.proxyData = function (data) {
-            var original = {};
-            // 记录当前层次所有的属性，如果有复杂类型对象则递归之
-            var keys = Object.keys(data);
-            for (var i = 0, len = keys.length; i < len; i++) {
-                var key = keys[i];
-                var value = data[key];
-                switch (typeof value) {
-                    case "object":
-                        if (value instanceof Array) {
-                            // 是数组，对于其自身要和简单类型一样处理
-                            original[key] = value;
-                            Object.defineProperty(data, key, {
-                                configurable: true,
-                                enumerable: true,
-                                get: this.getProxy.bind(this, data, key),
-                                set: this.setProxy.bind(this, data, key)
-                            });
-                            // 篡改数组的特定方法
-                            var self = this;
-                            AresEntity._arrayMethods.map(function (method) {
-                                value[method] = function () {
-                                    // 调用原始方法
-                                    Array.prototype[method].apply(this, arguments);
-                                    // 更新
-                                    self.setDirty(data.$path, key);
-                                };
-                            }, this);
-                        }
-                        else if (value == null) {
-                            // null和简单类型一样处理
-                            original[key] = value;
-                            // 篡改为getter和setter
-                            Object.defineProperty(data, key, {
-                                configurable: true,
-                                enumerable: true,
-                                get: this.getProxy.bind(this, data, key),
-                                set: this.setProxy.bind(this, data, key)
-                            });
-                        }
-                        else {
-                            // 复杂类型，需要递归
-                            Object.defineProperties(value, {
-                                $data: { get: function () { return value; } },
-                                $parent: { get: function () { return data; } },
-                                $root: { get: function () { return data.$root; } },
-                                $path: { get: function () { return (data === data.$root ? key : data.$path + "." + key); } }
-                            });
-                            original[key] = this.proxyData(value);
-                        }
-                        break;
-                    case "function":
-                        // 是方法，直接记录之
-                        original[key] = value;
-                        break;
-                    default:
-                        // 简单类型，记录一个默认值
-                        original[key] = value;
-                        // 篡改为getter和setter
-                        Object.defineProperty(data, key, {
-                            configurable: true,
-                            enumerable: true,
-                            get: this.getProxy.bind(this, data, key),
-                            set: this.setProxy.bind(this, data, key)
-                        });
-                        break;
-                }
-            }
-            Object.defineProperty(data, "$original", { get: function () { return original; } });
-        };
         AresEntity.prototype.getProxy = function (scope, key) {
             return scope.$original[key];
         };
@@ -815,16 +762,110 @@ var core;
             this._forceUpdate = false;
         };
         /**
+         * 为对象安插代理，会篡改对象中的实例为getter和setter，并且返回原始对象的副本
+         * @param data 要篡改的对象
+         */
+        AresEntity.prototype.proxyData = function (data) {
+            if (data.$original)
+                return data;
+            var original = {};
+            // 记录当前层次所有的属性，如果有复杂类型对象则递归之
+            var keys = Object.keys(data);
+            for (var i = 0, len = keys.length; i < len; i++) {
+                var key = keys[i];
+                var value = data[key];
+                switch (typeof value) {
+                    case "object":
+                        if (value instanceof Array) {
+                            // 是数组，对于其自身要和简单类型一样处理
+                            original[key] = value;
+                            Object.defineProperty(data, key, {
+                                configurable: true,
+                                enumerable: true,
+                                get: this.getProxy.bind(this, data, key),
+                                set: this.setProxy.bind(this, data, key)
+                            });
+                            // 篡改数组的特定方法
+                            var self = this;
+                            AresEntity._arrayMethods.map(function (method) {
+                                Object.defineProperty(value, method, {
+                                    writable: false,
+                                    value: function () {
+                                        // 调用原始方法
+                                        Array.prototype[method].apply(this, arguments);
+                                        // 更新
+                                        self.setDirty(data.$path, key);
+                                    }
+                                });
+                            }, this);
+                        }
+                        else if (value == null) {
+                            // null和简单类型一样处理
+                            original[key] = value;
+                            // 篡改为getter和setter
+                            Object.defineProperty(data, key, {
+                                configurable: true,
+                                enumerable: true,
+                                get: this.getProxy.bind(this, data, key),
+                                set: this.setProxy.bind(this, data, key)
+                            });
+                        }
+                        else {
+                            // 复杂类型，需要递归
+                            Object.defineProperties(value, {
+                                $data: { value: value, writable: false },
+                                $parent: { value: data, writable: false },
+                                $root: { value: data.$root, writable: false },
+                                $path: { value: (data === data.$root ? key : data.$path + "." + key), writable: false }
+                            });
+                            original[key] = this.proxyData(value);
+                        }
+                        break;
+                    case "function":
+                        // 是方法，直接记录之
+                        original[key] = value;
+                        break;
+                    default:
+                        // 简单类型，记录一个默认值
+                        original[key] = value;
+                        // 篡改为getter和setter
+                        Object.defineProperty(data, key, {
+                            configurable: true,
+                            enumerable: true,
+                            get: this.getProxy.bind(this, data, key),
+                            set: this.setProxy.bind(this, data, key)
+                        });
+                        break;
+                }
+            }
+            Object.defineProperty(data, "$original", {
+                writable: false,
+                value: original
+            });
+            return data;
+        };
+        /**
          * 判断依赖项是否脏了
          * @param names 依赖项名字数组
+         * @param scope 当前所在的作用域
          * @returns {boolean} 是否脏了
          */
-        AresEntity.prototype.dependDirty = function (names) {
+        AresEntity.prototype.dependDirty = function (names, scope) {
             if (this._forceUpdate)
                 return true;
             for (var i = 0, len = names.length; i < len; i++) {
-                if (this._dirtyMap[names[i]])
+                var name = names[i];
+                if (this._dirtyMap[name])
                     return true;
+                if (scope.$path != "") {
+                    // 在前面加上scope路径试一下
+                    if (this._dirtyMap[scope.$path + "." + name])
+                        return true;
+                    // 替换掉第一个变量名试一下
+                    var index = name.indexOf(".");
+                    if (this._dirtyMap[scope.$path + "." + name.substr(index + 1)])
+                        return true;
+                }
             }
             return false;
         };

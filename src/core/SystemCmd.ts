@@ -31,7 +31,7 @@ namespace core
             return {
                 update: (entity:AresEntity)=>{
                     var first:boolean = (names == null);
-                    if(first || entity.dependDirty(names))
+                    if(first || entity.dependDirty(names, scope))
                     {
                         if(first) names = [];
                         var nodes:Node[] = TextContentCmd.getValidNodes(target);
@@ -81,7 +81,7 @@ namespace core
             var expresion:Expresion = new Expresion(exp);
             return {
                 update: (entity:AresEntity)=>{
-                    if(entity.dependDirty(expresion.names))
+                    if(entity.dependDirty(expresion.names, scope))
                     {
                         // 更新target节点的innerText
                         target.innerText = expresion.run(scope);
@@ -99,7 +99,7 @@ namespace core
             var expresion:Expresion = new Expresion(exp);
             return {
                 update: (entity:AresEntity)=>{
-                    if(entity.dependDirty(expresion.names))
+                    if(entity.dependDirty(expresion.names, scope))
                     {
                         // 更新target节点的innerHTML
                         target.innerHTML = expresion.run(scope);
@@ -120,7 +120,7 @@ namespace core
             return {
                 update: (entity:AresEntity)=>{
                     var first:boolean = (names == null);
-                    if(first || entity.dependDirty(names))
+                    if(first || entity.dependDirty(names, scope))
                     {
                         if(subCmd != "")
                         {
@@ -177,7 +177,7 @@ namespace core
             return {
                 update: (entity:AresEntity)=>{
                     var first:boolean = (names == null);
-                    if(first || entity.dependDirty(names))
+                    if(first || entity.dependDirty(names, scope))
                     {
                         if(subCmd != "")
                         {
@@ -216,22 +216,22 @@ namespace core
             // 外面包一层function，因为要的是方法引用，而不是直接执行方法
             exp = "function($data){" + exp + "}";
             return {
-                update: (entity:AresEntity)=>{
+                update: ()=>{
                     var first:boolean = (names == null);
-                    if(first || entity.dependDirty(names))
+                    if(first)
                     {
                         if(subCmd != "")
                         {
                             // 子命令形式
                             var tempExp:Expresion = new Expresion(exp);
-                            if(first) names = tempExp.names;
+                            names = tempExp.names;
                             target.addEventListener(subCmd, tempExp.run(scope).bind(null, scope));
                         }
                         else
                         {
                             // 集成形式
                             var tempExp:Expresion = new Expresion(exp);
-                            if(first) names = tempExp.names;
+                            names = tempExp.names;
                             var params:any = tempExp.run(scope);
                             // 遍历所有params的key，在target上监听该事件
                             for(var name in params)
@@ -300,7 +300,7 @@ namespace core
             var expresion:Expresion = new Expresion(exp);
             return {
                 update: (entity:AresEntity)=>{
-                    if(entity.dependDirty(expresion.names))
+                    if(entity.dependDirty(expresion.names, scope))
                     {
                         var condition:boolean = expresion.run(scope);
                         target.style.display = (condition ? "" : "none");
@@ -338,6 +338,7 @@ namespace core
             var listName:string = res[2];
             var parent:HTMLElement = target.parentElement;
             var firstElement:HTMLElement = target;
+            parent.removeChild(firstElement);
             target = target.cloneNode(true) as HTMLElement;
             // 去掉target中的a-for属性
             target.removeAttribute("data-a-for");
@@ -347,7 +348,7 @@ namespace core
             return {
                 update: (entity:AresEntity)=>{
                     var first:boolean = (names == null);
-                    if(first || entity.dependDirty(names))
+                    if(first || entity.dependDirty(names, scope))
                     {
                         // 首先清空当前已有的对象节点
                         var len:number = targets.length;
@@ -365,9 +366,16 @@ namespace core
                             for(var i:number = 0; i < list; i++)
                             {
                                 // 构造一个新作用域
+                                var tempPath:string = `${listName}[${i}]`;
                                 var subScope:any = {};
                                 subScope.__proto__ = scope;
-                                subScope[subName] = i;
+                                Object.defineProperties(subScope, {
+                                    $data: {value: subScope, writable: false},
+                                    $parent: {value: scope, writable: false},
+                                    $root: {value: scope.$root, writable: false},
+                                    $path: {value: (scope === scope.$root ? tempPath : scope.$path + "." + tempPath), writable: false}
+                                });
+                                Object.defineProperty(subScope, subName, {value: i, writable: false});
                                 var tempUpdaters:Updater[] = update(i, entity, subScope, next);
                                 subUpdaters.push.apply(subUpdaters, tempUpdaters);
                             }
@@ -377,9 +385,17 @@ namespace core
                             for(var i:number = 0, len:number = list.length; i < len; i++)
                             {
                                 // 构造一个新作用域
+                                var tempPath:string = `${listName}[${i}]`;
                                 var subScope:any = {};
                                 subScope.__proto__ = scope;
-                                subScope[subName] = list[i];
+                                Object.defineProperties(subScope, {
+                                    $data: {value: subScope, writable: false},
+                                    $parent: {value: scope, writable: false},
+                                    $root: {value: scope.$root, writable: false},
+                                    $path: {value: (scope === scope.$root ? tempPath : scope.$path + "." + tempPath), writable: false}
+                                });
+                                Object.defineProperty(subScope, subName, {value: entity.proxyData(list[i]), writable: false});
+                                Object.defineProperty(subScope[subName], "$path", {value: subScope.$path, writable: false});
                                 var tempUpdaters:Updater[] = update(i, entity, subScope, next);
                                 subUpdaters.push.apply(subUpdaters, tempUpdaters);
                             }
@@ -390,10 +406,17 @@ namespace core
                             for(var key in list)
                             {
                                 // 构造一个新作用域
+                                var tempPath:string = `${listName}["${key}"]`;
                                 var subScope:any = {};
                                 subScope.__proto__ = scope;
-                                subScope[subName] = list[key];
-                                subScope["$key"] = key;
+                                Object.defineProperties(subScope, {
+                                    $key: {value: key, writable: false},
+                                    $data: {value: subScope, writable: false},
+                                    $parent: {value: scope, writable: false},
+                                    $root: {value: scope.$root, writable: false},
+                                    $path: {value: (scope === scope.$root ? tempPath : scope.$path + "." + tempPath), writable: false}
+                                });
+                                Object.defineProperty(subScope, subName, {value: entity.proxyData(list[key]), writable: false});
                                 var tempUpdaters:Updater[] = update(index, entity, subScope, next);
                                 subUpdaters.push.apply(subUpdaters, tempUpdaters);
                                 index ++;
