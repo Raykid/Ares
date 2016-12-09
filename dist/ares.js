@@ -569,7 +569,7 @@ var core;
                                 subUpdaters.push.apply(subUpdaters, tempUpdaters);
                             }
                         }
-                        else {
+                        else if (list instanceof Array) {
                             for (var i = 0, len = list.length; i < len; i++) {
                                 // 构造一个新作用域
                                 var subScope = {};
@@ -577,6 +577,19 @@ var core;
                                 subScope[subName] = list[i];
                                 var tempUpdaters = update(i, entity, subScope, next);
                                 subUpdaters.push.apply(subUpdaters, tempUpdaters);
+                            }
+                        }
+                        else {
+                            var index = 0;
+                            for (var key in list) {
+                                // 构造一个新作用域
+                                var subScope = {};
+                                subScope.__proto__ = scope;
+                                subScope[subName] = list[key];
+                                subScope["$key"] = key;
+                                var tempUpdaters = update(index, entity, subScope, next);
+                                subUpdaters.push.apply(subUpdaters, tempUpdaters);
+                                index++;
                             }
                         }
                     }

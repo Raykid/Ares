@@ -372,7 +372,7 @@ namespace core
                                 subUpdaters.push.apply(subUpdaters, tempUpdaters);
                             }
                         }
-                        else
+                        else if(list instanceof Array)
                         {
                             for(var i:number = 0, len:number = list.length; i < len; i++)
                             {
@@ -382,6 +382,21 @@ namespace core
                                 subScope[subName] = list[i];
                                 var tempUpdaters:Updater[] = update(i, entity, subScope, next);
                                 subUpdaters.push.apply(subUpdaters, tempUpdaters);
+                            }
+                        }
+                        else
+                        {
+                            var index:number = 0;
+                            for(var key in list)
+                            {
+                                // 构造一个新作用域
+                                var subScope:any = {};
+                                subScope.__proto__ = scope;
+                                subScope[subName] = list[key];
+                                subScope["$key"] = key;
+                                var tempUpdaters:Updater[] = update(index, entity, subScope, next);
+                                subUpdaters.push.apply(subUpdaters, tempUpdaters);
+                                index ++;
                             }
                         }
                     }
