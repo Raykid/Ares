@@ -239,11 +239,10 @@ namespace core
             {
                 // 执行文本域命令
                 var tcCmd:TextContentCmd = TextContentCmd.getInstance();
-                var tcExp:string = element.innerText;
-                if(tcCmd.needParse(element, tcExp))
+                if(tcCmd.needParse(element))
                 {
                     // 添加文本域命令
-                    updaters.push(tcCmd.exec(element, tcExp, scope));
+                    updaters.push(tcCmd.exec(element, element.innerHTML, scope));
                 }
                 // 遍历子节点
                 var children:HTMLCollection = element.children;

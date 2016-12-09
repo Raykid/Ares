@@ -12,6 +12,19 @@ namespace core
             return TextContentCmd._instance;
         }
 
+        private static getValidNodes(target:HTMLElement):Node[]
+        {
+            // 取出target中所有的text节点
+            var nodes:NodeList = target.childNodes;
+            var res:Node[] = [];
+            for(var i:number = 0, len:number = nodes.length; i < len; i++)
+            {
+                var node:Node = nodes[i];
+                if(node.nodeType == 3) res.push(node);
+            }
+            return res;
+        }
+
         public exec(target:HTMLElement, exp:string, scope:Scope):Updater
         {
             var names:string[];
@@ -21,28 +34,43 @@ namespace core
                     if(first || entity.dependDirty(names))
                     {
                         if(first) names = [];
-                        var temp:string = exp;
-                        // 依序将{{}}计算出来
-                        for(var res:ContentResult = Expresion.getContentBetween(temp, "{{", "}}"); res != null; res = Expresion.getContentBetween(temp, "{{", "}}"))
+                        var nodes:Node[] = TextContentCmd.getValidNodes(target);
+                        for(var i:number = 0, len:number = nodes.length; i < len; i++)
                         {
-                            var tempExp:Expresion = new Expresion(res.value);
-                            temp = temp.substr(0, res.begin - 2) + tempExp.run(scope) + temp.substr(res.end + 2);
-                            if(first) names.push.apply(names, tempExp.names);
+                            var node:Node = nodes[i];
+                            var temp:string = node.nodeValue;
+                            var hasChange:boolean = false;
+                            // 依序将{{}}计算出来
+                            for(var res:ContentResult = Expresion.getContentBetween(temp, "{{", "}}"); res != null; res = Expresion.getContentBetween(temp, "{{", "}}"))
+                            {
+                                var tempExp:Expresion = new Expresion(res.value);
+                                temp = temp.substr(0, res.begin - 2) + tempExp.run(scope) + temp.substr(res.end + 2);
+                                if(first) names.push.apply(names, tempExp.names);
+                                hasChange = true;
+                            }
+                            // 更新target节点的内容
+                            if(hasChange)
+                            {
+                                var newNode:Node = node.cloneNode(false);
+                                newNode.nodeValue = temp;
+                                target.replaceChild(newNode, node);
+                            }
                         }
-                        // 更新target节点的innerText
-                        target.innerText = temp;
                     }
                 }
             };
         }
 
-        public needParse(target:HTMLElement, exp:string):boolean
+        public needParse(target:HTMLElement):boolean
         {
-            // 不是叶子节点不给转换
-            if(target.children.length > 0) return false;
+            var nodes:Node[] = TextContentCmd.getValidNodes(target);
             // 看看有没有被{{}}包围的内容
-            var res:ContentResult = Expresion.getContentBetween(exp, "{{", "}}");
-            return (res != null);
+            for(var i:number = 0, len:number = nodes.length; i < len; i++)
+            {
+                var res:ContentResult = Expresion.getContentBetween(nodes[i].nodeValue, "{{", "}}");
+                if(res != null) return true;
+            }
+            return false;
         }
     }
     /** 文本命令 */

@@ -223,6 +223,17 @@ var core;
         TextContentCmd.getInstance = function () {
             return TextContentCmd._instance;
         };
+        TextContentCmd.getValidNodes = function (target) {
+            // 取出target中所有的text节点
+            var nodes = target.childNodes;
+            var res = [];
+            for (var i = 0, len = nodes.length; i < len; i++) {
+                var node = nodes[i];
+                if (node.nodeType == 3)
+                    res.push(node);
+            }
+            return res;
+        };
         TextContentCmd.prototype.exec = function (target, exp, scope) {
             var names;
             return {
@@ -231,27 +242,39 @@ var core;
                     if (first || entity.dependDirty(names)) {
                         if (first)
                             names = [];
-                        var temp = exp;
-                        // 依序将{{}}计算出来
-                        for (var res = core.Expresion.getContentBetween(temp, "{{", "}}"); res != null; res = core.Expresion.getContentBetween(temp, "{{", "}}")) {
-                            var tempExp = new core.Expresion(res.value);
-                            temp = temp.substr(0, res.begin - 2) + tempExp.run(scope) + temp.substr(res.end + 2);
-                            if (first)
-                                names.push.apply(names, tempExp.names);
+                        var nodes = TextContentCmd.getValidNodes(target);
+                        for (var i = 0, len = nodes.length; i < len; i++) {
+                            var node = nodes[i];
+                            var temp = node.nodeValue;
+                            var hasChange = false;
+                            // 依序将{{}}计算出来
+                            for (var res = core.Expresion.getContentBetween(temp, "{{", "}}"); res != null; res = core.Expresion.getContentBetween(temp, "{{", "}}")) {
+                                var tempExp = new core.Expresion(res.value);
+                                temp = temp.substr(0, res.begin - 2) + tempExp.run(scope) + temp.substr(res.end + 2);
+                                if (first)
+                                    names.push.apply(names, tempExp.names);
+                                hasChange = true;
+                            }
+                            // 更新target节点的内容
+                            if (hasChange) {
+                                var newNode = node.cloneNode(false);
+                                newNode.nodeValue = temp;
+                                target.replaceChild(newNode, node);
+                            }
                         }
-                        // 更新target节点的innerText
-                        target.innerText = temp;
                     }
                 }
             };
         };
-        TextContentCmd.prototype.needParse = function (target, exp) {
-            // 不是叶子节点不给转换
-            if (target.children.length > 0)
-                return false;
+        TextContentCmd.prototype.needParse = function (target) {
+            var nodes = TextContentCmd.getValidNodes(target);
             // 看看有没有被{{}}包围的内容
-            var res = core.Expresion.getContentBetween(exp, "{{", "}}");
-            return (res != null);
+            for (var i = 0, len = nodes.length; i < len; i++) {
+                var res = core.Expresion.getContentBetween(nodes[i].nodeValue, "{{", "}}");
+                if (res != null)
+                    return true;
+            }
+            return false;
         };
         TextContentCmd._instance = new TextContentCmd();
         return TextContentCmd;
@@ -841,10 +864,9 @@ var core;
             if (!stopCompile) {
                 // 执行文本域命令
                 var tcCmd = core.TextContentCmd.getInstance();
-                var tcExp = element.innerText;
-                if (tcCmd.needParse(element, tcExp)) {
+                if (tcCmd.needParse(element)) {
                     // 添加文本域命令
-                    updaters.push(tcCmd.exec(element, tcExp, scope));
+                    updaters.push(tcCmd.exec(element, element.innerHTML, scope));
                 }
                 // 遍历子节点
                 var children = element.children;
