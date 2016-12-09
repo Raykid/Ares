@@ -408,9 +408,7 @@ var core;
                             var tempExp = new core.Expresion(exp);
                             if (first)
                                 names = tempExp.names;
-                            target.addEventListener(subCmd, function () {
-                                tempExp.run(scope)(scope);
-                            });
+                            target.addEventListener(subCmd, tempExp.run(scope).bind(null, scope));
                         }
                         else {
                             // 集成形式
@@ -420,7 +418,7 @@ var core;
                             var params = tempExp.run(scope);
                             // 遍历所有params的key，在target上监听该事件
                             for (var name in params) {
-                                target.addEventListener(name, params[name].bind(scope));
+                                target.addEventListener(name, params[name].bind(null, scope));
                             }
                         }
                     }

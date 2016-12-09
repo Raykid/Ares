@@ -197,9 +197,7 @@ namespace core
                             // 子命令形式
                             var tempExp:Expresion = new Expresion(exp);
                             if(first) names = tempExp.names;
-                            target.addEventListener(subCmd, ()=>{
-                                tempExp.run(scope)(scope);
-                            });
+                            target.addEventListener(subCmd, tempExp.run(scope).bind(null, scope));
                         }
                         else
                         {
@@ -210,7 +208,7 @@ namespace core
                             // 遍历所有params的key，在target上监听该事件
                             for(var name in params)
                             {
-                                target.addEventListener(name, params[name].bind(scope));
+                                target.addEventListener(name, params[name].bind(null, scope));
                             }
                         }
                     }
