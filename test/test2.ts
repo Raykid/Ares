@@ -1,5 +1,5 @@
-/// <reference path="../src/ares/Ares.ts"/>
-/// <reference path="../src/ares/html/HTMLCompiler.ts"/>
+/// <reference path="../dist/ares.d.ts"/>
+/// <reference path="../dist/ares_html.d.ts"/>
 
 /**
  * Created by Raykid on 2016/12/23.

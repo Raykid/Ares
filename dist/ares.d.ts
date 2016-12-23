@@ -1,9 +1,14 @@
 /**
- * Created by Raykid on 2016/12/22.
+ * Created by Raykid on 2016/12/23.
  */
-namespace ares
+declare interface Array<T> {
+    $remove(item: T): Array<T>;
+    $set(index: any, val: T): T;
+}
+
+declare namespace ares
 {
-    export interface Compiler
+    interface Compiler
     {
         /**
          * 初始化编译器
@@ -18,7 +23,7 @@ namespace ares
         compile(target:any, scope:any):void;
     }
 
-    export interface IAres
+    interface IAres
     {
         /** 获取ViewModel */
         data:any;
@@ -31,12 +36,12 @@ namespace ares
         createWatcher(exp:string, scope:any, callback:WatcherCallback):IWatcher;
     }
 
-    export interface AresOptions
+    interface AresOptions
     {
         inited:(entity?:IAres)=>void;
     }
 
-    export interface IWatcher
+    interface IWatcher
     {
         /**
          * 获取到表达式当前最新值
@@ -50,8 +55,15 @@ namespace ares
         update(extra?:any):void
     }
 
-    export interface WatcherCallback
+    interface WatcherCallback
     {
         (newValue?:any, oldValue?:any, extra?:any):void;
     }
 }
+
+declare interface AresStatic
+{
+    bind(data:any, compiler:ares.Compiler, options?:ares.AresOptions):ares.IAres;
+}
+
+declare var ares:AresStatic;

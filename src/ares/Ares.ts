@@ -14,7 +14,7 @@ namespace ares
      * @param options 一些额外参数
      * @returns {core.AresEntity} 绑定实体对象
      */
-    export function bind(data:any, compiler:Compiler, options?:any):ares.Ares
+    export function bind(data:any, compiler:Compiler, options?:ares.AresOptions):ares.IAres
     {
         return new Ares(data, compiler, options);
     }
@@ -31,7 +31,7 @@ namespace ares
             return this._data;
         }
 
-        public constructor(data:any, compiler:ares.Compiler, options?:ares.Options)
+        public constructor(data:any, compiler:ares.Compiler, options?:ares.AresOptions)
         {
             // 判断DOM是否已经生成完毕
             if(document.body)
@@ -46,7 +46,7 @@ namespace ares
             }
         }
 
-        private doInited(data:any, compiler:ares.Compiler, options:ares.Options):void
+        private doInited(data:any, compiler:ares.Compiler, options:ares.AresOptions):void
         {
             // 记录变异对象
             this._data = ares.Mutator.mutate(data);
@@ -65,10 +65,5 @@ namespace ares
         {
             return new Watcher(exp, scope, callback);
         }
-    }
-
-    export interface Options
-    {
-        inited:(entity?:Ares)=>void;
     }
 }
