@@ -1,986 +1,363 @@
 /**
- * Created by Raykid on 2016/12/6.
+ * Created by Raykid on 2016/12/22.
  */
-var core;
-(function (core) {
-    var Expresion = (function () {
-        function Expresion(exp) {
-            var res = Expresion.changeParamNames(exp);
-            this._exp = res.exp;
-            this._names = res.names;
+var ares;
+(function (ares) {
+    var Dep = (function () {
+        function Dep() {
+            this._map = {};
         }
-        Object.defineProperty(Expresion.prototype, "names", {
+        /**
+         * 添加数据变更订阅者
+         * @param watcher 数据变更订阅者
+         */
+        Dep.prototype.watch = function (watcher) {
+            if (!this._map[watcher.uid]) {
+                this._map[watcher.uid] = watcher;
+            }
+        };
+        /**
+         * 数据变更，通知所有订阅者
+         * @param extra 可能的额外数据
+         */
+        Dep.prototype.notify = function (extra) {
+            for (var uid in this._map) {
+                var watcher = this._map[uid];
+                watcher.update(extra);
+            }
+        };
+        return Dep;
+    })();
+    ares.Dep = Dep;
+})(ares || (ares = {}));
+/**
+ * Created by Raykid on 2016/12/22.
+ * 数据更新订阅者，当依赖的数据有更新时会触发callback通知外面
+ */
+var ares;
+(function (ares) {
+    var Watcher = (function () {
+        function Watcher(exp, scope, callback) {
+            // 生成一个全局唯一的ID
+            this._uid = Watcher._uid++;
+            // 记录表达式和作用域
+            this._exp = exp;
+            this._scope = scope;
+            // 将表达式和作用域解析为一个Function
+            this._expFunc = ares.utils.createEvalFunc(exp);
+            // 记录回调函数
+            this._callback = callback;
+            // 进行首次更新
+            this.update();
+        }
+        Object.defineProperty(Watcher.prototype, "uid", {
+            /** 获取Watcher的全局唯一ID */
             get: function () {
-                return this._names;
+                return this._uid;
             },
             enumerable: true,
             configurable: true
         });
-        Expresion.prototype.run = function (scope) {
-            return new Function("$data", "return " + this._exp)(scope);
+        /**
+         * 获取到表达式当前最新值
+         * @returns {any} 最新值
+         */
+        Watcher.prototype.getValue = function () {
+            var value = null;
+            // 记录自身
+            Watcher.updating = this;
+            // 表达式求值
+            try {
+                value = this._expFunc(this._scope);
+            }
+            catch (err) {
+                // 输出错误日志
+                console.error("表达式求值错误，exp：" + this._exp + "，scope：" + JSON.stringify(this._scope));
+            }
+            // 移除自身记录
+            Watcher.updating = null;
+            return value;
         };
-        Expresion.parseOriExp = function (exp) {
-            var names = [];
-            if (exp == "")
-                return { exp: exp, names: names };
-            // 分别将""和''找出来，然后将其两边的字符串递归处理，最后再用正则表达式匹配
-            var first1 = Expresion.getFirst(exp, "'");
-            var first2 = Expresion.getFirst(exp, '"');
-            var first, second;
-            if (!first1 && !first2) {
-                var localVarMap = {};
-                // 啥都没有，使用正则表达式匹配
-                exp = exp.replace(/[a-z\$][\w\.\$]*/ig, function (str, index, exp) {
-                    if (str.indexOf("$data.") != 0) {
-                        // 如果前面4个字符是var或者let或const则作为局部变量，不进行替换
-                        var tempVar = exp.substr(index - 4, 4);
-                        if (tempVar == "var " || tempVar == "let " || exp.substr(index - 6, 6) == "const ") {
-                            localVarMap[str] = true;
-                            return str;
-                        }
-                        // 如果是局部变量则不进行替换
-                        if (localVarMap[str])
-                            return str;
-                        // 如果str和冒号:之间都是空白字符或者没有字符，则不替换$data
-                        var end = index + str.length;
-                        var i = exp.indexOf(":", end);
-                        if (i > index) {
-                            var temp = exp.substring(end, i);
-                            if (/^\s*$/.test(temp))
-                                return str;
-                        }
-                        // 如果是)后面跟着个.则不替换，因为是方法执行后的取值操作
-                        if (exp.substr(index - 2, 2) == ").")
-                            return str;
-                        // 如果是true或false则不进行替换
-                        if (str == "true" || str == "false")
-                            return str;
-                        // 如果是js关键字则不替换
-                        if (Expresion._keyWords[str])
-                            return str;
-                        // 如果是在catch括号内部的变量不替换
-                        if (exp.substr(index - 6, 6) == "catch(")
-                            return str;
-                        // 如果是$data本身则不进行替换
-                        if (str == "$data")
-                            return str;
-                        // 如果window下存在这个变量，则不进行替换
-                        var iDot = str.indexOf(".");
-                        if (iDot < 0)
-                            iDot = str.length;
-                        var argName = str.substr(0, iDot);
-                        if (window[argName])
-                            return str;
-                        // 否则记录名字并添加$data前缀
-                        names.push(str);
-                        str = "$data." + str;
-                    }
-                    return str;
-                });
+        /**
+         * 当依赖的数据有更新时调用该方法
+         * @param extra 可能的额外数据
+         */
+        Watcher.prototype.update = function (extra) {
+            var value = this.getValue();
+            if (!Watcher.isEqual(value, this._value)) {
+                this._callback && this._callback(value, this._value, extra);
+                this._value = Watcher.deepCopy(value);
+            }
+        };
+        /**
+         * 是否相等，包括基础类型和对象/数组的对比
+         */
+        Watcher.isEqual = function (a, b) {
+            return (a == b || (Watcher.isObject(a) && Watcher.isObject(b)
+                ? JSON.stringify(a) == JSON.stringify(b)
+                : false));
+        };
+        /**
+         * 是否为对象(包括数组、正则等)
+         */
+        Watcher.isObject = function (obj) {
+            return (obj && typeof obj == "object");
+        };
+        /**
+         * 复制对象，若为对象则深度复制
+         */
+        Watcher.deepCopy = function (from) {
+            if (Watcher.isObject(from)) {
+                // 复杂类型对象，先字符串化，再对象化
+                return JSON.parse(JSON.stringify(from));
             }
             else {
-                if (first1 && first2)
-                    if (first1.begin < first2.begin)
-                        first = first1;
-                    else
-                        first = first2;
-                else if (first1)
-                    first = first1;
-                else if (first2)
-                    first = first2;
-                second = Expresion.getFirst(exp, first.value, first.end);
-                var part1 = Expresion.parseOriExp(exp.substr(0, first.begin));
-                var part2 = exp.substring(first.begin, second.end);
-                var part3 = Expresion.parseOriExp(exp.substr(second.end));
-                exp = part1.exp + part2 + part3.exp;
-                // 记录名字
-                names.push.apply(names, part1.names);
-                names.push.apply(names, part3.names);
+                // 基本类型对象，直接返回之
+                return from;
             }
-            return { exp: exp, names: names };
         };
-        Expresion.parseTempExp = function (exp) {
-            var names = [];
-            if (exp == "")
-                return { exp: exp, names: names };
-            var res = Expresion.getContentBetween(exp, "\\$\\{", "\\}");
-            if (res) {
-                // ${}内部是正规的js表达式，所以用常规方式解析，左边直接截取即可，右面递归解析模板方式
-                var part1 = exp.substr(0, res.begin);
-                var part2 = Expresion.parseOriExp(res.value);
-                var part3 = Expresion.parseTempExp(exp.substr(res.end + 1));
-                exp = part1 + part2.exp + "}" + part3.exp;
-                // 记录名字
-                names.push.apply(names, part2.names);
-                names.push.apply(names, part3.names);
-            }
-            return { exp: exp, names: names };
-        };
-        /**
-         * 获取第一个出现的指定标识的数据
-         * @param exp 原始表达式
-         * @param flag 指定标识
-         * @param from 起始索引
-         * @returns {ContentResult} 在exp中首次出现flag的数据
-         */
-        Expresion.getFirst = function (exp, flag, from) {
-            if (from === void 0) { from = 0; }
-            var reg = new RegExp("(\\\\*)" + flag, "g");
-            reg.lastIndex = from;
-            for (var res = reg.exec(exp); res != null; res = reg.exec(exp)) {
-                // 如果字符前面的\是奇数个，表示这个字符是被转义的，不是目标字符
-                if (res[1].length % 2 == 0) {
-                    return {
-                        begin: res.index,
-                        end: res.index + res[0].length,
-                        value: res[0]
-                    };
-                }
-            }
-            return null;
-        };
-        /**
-         * 获取flag表示的字符之间所有的字符，该字符前面如果有\则会当做普通字符，而不会作为flag字符
-         * @param exp 原始表达式
-         * @param begin 边界开始字符串
-         * @param end 边界结束字符串
-         * @returns {ContentResult} 内容结构体
-         */
-        Expresion.getContentBetween = function (exp, begin, end) {
-            var bRes = Expresion.getFirst(exp, begin);
-            if (!bRes)
-                return null;
-            var eRes = Expresion.getFirst(exp, end, bRes.end);
-            if (!eRes)
-                return null;
-            return {
-                begin: bRes.end,
-                end: eRes.begin,
-                value: exp.substring(bRes.end, eRes.begin)
-            };
-        };
-        /**
-         * 将表达式中所有不以$data.开头的变量都加上$data.，以防找不到变量
-         * @param exp 字符串表达式
-         * @returns {string} 处理后的表达式
-         */
-        Expresion.changeParamNames = function (exp) {
-            var names = [];
-            if (exp == null || exp == "")
-                return { exp: exp, names: names };
-            // 用普通字符串方式处理模板字符串前面的部分，用模板字符串方式处理模板字符串部分，然后递归处理剩余部分
-            var res = Expresion.getContentBetween(exp, "`", "`");
-            if (res) {
-                var part1 = Expresion.parseOriExp(exp.substr(0, res.begin - 1));
-                var part2 = Expresion.parseTempExp(res.value);
-                var part3 = Expresion.changeParamNames(exp.substr(res.end + 1));
-                exp = part1.exp + "`" + part2.exp + "`" + part3.exp;
-                // 记录名字
-                names.push.apply(names, part1.names);
-                names.push.apply(names, part2.names);
-                names.push.apply(names, part3.names);
-            }
-            else {
-                var temp = Expresion.parseOriExp(exp);
-                exp = temp.exp;
-                // 记录名字
-                names.push.apply(names, temp.names);
-            }
-            // 为names去重
-            var tempMap = {};
-            names = names.filter(function (name) {
-                if (!tempMap[name]) {
-                    tempMap[name] = true;
-                    return true;
-                }
-                return false;
-            }, this);
-            return { exp: exp, names: names };
-        };
-        Expresion._keyWords = {
-            "function": true,
-            "var": true,
-            "let": true,
-            "const": true,
-            "try": true,
-            "catch": true,
-            "return": true,
-            "null": true
-        };
-        return Expresion;
+        /** 记录当前正在执行update方法的Watcher引用 */
+        Watcher.updating = null;
+        Watcher._uid = 0;
+        return Watcher;
     })();
-    core.Expresion = Expresion;
-})(core || (core = {}));
+    ares.Watcher = Watcher;
+})(ares || (ares = {}));
+/// <reference path="Dep.ts"/>
+/// <reference path="Watcher.ts"/>
 /**
- * Created by Raykid on 2016/12/6.
+ * Created by Raykid on 2016/12/22.
  */
-var core;
-(function (core) {
-    /** 文本内容命令 */
-    var TextContentCmd = (function () {
-        function TextContentCmd() {
+var ares;
+(function (ares) {
+    var Mutator = (function () {
+        function Mutator() {
         }
-        TextContentCmd.getInstance = function () {
-            return TextContentCmd._instance;
-        };
-        TextContentCmd.getValidNodes = function (target) {
-            // 取出target中所有的text节点
-            var nodes = target.childNodes;
-            var res = [];
-            for (var i = 0, len = nodes.length; i < len; i++) {
-                var node = nodes[i];
-                if (node.nodeType == 3)
-                    res.push(node);
-            }
-            return res;
-        };
-        TextContentCmd.prototype.exec = function (target, exp, scope) {
-            var names;
-            return {
-                update: function (entity) {
-                    var first = (names == null);
-                    if (first || entity.dependDirty(names, scope)) {
-                        if (first)
-                            names = [];
-                        var nodes = TextContentCmd.getValidNodes(target);
-                        for (var i = 0, len = nodes.length; i < len; i++) {
-                            var node = nodes[i];
-                            var temp = node.nodeValue;
-                            var hasChange = false;
-                            // 依序将{{}}计算出来
-                            for (var res = core.Expresion.getContentBetween(temp, "{{", "}}"); res != null; res = core.Expresion.getContentBetween(temp, "{{", "}}")) {
-                                var tempExp = new core.Expresion(res.value);
-                                temp = temp.substr(0, res.begin - 2) + tempExp.run(scope) + temp.substr(res.end + 2);
-                                if (first)
-                                    names.push.apply(names, tempExp.names);
-                                hasChange = true;
-                            }
-                            // 更新target节点的内容
-                            if (hasChange) {
-                                var newNode = node.cloneNode(false);
-                                newNode.nodeValue = temp;
-                                target.replaceChild(newNode, node);
-                            }
-                        }
-                    }
-                }
-            };
-        };
-        TextContentCmd.prototype.needParse = function (target) {
-            var nodes = TextContentCmd.getValidNodes(target);
-            // 看看有没有被{{}}包围的内容
-            for (var i = 0, len = nodes.length; i < len; i++) {
-                var res = core.Expresion.getContentBetween(nodes[i].nodeValue, "{{", "}}");
-                if (res != null)
-                    return true;
-            }
-            return false;
-        };
-        TextContentCmd._instance = new TextContentCmd();
-        return TextContentCmd;
-    })();
-    core.TextContentCmd = TextContentCmd;
-    /** 文本命令 */
-    var TextCmd = (function () {
-        function TextCmd() {
-        }
-        TextCmd.prototype.exec = function (target, exp, scope) {
-            var expresion = new core.Expresion(exp);
-            return {
-                update: function (entity) {
-                    if (entity.dependDirty(expresion.names, scope)) {
-                        // 更新target节点的innerText
-                        target.innerText = expresion.run(scope);
-                    }
-                }
-            };
-        };
-        return TextCmd;
-    })();
-    core.TextCmd = TextCmd;
-    /** HTML文本命令 */
-    var HtmlCmd = (function () {
-        function HtmlCmd() {
-        }
-        HtmlCmd.prototype.exec = function (target, exp, scope) {
-            var expresion = new core.Expresion(exp);
-            return {
-                update: function (entity) {
-                    if (entity.dependDirty(expresion.names, scope)) {
-                        // 更新target节点的innerHTML
-                        target.innerHTML = expresion.run(scope);
-                    }
-                }
-            };
-        };
-        return HtmlCmd;
-    })();
-    core.HtmlCmd = HtmlCmd;
-    /** CSS类型命令 */
-    var CssCmd = (function () {
-        function CssCmd() {
-        }
-        CssCmd.prototype.exec = function (target, exp, scope, subCmd) {
-            var names = null;
-            // 记录原始class值
-            var oriCls = target.getAttribute("class");
-            return {
-                update: function (entity) {
-                    var first = (names == null);
-                    if (first || entity.dependDirty(names, scope)) {
-                        if (subCmd != "") {
-                            // 子命令形式
-                            var tempExp = new core.Expresion(exp);
-                            if (first)
-                                names = tempExp.names;
-                            var match = tempExp.run(scope);
-                            if (match == true) {
-                                var newCls = subCmd;
-                                if (oriCls)
-                                    newCls = oriCls + " " + newCls;
-                                // 更新target节点的class属性
-                                target.setAttribute("class", newCls);
-                            }
-                        }
-                        else {
-                            var tempExp = new core.Expresion(exp);
-                            if (first)
-                                names = tempExp.names;
-                            var params = tempExp.run(scope);
-                            if (typeof params == "string") {
-                                // 直接赋值形式
-                                if (oriCls)
-                                    params = oriCls + " " + params;
-                                // 更新target节点的class属性
-                                target.setAttribute("class", params);
-                            }
-                            else {
-                                // 集成形式
-                                var arr = [];
-                                if (oriCls)
-                                    arr.push(oriCls);
-                                // 遍历所有params的key，如果其表达式值为true则添加其类型
-                                for (var cls in params) {
-                                    if (params[cls] == true)
-                                        arr.push(cls);
-                                }
-                                // 更新target节点的class属性
-                                if (arr.length > 0)
-                                    target.setAttribute("class", arr.join(" "));
-                            }
-                        }
-                    }
-                }
-            };
-        };
-        return CssCmd;
-    })();
-    core.CssCmd = CssCmd;
-    /** 修改任意属性命令 */
-    var AttrCmd = (function () {
-        function AttrCmd() {
-        }
-        AttrCmd.prototype.exec = function (target, exp, scope, subCmd) {
-            var names = null;
-            return {
-                update: function (entity) {
-                    var first = (names == null);
-                    if (first || entity.dependDirty(names, scope)) {
-                        if (subCmd != "") {
-                            // 子命令形式
-                            var tempExp = new core.Expresion(exp);
-                            if (first)
-                                names = tempExp.names;
-                            var res = tempExp.run(scope);
-                            target.setAttribute(subCmd, res);
-                        }
-                        else {
-                            // 集成形式
-                            var tempExp = new core.Expresion(exp);
-                            if (first)
-                                names = tempExp.names;
-                            var params = tempExp.run(scope);
-                            // 遍历所有params的key，如果其表达式值为true则添加其类型
-                            for (var name in params) {
-                                var value = params[name];
-                                target.setAttribute(name, value);
-                            }
-                        }
-                    }
-                }
-            };
-        };
-        return AttrCmd;
-    })();
-    core.AttrCmd = AttrCmd;
-    /** 监听事件命令 */
-    var OnCmd = (function () {
-        function OnCmd() {
-        }
-        OnCmd.prototype.exec = function (target, exp, scope, subCmd) {
-            var names = null;
-            exp = this.transform(exp);
-            // 外面包一层function，因为要的是方法引用，而不是直接执行方法
-            exp = "function($data){" + exp + "}";
-            return {
-                update: function () {
-                    var first = (names == null);
-                    if (first) {
-                        if (subCmd != "") {
-                            // 子命令形式
-                            var tempExp = new core.Expresion(exp);
-                            names = tempExp.names;
-                            target.addEventListener(subCmd, tempExp.run(scope).bind(null, scope));
-                        }
-                        else {
-                            // 集成形式
-                            var tempExp = new core.Expresion(exp);
-                            names = tempExp.names;
-                            var params = tempExp.run(scope);
-                            // 遍历所有params的key，在target上监听该事件
-                            for (var name in params) {
-                                target.addEventListener(name, params[name].bind(null, scope));
-                            }
-                        }
-                    }
-                }
-            };
-        };
-        OnCmd.prototype.transform = function (exp) {
-            var count = 0;
-            var reg = /[\(\)]/g;
-            var bIndex = -1;
-            var eIndex = -1;
-            for (var res = reg.exec(exp); res != null; res = reg.exec(exp)) {
-                if (res[0] == "(") {
-                    if (count == 0)
-                        bIndex = res.index + 1;
-                    count++;
-                }
-                else {
-                    count--;
-                    if (count == 0) {
-                        eIndex = res.index;
-                        break;
-                    }
-                }
-            }
-            if (bIndex >= 0 && eIndex >= 0) {
-                // 递归处理参数部分和后面的部分
-                var part2 = this.transform(exp.substring(bIndex, eIndex));
-                var part3 = this.transform(exp.substr(eIndex + 1));
-                // 处理方法名部分
-                var part1 = exp.substr(0, bIndex - 1);
-                var reg = /[\w\$][\w\$\.]+[\w\$]$/;
-                var res = reg.exec(part1);
-                if (res != null) {
-                    var funcName = res[0];
-                    var before = part1.substr(0, res.index);
-                    // 用call方法将$data绑定到方法参数里
-                    exp = before + "(function(){var temp = [" + part2 + "];try{return " + funcName + ".apply($data,temp)" + part3 + "}catch(err){return " + funcName + ".apply(null,temp)" + part3 + "}})()";
-                }
-                else {
-                    exp = part1 + "(" + part2 + ")" + part3;
-                }
-            }
-            return exp;
-        };
-        return OnCmd;
-    })();
-    core.OnCmd = OnCmd;
-    /** if命令 */
-    var IfCmd = (function () {
-        function IfCmd() {
-        }
-        IfCmd.prototype.exec = function (target, exp, scope) {
-            var expresion = new core.Expresion(exp);
-            return {
-                update: function (entity) {
-                    if (entity.dependDirty(expresion.names, scope)) {
-                        var condition = expresion.run(scope);
-                        target.style.display = (condition ? "" : "none");
-                    }
-                }
-            };
-        };
-        return IfCmd;
-    })();
-    core.IfCmd = IfCmd;
-    /** for命令 */
-    var ForCmd = (function () {
-        function ForCmd() {
-            this._reg = /([\w\.\$]+)\s+in\s+([\w\.\$]+)/;
-        }
-        Object.defineProperty(ForCmd.prototype, "priority", {
-            get: function () {
-                return 1000;
-            },
-            enumerable: true,
-            configurable: true
-        });
-        Object.defineProperty(ForCmd.prototype, "stopCompile", {
-            get: function () {
-                // for命令需要将所有子节点延迟到更新时再编译
-                return true;
-            },
-            enumerable: true,
-            configurable: true
-        });
-        ForCmd.prototype.exec = function (target, exp, scope) {
-            var names = null;
-            var subUpdaters = [];
-            var next = target.nextElementSibling;
-            var targets = [];
-            var res = this._reg.exec(exp);
-            var subName = res[1];
-            var listName = res[2];
-            var parent = target.parentElement;
-            var firstElement = target;
-            parent.removeChild(firstElement);
-            target = target.cloneNode(true);
-            // 去掉target中的a-for属性
-            target.removeAttribute("data-a-for");
-            target.removeAttribute("a-for");
-            // 记录下所有target剩余的属性，否则firstElement之后无法被正确编译，因为缺少属性
-            var firstAttrs = target.attributes;
-            return {
-                update: function (entity) {
-                    var first = (names == null);
-                    if (first || entity.dependDirty(names, scope)) {
-                        // 首先清空当前已有的对象节点
-                        var len = targets.length;
-                        while (len--) {
-                            var child = targets.pop();
-                            child.parentElement.removeChild(child);
-                        }
-                        // 生成新对象
-                        var tempExp = new core.Expresion(listName);
-                        if (first)
-                            names = tempExp.names;
-                        var list = tempExp.run(scope);
-                        if (typeof list == "number") {
-                            for (var i = 0; i < list; i++) {
-                                // 构造一个新作用域
-                                var tempPath = listName + "[" + i + "]";
-                                var subScope = {};
-                                subScope.__proto__ = scope;
-                                Object.defineProperties(subScope, {
-                                    $data: { value: subScope, writable: false },
-                                    $parent: { value: scope, writable: false },
-                                    $root: { value: scope.$root, writable: false },
-                                    $path: { value: (scope === scope.$root ? tempPath : scope.$path + "." + tempPath), writable: false }
-                                });
-                                Object.defineProperty(subScope, subName, { value: i, writable: false });
-                                var tempUpdaters = update(i, entity, subScope, next);
-                                subUpdaters.push.apply(subUpdaters, tempUpdaters);
-                            }
-                        }
-                        else if (list instanceof Array) {
-                            for (var i = 0, len = list.length; i < len; i++) {
-                                // 构造一个新作用域
-                                var tempPath = listName + "[" + i + "]";
-                                var subScope = {};
-                                subScope.__proto__ = scope;
-                                Object.defineProperties(subScope, {
-                                    $data: { value: subScope, writable: false },
-                                    $parent: { value: scope, writable: false },
-                                    $root: { value: scope.$root, writable: false },
-                                    $path: { value: (scope === scope.$root ? tempPath : scope.$path + "." + tempPath), writable: false }
-                                });
-                                Object.defineProperty(subScope, subName, { value: entity.proxyData(list[i]), writable: false });
-                                Object.defineProperty(subScope[subName], "$path", { value: subScope.$path, writable: false });
-                                var tempUpdaters = update(i, entity, subScope, next);
-                                subUpdaters.push.apply(subUpdaters, tempUpdaters);
-                            }
-                        }
-                        else {
-                            var index = 0;
-                            for (var key in list) {
-                                // 构造一个新作用域
-                                var tempPath = listName + "[\"" + key + "\"]";
-                                var subScope = {};
-                                subScope.__proto__ = scope;
-                                Object.defineProperties(subScope, {
-                                    $key: { value: key, writable: false },
-                                    $data: { value: subScope, writable: false },
-                                    $parent: { value: scope, writable: false },
-                                    $root: { value: scope.$root, writable: false },
-                                    $path: { value: (scope === scope.$root ? tempPath : scope.$path + "." + tempPath), writable: false }
-                                });
-                                Object.defineProperty(subScope, subName, { value: entity.proxyData(list[key]), writable: false });
-                                var tempUpdaters = update(index, entity, subScope, next);
-                                subUpdaters.push.apply(subUpdaters, tempUpdaters);
-                                index++;
-                            }
-                        }
-                    }
-                    // 无论如何一定要更新一下子列表
-                    for (var i = 0, len = subUpdaters.length; i < len; i++) {
-                        subUpdaters[i].update(entity);
-                    }
-                }
-            };
-            function update(index, entity, subScope, next) {
-                // 构造一个新的节点，如果是第一个元素则直接使用firstElement作为目标节点
-                var newTarget;
-                if (index == 0) {
-                    newTarget = firstElement;
-                    // 为首个节点赋属性值
-                    for (var i = 0, len = firstAttrs.length; i < len; i++) {
-                        var attr = firstAttrs[i];
-                        firstElement.setAttribute(attr.name, attr.value);
-                    }
-                }
-                else {
-                    newTarget = target.cloneNode(true);
-                }
-                if (parent.contains(next))
-                    parent.insertBefore(newTarget, next);
-                else
-                    parent.appendChild(newTarget);
-                targets.push(newTarget);
-                // 为for循环的scope添加$index属性
-                subScope["$index"] = index;
-                // 用新的作用域遍历新节点
-                return entity.compile(newTarget, subScope);
-            }
-        };
-        return ForCmd;
-    })();
-    core.ForCmd = ForCmd;
-})(core || (core = {}));
-/// <reference path="Expresion.ts"/>
-/// <reference path="SystemCmd.ts"/>
-/**
- * Created by Raykid on 2016/12/6.
- */
-var core;
-(function (core) {
-    var Command = (function () {
-        function Command() {
-        }
-        /** 获取命令对象 */
-        Command.getCmd = function (name) {
-            // 优先查找系统命令，找不到再去自定义命令表查找
-            return (Command._cmdMap[name] ||
-                Command._customCmdMap[name]);
-        };
         /**
-         * 添加命令对象
-         * @param name 命令对象名字
-         * @param cmd 命令对象实现对象
+         * 将用户传进来的数据“变异”成为具有截获数据变更能力的数据
+         * @param data 原始数据
+         * @returns {any} 变异后的数据
          */
-        Command.addCmd = function (name, cmd) {
-            Command._customCmdMap[name] = cmd;
-        };
-        /**
-         * 移除命令对象
-         * @param name 命令对象名字
-         * @returns {Cmd} 被移除的命令对象
-         */
-        Command.removeCmd = function (name) {
-            var cmd = Command._customCmdMap[name];
-            delete Command._customCmdMap[name];
-            return cmd;
-        };
-        // 自定义的命令表
-        Command._customCmdMap = {};
-        // 系统默认的命令表
-        Command._cmdMap = {
-            text: new core.TextCmd(),
-            html: new core.HtmlCmd(),
-            css: new core.CssCmd(),
-            attr: new core.AttrCmd(),
-            on: new core.OnCmd(),
-            if: new core.IfCmd(),
-            for: new core.ForCmd()
-        };
-        return Command;
-    })();
-    core.Command = Command;
-})(core || (core = {}));
-/// <reference path="Command.ts"/>
-/**
- * Created by Raykid on 2016/12/5.
- */
-var core;
-(function (core) {
-    var AresEntity = (function () {
-        function AresEntity(data, element, path) {
-            if (path === void 0) { path = ""; }
-            this._dirtyMap = {};
-            this._dirtyId = 0;
-            this._forceUpdate = false;
-            this._element = element;
-            this._data = data;
-            // 向data中加入$data、$parent和$root参数，都是data本身，用以构建一个Scope对象
-            Object.defineProperties(data, {
-                $data: { value: data, writable: false },
-                $parent: { value: data, writable: false },
-                $root: { value: data, writable: false },
-                $path: { value: path, writable: false }
-            });
-            // 生成一个data的浅层拷贝对象，作为data原始值的保存
-            this.proxyData(data);
-            // 开始解析整个element，用整个data作为当前词法作用域
-            this._updaters = this.compile(element, data);
-            // 进行一次全局更新
-            this.update(true);
-        }
-        AresEntity.prototype.getProxy = function (scope, key) {
-            return scope.$original[key];
-        };
-        AresEntity.prototype.setProxy = function (scope, key, value) {
-            // 相等的话则不进行任何处理
-            if (value == scope.$original[key])
+        Mutator.mutate = function (data) {
+            // 如果是简单类型，则啥也不做
+            if (!data || typeof data != "object")
                 return;
-            scope.$original[key] = value;
-            this.setDirty(scope.$path, key);
-        };
-        AresEntity.prototype.setDirty = function (path, name) {
-            if (path != "")
-                name = path + "." + name;
-            this._dirtyMap[name] = true;
-            // 计划渲染
-            if (this._dirtyId == 0)
-                this._dirtyId = setTimeout(this.render, 0, this);
-        };
-        AresEntity.prototype.render = function (entity) {
-            entity._dirtyId = 0;
-            entity.update();
-        };
-        AresEntity.prototype.update = function (force) {
-            this._forceUpdate = (force == true);
-            var updaters = this._updaters;
-            for (var i = 0, len = updaters.length; i < len; i++) {
-                updaters[i].update(this);
+            // 是个复杂类型对象，针对每个内部变量都进行一次变异
+            for (var key in data) {
+                Mutator.mutateObject(data, key, data[key]);
             }
-            // 清空dirtyMap
-            for (var key in this._dirtyMap) {
-                delete this._dirtyMap[key];
-            }
-            this._forceUpdate = false;
-        };
-        /**
-         * 为对象安插代理，会篡改对象中的实例为getter和setter，并且返回原始对象的副本
-         * @param data 要篡改的对象
-         */
-        AresEntity.prototype.proxyData = function (data) {
-            if (data.$original)
-                return data;
-            var original = {};
-            // 记录当前层次所有的属性，如果有复杂类型对象则递归之
-            var keys = Object.keys(data);
-            for (var i = 0, len = keys.length; i < len; i++) {
-                var key = keys[i];
-                var value = data[key];
-                switch (typeof value) {
-                    case "object":
-                        if (value instanceof Array) {
-                            // 是数组，对于其自身要和简单类型一样处理
-                            original[key] = value;
-                            Object.defineProperty(data, key, {
-                                configurable: true,
-                                enumerable: true,
-                                get: this.getProxy.bind(this, data, key),
-                                set: this.setProxy.bind(this, data, key)
-                            });
-                            // 篡改数组的特定方法
-                            var self = this;
-                            AresEntity._arrayMethods.map(function (method) {
-                                Object.defineProperty(value, method, {
-                                    writable: false,
-                                    value: function () {
-                                        // 调用原始方法
-                                        Array.prototype[method].apply(this, arguments);
-                                        // 更新
-                                        self.setDirty(data.$path, key);
-                                    }
-                                });
-                            }, this);
-                        }
-                        else if (value == null) {
-                            // null和简单类型一样处理
-                            original[key] = value;
-                            // 篡改为getter和setter
-                            Object.defineProperty(data, key, {
-                                configurable: true,
-                                enumerable: true,
-                                get: this.getProxy.bind(this, data, key),
-                                set: this.setProxy.bind(this, data, key)
-                            });
-                        }
-                        else {
-                            // 复杂类型，需要递归
-                            Object.defineProperties(value, {
-                                $data: { value: value, writable: false },
-                                $parent: { value: data, writable: false },
-                                $root: { value: data.$root, writable: false },
-                                $path: { value: (data === data.$root ? key : data.$path + "." + key), writable: false }
-                            });
-                            original[key] = this.proxyData(value);
-                        }
-                        break;
-                    case "function":
-                        // 是方法，直接记录之
-                        original[key] = value;
-                        break;
-                    default:
-                        // 简单类型，记录一个默认值
-                        original[key] = value;
-                        // 篡改为getter和setter
-                        Object.defineProperty(data, key, {
-                            configurable: true,
-                            enumerable: true,
-                            get: this.getProxy.bind(this, data, key),
-                            set: this.setProxy.bind(this, data, key)
-                        });
-                        break;
-                }
-            }
-            Object.defineProperty(data, "$original", {
-                writable: false,
-                value: original
-            });
             return data;
         };
-        /**
-         * 判断依赖项是否脏了
-         * @param names 依赖项名字数组
-         * @param scope 当前所在的作用域
-         * @returns {boolean} 是否脏了
-         */
-        AresEntity.prototype.dependDirty = function (names, scope) {
-            if (this._forceUpdate)
-                return true;
-            for (var i = 0, len = names.length; i < len; i++) {
-                var name = names[i];
-                if (this._dirtyMap[name])
-                    return true;
-                if (scope.$path != "") {
-                    // 在前面加上scope路径试一下
-                    if (this._dirtyMap[scope.$path + "." + name])
-                        return true;
-                    // 替换掉第一个变量名试一下
-                    var index = name.indexOf(".");
-                    if (this._dirtyMap[scope.$path + "." + name.substr(index + 1)])
-                        return true;
+        Mutator.mutateObject = function (data, key, value) {
+            // 对每个复杂类型对象都要有一个对应的依赖列表
+            var dep = new ares.Dep();
+            // 变异过程
+            Object.defineProperty(data, key, {
+                enumerable: true,
+                configurable: false,
+                get: function () {
+                    // 如果Watcher.updating不是null，说明当前正在执行表达式，那么获取的变量自然是其需要依赖的
+                    var watcher = ares.Watcher.updating;
+                    if (watcher)
+                        dep.watch(watcher);
+                    // 利用闭包保存原始值
+                    return value;
+                },
+                set: function (v) {
+                    if (v == value)
+                        return;
+                    value = v;
+                    // 如果是数组就走专门的数组变异方法，否则递归变异对象
+                    if (Array.isArray(v))
+                        Mutator.mutateArray(v, dep);
+                    else
+                        Mutator.mutate(v);
+                    // 触发通知
+                    dep.notify();
                 }
-            }
-            return false;
+            });
+            // 递归变异
+            Mutator.mutate(value);
         };
-        AresEntity.prototype.compile = function (element, scope) {
-            // 检查节点上面以data-a-或者a-开头的属性，将其认为是绑定属性
-            var attrs = element.attributes;
-            var bundles = [];
-            var stopCompile = false;
-            for (var i = 0, len = attrs.length; i < len; i++) {
-                var attr = attrs[i];
-                var name = attr.name;
-                // 所有ares属性必须以data-a-或者a-开头
-                if (name.indexOf("a-") == 0 || name.indexOf("data-a-") == 0) {
-                    var bIndex = (name.charAt(0) == "d" ? 7 : 2);
-                    var eIndex = name.indexOf(":");
-                    if (eIndex < 0)
-                        eIndex = name.length;
-                    // 取到命令名
-                    var cmdName = name.substring(bIndex, eIndex);
-                    // 取到子命令名
-                    var subCmd = name.substr(eIndex + 1);
-                    // 用命令名取到命令依赖对象
-                    var cmd = core.Command.getCmd(cmdName);
-                    if (cmd) {
-                        bundles.push({ cmd: cmd, attr: attr, subCmd: subCmd });
-                        // 更新编译子节点的属性
-                        if (cmd.stopCompile) {
-                            stopCompile = true;
-                            // 只剩下这一个命令
-                            bundles.splice(0, bundles.length - 1);
-                            break;
+        Mutator.mutateArray = function (arr, dep) {
+            // 变异当前数组
+            arr["__proto__"] = Mutator.defineReactiveArray(dep);
+            // 遍历当前数组，将内容对象全部变异
+            for (var i = 0, len = arr.length; i < len; i++) {
+                Mutator.mutate(arr[i]);
+            }
+        };
+        Mutator.defineReactiveArray = function (dep) {
+            var proto = Array.prototype;
+            var result = Object.create(proto);
+            // 遍历所有方法，一个一个地变异
+            Mutator._arrMethods.forEach(function (method) {
+                // 利用闭包记录一个原始方法
+                var oriMethod = proto[method];
+                // 开始变异
+                Object.defineProperty(result, method, {
+                    value: function () {
+                        var args = [];
+                        for (var _i = 0; _i < arguments.length; _i++) {
+                            args[_i - 0] = arguments[_i];
                         }
+                        // 首先调用原始方法，获取返回值
+                        var result = oriMethod.apply(this, args);
+                        // 数组插入项
+                        var inserted;
+                        switch (method) {
+                            case "push":
+                            case "unshift":
+                                inserted = args;
+                                break;
+                            case "splice":
+                                inserted = args.slice(2);
+                                break;
+                        }
+                        // 监视数组插入项，而不是重新监视整个数组
+                        if (inserted && inserted.length) {
+                            Mutator.mutateArray(inserted, dep);
+                        }
+                        // 触发更新
+                        dep.notify({ method: args });
+                        // 返回值
+                        return result;
                     }
+                });
+            });
+            // 提供替换数组设置的方法，因为直接设置数组下标的方式无法变异
+            Object.defineProperty(result, "$set", {
+                value: function (index, value) {
+                    // 超出数组长度默认追加到最后
+                    if (index >= this.length)
+                        index = this.length;
+                    return this.splice(index, 1, value)[0];
                 }
-            }
-            // 排序cmd
-            bundles.sort(function (a, b) { return (b.cmd.priority || 0) - (a.cmd.priority || 0); });
-            // 开始执行cmd
-            var updaters = [];
-            for (var i = 0, len = bundles.length; i < len; i++) {
-                var bundle = bundles[i];
-                // 生成一个更新项
-                var updater = bundle.cmd.exec(element, bundle.attr.value, scope, bundle.subCmd);
-                updaters.push(updater);
-                // 从DOM节点上移除属性
-                if (bundle.attr)
-                    bundle.attr.ownerElement.removeAttributeNode(bundle.attr);
-            }
-            // 判断是否停止编译
-            if (!stopCompile) {
-                // 执行文本域命令
-                var tcCmd = core.TextContentCmd.getInstance();
-                if (tcCmd.needParse(element)) {
-                    // 添加文本域命令
-                    updaters.push(tcCmd.exec(element, element.innerHTML, scope));
+            });
+            // 提供替换数组移除的方法，因为直接移除的方式无法变异
+            Object.defineProperty(result, "$remove", {
+                value: function (item) {
+                    var index = this.indexOf(item);
+                    if (index > -1)
+                        return this.splice(index, 1);
+                    return null;
                 }
-                // 遍历子节点
-                var children = element.children;
-                for (var i = 0, len = children.length; i < len; i++) {
-                    var child = children[i];
-                    var temp = this.compile(child, scope);
-                    updaters = updaters.concat(temp);
-                }
-            }
-            // 返回Updater
-            return updaters;
+            });
+            return result;
         };
-        AresEntity._arrayMethods = [
-            'push',
-            'pop',
-            'shift',
-            'unshift',
-            'splice',
-            'sort',
-            'reverse'
+        // 记录数组中会造成数据更新的所有方法名
+        Mutator._arrMethods = [
+            "push",
+            "pop",
+            "unshift",
+            "shift",
+            "splice",
+            "sort",
+            "reverse"
         ];
-        return AresEntity;
+        return Mutator;
     })();
-    core.AresEntity = AresEntity;
-})(core || (core = {}));
-/// <reference path="core/AresEntity.ts"/>
+    ares.Mutator = Mutator;
+})(ares || (ares = {}));
 /**
- * Created by Raykid on 2016/12/5.
+ * Created by Raykid on 2016/12/22.
  */
-var Ares = (function () {
-    function Ares() {
-    }
+var ares;
+(function (ares) {
+    var utils;
+    (function (utils) {
+        /**
+         * 创建一个表达式求值方法，用于未来执行
+         * @param exp 表达式
+         * @returns {Function} 创建的方法
+         */
+        function createEvalFunc(exp) {
+            return Function("scope", "with(scope){return " + exp + "}");
+        }
+        utils.createEvalFunc = createEvalFunc;
+        /**
+         * 表达式求值，无法执行多条语句
+         * @param exp 表达式
+         * @param scope 表达式的作用域
+         * @returns {any} 返回值
+         */
+        function evalExp(exp, scope) {
+            return createEvalFunc(exp)(scope);
+        }
+        utils.evalExp = evalExp;
+        /**
+         * 创建一个执行方法，用于未来执行
+         * @param exp 表达式
+         * @returns {Function} 创建的方法
+         */
+        function createRunFunc(exp) {
+            return Function("scope", "with(scope){" + exp + "}");
+        }
+        utils.createRunFunc = createRunFunc;
+        /**
+         * 直接执行表达式，不求值。该方法可以执行多条语句
+         * @param exp 表达式
+         * @param scope 表达式的作用域
+         */
+        function runExp(exp, scope) {
+            createRunFunc(exp)(scope);
+        }
+        utils.runExp = runExp;
+    })(utils = ares.utils || (ares.utils = {}));
+})(ares || (ares = {}));
+/// <reference path="Compiler.ts"/>
+/// <reference path="Mutator.ts"/>
+/// <reference path="Utils.ts"/>
+/**
+ * Created by Raykid on 2016/12/16.
+ */
+var ares;
+(function (ares) {
     /**
-     * 创建一个数据绑定
-     * @param viewModel 要绑定的数据对象
-     * @param nameOrElement 要绑定到的DOM节点的名字或者引用
-     * @param options 额外参数，参考AresOptions接口
+     * 将数据模型和视图进行绑定
+     * @param model 数据模型
+     * @param compiler 视图解析器，不同类型的视图需要使用不同的解析器解析后方可使用
+     * @param options 一些额外参数
+     * @returns {core.AresEntity} 绑定实体对象
      */
-    Ares.create = function (viewModel, nameOrElement, options) {
-        if (document.body) {
-            doCreate();
-        }
-        else {
-            window.onload = doCreate;
-        }
-        function doCreate() {
-            var el;
-            if (typeof nameOrElement == "string") {
-                el = document.getElementById(nameOrElement);
+    function bind(data, compiler, options) {
+        return new Ares(data, compiler, options);
+    }
+    ares.bind = bind;
+    var Ares = (function () {
+        function Ares(data, compiler, options) {
+            // 判断DOM是否已经生成完毕
+            if (document.body) {
+                // 如果DOM已经生成完毕，则直接执行初始化
+                this.doInited(data, compiler, options);
             }
             else {
-                el = nameOrElement;
+                // 如果DOM还没生成完毕，则等待生成完毕后再执行初始化
+                window.onload = this.doInited.bind(this, data, compiler, options);
             }
-            // 生成一个Entity
-            new core.AresEntity(viewModel, el);
-            // 调用回调
-            if (options && options.initialized)
-                options.initialized(viewModel);
         }
-    };
-    return Ares;
-})();
+        Object.defineProperty(Ares.prototype, "data", {
+            /** 获取ViewModel */
+            get: function () {
+                return this._data;
+            },
+            enumerable: true,
+            configurable: true
+        });
+        Ares.prototype.doInited = function (data, compiler, options) {
+            // 记录变异对象
+            this._data = ares.Mutator.mutate(data);
+            this._compiler = compiler;
+            this._options = options;
+            // 初始化Compiler
+            this._compiler.init(this);
+            // 调用回调
+            if (this._options && this._options.inited) {
+                this._options.inited.call(this._data, this);
+            }
+        };
+        return Ares;
+    })();
+    ares.Ares = Ares;
+})(ares || (ares = {}));
 //# sourceMappingURL=ares.js.map

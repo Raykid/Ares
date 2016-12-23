@@ -2,8 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Test</title>
-    <script src="../dist/ares.js"></script>
+    <title>Ares Test</title>
     <script src="test.js"></script>
 
     <style type="text/css">
@@ -12,41 +11,13 @@
     </style>
 </head>
 <body>
-<div id="div_main">
-    分数由基础分和表现分相加而得<br>
-    项目总分值为项目预估人日数 x 100，然后由参与项目的所有人按照所负责的任务多寡进行分配，分配规则为：<br>
-    1. 每人负责的模块人日数之和与项目总人日数之比为该组员在此项目中的权重值<br>
-    2. 项目分数计算完毕后，项目负责人多获得项目总分值10%的分数作为奖励<br>
-    3. 在项目中负责了预估人日数之外的，但是对全组开发有益的工作（比如把所有消息配置工作都包了），酌情增加其权重值<br>
-    4. 项目上线的下一个工作日为结算日，公布得分值，并且把分数加到个人头上<br>
-    分数根据各人表现情况会不停上下浮动，当有奖金的分配时会按照该分数作为权重值分发<br>
-    评选优秀员工和晋升加薪时也会以该值排序，择优选择。<br>
-    点击人名会显示加减分详情<br>
-    <br>
-    <ul>
-        <li a-for="data in datas" a-on:click="data.showDetails=!data.showDetails">{{$index + 1}}. {{data.name}}(T{{data.level}})：<b a-attr:style="getScore(data) > data.base ? 'color:green' : (getScore(data) < data.base ? 'color:red' : 'color:black')">{{getScore(data)}}/{{data.base}}</b>分，详情({{data.details.length}})
-            <ul a-if="data.showDetails">
-                <li a-for="detail in data.details"><b a-attr:style="detail.plus != null ? 'color:green' : 'color:red'">{{(detail.plus != null ? '+' : '') + getChangeScore(data.level, getChange(detail).change)}}</b>({{getChange(detail).change}} x {{getChangeCoe(data.level, getChange(detail).change).toFixed(1)}})：{{detail.time}} {{getChange(detail).prompt}}{{(detail.prompt != null ? '（' + detail.prompt + '）' : '')}}</li>
-            </ul>
-        </li>
-    </ul>
-    <br><br>
-    职级与加减分系数关系表如下：<br>
-    <ul>
-        <li a-for="coe in coeDict">
-            T{{$key}}：加分系数{{coe.plus.toFixed(1)}}，减分系数{{coe.minus.toFixed(1)}}
-        </li>
-    </ul>
-    <br><br>
-    加分项目如下（不断更新）：<br>
-    <ul>
-        <li a-for="plus in plusList">{{$index + 1}}. {{plus.prompt}}：<b style="color:green">+{{plus.change}}</b></li>
-    </ul>
-    <br>
-    减分项目如下（不断更新）：<br>
-    <ul>
-        <li a-for="minus in minusList">{{$index + 1}}. {{minus.prompt}}：<b style="color:red">{{minus.change}}</b></li>
-    </ul>
-</div>
+    <div id="div_root">
+        <div a-on:click="testFunc($event);">111 {{text}} 222</div>
+        <div a-text="'你好：' + text" a-attr="{class: testCls}"></div>
+        <div a-text="'你好：' + test.text" a-attr:class="testCls"></div>
+        <div a-html="testHTML" a-css="{test1: testCls=='test1', test2: testCls=='test2'}"></div>
+        <h1 a-if="testIf">asdf{{testIfText}}asdf</h1>
+        <p a-for="a in testArr">{{a}}</p>
+    </div>
 </body>
 </html>

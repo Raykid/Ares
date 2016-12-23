@@ -1,8 +1,9 @@
 {
   "compilerOptions": {
     "module": "commonjs",
-    "target": "es6",
-    "sourceMap": true
+    "target": "es5",
+    "sourceMap": true,
+    "outFile": "test.js"
   },
   "files": [
     "./test.ts"

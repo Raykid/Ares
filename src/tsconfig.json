@@ -6,6 +6,6 @@
     "outFile": "../dist/ares.js"
   },
   "files": [
-    "./Ares.ts"
+    "ares/Ares.ts"
   ]
 }
