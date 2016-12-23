@@ -1,5 +1,8 @@
+/// <reference path="../src/ares/Ares.ts"/>
+/// <reference path="../src/ares/html/HTMLCompiler.ts"/>
+
 /**
- * Created by Raykid on 2016/12/16.
+ * Created by Raykid on 2016/12/23.
  */
 ares.bind({
     text: "text",

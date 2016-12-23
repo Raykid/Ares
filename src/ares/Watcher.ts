@@ -4,12 +4,7 @@
  */
 namespace ares
 {
-    export interface WatcherCallback
-    {
-        (newValue?:any, oldValue?:any, extra?:any):void;
-    }
-
-    export class Watcher
+    export class Watcher implements IWatcher
     {
         /** 记录当前正在执行update方法的Watcher引用 */
         public static updating:Watcher = null;

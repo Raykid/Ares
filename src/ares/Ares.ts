@@ -1,4 +1,4 @@
-/// <reference path="Compiler.ts"/>
+/// <reference path="Interfaces.ts"/>
 /// <reference path="Mutator.ts"/>
 /// <reference path="Utils.ts"/>
 
@@ -19,7 +19,7 @@ namespace ares
         return new Ares(data, compiler, options);
     }
 
-    export class Ares
+    export class Ares implements IAres
     {
         private _data:any;
         private _compiler:Compiler;
@@ -59,6 +59,11 @@ namespace ares
             {
                 this._options.inited.call(this._data, this);
             }
+        }
+
+        public createWatcher(exp:string, scope:any, callback:WatcherCallback):IWatcher
+        {
+            return new Watcher(exp, scope, callback);
         }
     }
 

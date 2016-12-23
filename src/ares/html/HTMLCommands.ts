@@ -14,7 +14,8 @@ namespace ares.html
         target:Node;
         subCmd:string;
         exp:string;
-        compile:(element:Node, scope:any)=>void;
+        compiler:Compiler;
+        entity:IAres;
         [name:string]:any;
     }
 
@@ -22,7 +23,7 @@ namespace ares.html
         /** 文本域命令 */
         textContent: (context:CommandContext)=>
         {
-            new Watcher(context.exp, context.scope, (value:string)=>
+            context.entity.createWatcher(context.exp, context.scope, (value:string)=>
             {
                 context.target.nodeValue = value;
             });
@@ -30,7 +31,7 @@ namespace ares.html
         /** 文本命令 */
         text: (context:CommandContext)=>
         {
-            new Watcher(context.exp, context.scope, (value:string)=>
+            context.entity.createWatcher(context.exp, context.scope, (value:string)=>
             {
                 context.target.textContent = value;
             });
@@ -38,7 +39,7 @@ namespace ares.html
         /** HTML文本命令 */
         html: (context:CommandContext)=>
         {
-            new Watcher(context.exp, context.scope, (value:string)=>
+            context.entity.createWatcher(context.exp, context.scope, (value:string)=>
             {
                 var target:HTMLElement = context.target as HTMLElement;
                 target.innerHTML = value;
@@ -46,7 +47,7 @@ namespace ares.html
                 var children:NodeList = target.childNodes;
                 for(var i:number = 0, len:number = children.length; i < len; i++)
                 {
-                    context.compile(children[i], context.scope);
+                    context.compiler.compile(children[i], context.scope);
                 }
             });
         },
@@ -57,7 +58,7 @@ namespace ares.html
             // 记录原始class值
             var oriCls:string = target.getAttribute("class");
             // 生成订阅器
-            new Watcher(context.exp, context.scope, (params:any)=>
+            context.entity.createWatcher(context.exp, context.scope, (params:any)=>
             {
                 if(typeof params == "string")
                 {
@@ -85,7 +86,7 @@ namespace ares.html
         attr: (context:CommandContext)=>
         {
             var target:HTMLElement = context.target as HTMLElement;
-            new Watcher(context.exp, context.scope, (value:any)=>
+            context.entity.createWatcher(context.exp, context.scope, (value:any)=>
             {
                 if(context.subCmd != "")
                 {
@@ -136,14 +137,14 @@ namespace ares.html
             var refNode:Node = document.createTextNode("");
             context.target.parentNode.insertBefore(refNode, context.target);
             // 只有在条件为true时才启动编译
-            new Watcher(context.exp, context.scope, (value:boolean)=>
+            context.entity.createWatcher(context.exp, context.scope, (value:boolean)=>
             {
                 if(value == true)
                 {
                     // 启动编译
                     if(!compiled)
                     {
-                        context.compile(context.target, context.scope);
+                        context.compiler.compile(context.target, context.scope);
                         compiled = true;
                     }
                     // 插入节点
@@ -183,7 +184,7 @@ namespace ares.html
             pNode.replaceChild(eNode, context.target);
             pNode.insertBefore(sNode, eNode);
             // 添加订阅
-            new Watcher(arrName, context.scope, (value:any)=>{
+            context.entity.createWatcher(arrName, context.scope, (value:any)=>{
                 // 清理原始显示
                 range.setStart(sNode, 0);
                 range.setEnd(eNode, 0);
@@ -210,7 +211,7 @@ namespace ares.html
                     newScope.$index = key;
                     newScope[itemName] = value[key];
                     // 开始编译新节点
-                    context.compile(pNode, newScope);
+                    context.compiler.compile(pNode, newScope);
                 }
             });
         }

@@ -3,9 +3,9 @@
     "module": "commonjs",
     "target": "es5",
     "sourceMap": true,
-    "outFile": "test2.js"
+    "outFile": "../../../dist/ares_html.js"
   },
   "files": [
-    "test2.ts"
+    "HTMLCompiler.ts"
   ]
 }

@@ -1,3 +1,5 @@
+/// <reference path="../Interfaces.ts"/>
+/// <reference path="../Utils.ts"/>
 /// <reference path="HTMLCommands.ts"/>
 
 /**
@@ -5,18 +7,20 @@
  */
 namespace ares.html
 {
-    export class HTMLCompiler implements ares.Compiler
+    export class HTMLCompiler implements Compiler
     {
+        private static _textExpReg:RegExp = /(.*?)\{\{(.*?)\}\}(.*)/;
+
         private _idOrElement:string|HTMLElement;
         private _root:HTMLElement;
-        private _entity:Ares;
+        private _entity:IAres;
 
         public constructor(idOrElement:string|HTMLElement)
         {
             this._idOrElement = idOrElement;
         }
 
-        public init(entity:Ares):void
+        public init(entity:IAres):void
         {
             if(typeof this._idOrElement == "string")
                 this._root = document.getElementById(this._idOrElement as string) ||
@@ -25,15 +29,19 @@ namespace ares.html
                 this._root = this._idOrElement as HTMLElement;
             this._entity = entity;
             // 开始编译root节点
-            HTMLCompiler.compile(this._root, this._entity.data);
+            this.compile(this._root, entity.data);
         }
 
-        private static compile(node:Node, scope:any):void
+        public compile(node:Node, scope:any):void
         {
             if(node.nodeType == 3)
             {
                 // 是个文本节点
-                HTMLCompiler.compileTextContent(node, scope);
+                if(typeof this.compileTextContent != "function")
+                {
+                    alert("fuck");
+                }
+                this.compileTextContent(node, scope);
             }
             else
             {
@@ -71,7 +79,8 @@ namespace ares.html
                                     target: node as HTMLElement,
                                     subCmd: subCmd,
                                     exp: exp,
-                                    compile: HTMLCompiler.compile
+                                    compiler: this,
+                                    entity: this._entity
                                 }
                             });
                             // 如果是for或者if则设置懒编译
@@ -102,30 +111,30 @@ namespace ares.html
                     for(var i:number = 0, len:number = children.length; i < len; i++)
                     {
                         var child:Node = children[i];
-                        HTMLCompiler.compile(child, scope);
+                        this.compile(child, scope);
                     }
                 }
             }
         }
 
-        private static _textExpReg:RegExp = /(.*?)\{\{(.*?)\}\}(.*)/;
-        private static compileTextContent(node:Node, scope:any):void
+        private compileTextContent(node:Node, scope:any):void
         {
             if(HTMLCompiler._textExpReg.test(node.nodeValue))
             {
-                var exp:string = HTMLCompiler.parseTextExp(node.nodeValue);
+                var exp:string = this.parseTextExp(node.nodeValue);
                 var cmd:Command = ares.html.commands["textContent"];
                 cmd({
                     scope: scope,
                     target: node,
                     subCmd: "",
                     exp: exp,
-                    compile: HTMLCompiler.compile
+                    compiler: this,
+                    entity: this._entity
                 });
             }
         }
 
-        private static parseTextExp(exp:string):string
+        private parseTextExp(exp:string):string
         {
             var reg:RegExp = HTMLCompiler._textExpReg;
             for(var result:RegExpExecArray = reg.exec(exp); result != null; result = reg.exec(exp))

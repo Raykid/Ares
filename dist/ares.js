@@ -305,7 +305,7 @@ var ares;
         utils.runExp = runExp;
     })(utils = ares.utils || (ares.utils = {}));
 })(ares || (ares = {}));
-/// <reference path="Compiler.ts"/>
+/// <reference path="Interfaces.ts"/>
 /// <reference path="Mutator.ts"/>
 /// <reference path="Utils.ts"/>
 /**
@@ -355,6 +355,9 @@ var ares;
             if (this._options && this._options.inited) {
                 this._options.inited.call(this._data, this);
             }
+        };
+        Ares.prototype.createWatcher = function (exp, scope, callback) {
+            return new ares.Watcher(exp, scope, callback);
         };
         return Ares;
     })();
