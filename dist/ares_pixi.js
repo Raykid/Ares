@@ -126,8 +126,88 @@ var ares;
                         }
                     }
                 });
+            },
+            /** for命令 */
+            for: function (context) {
+                // 解析表达式
+                var reg = /^\s*(\S+)\s+in\s+(\S+)\s*$/;
+                var res = reg.exec(context.exp);
+                if (!res) {
+                    console.error("for命令表达式错误：" + context.exp);
+                    return;
+                }
+                var itemName = res[1];
+                var arrName = res[2];
+                var parent = context.target.parent;
+                var sNode = new PIXI.DisplayObject();
+                sNode.interactive = sNode.interactiveChildren = false;
+                var eNode = new PIXI.DisplayObject();
+                eNode.interactive = eNode.interactiveChildren = false;
+                // 替换原始模板
+                var index = parent.getChildIndex(context.target);
+                parent.addChildAt(sNode, index);
+                parent.addChildAt(eNode, index + 1);
+                parent.removeChild(context.target);
+                // 添加订阅
+                context.entity.createWatcher(arrName, context.scope, function (value) {
+                    // 清理原始显示
+                    var bIndex = parent.getChildIndex(sNode);
+                    var eIndex = parent.getChildIndex(eNode);
+                    for (var i = bIndex + 1; i < eIndex; i++) {
+                        parent.removeChildAt(i).destroy();
+                    }
+                    // 如果是数字，构建一个数字列表
+                    if (typeof value == "number") {
+                        var temp = [];
+                        for (var i = 0; i < value; i++) {
+                            temp.push(i);
+                        }
+                        value = temp;
+                    }
+                    // 开始遍历
+                    var curIndex = 0;
+                    for (var key in value) {
+                        // 拷贝一个target
+                        var newNode = cloneObject(context.target);
+                        // 添加到显示里
+                        parent.addChildAt(newNode, (bIndex + 1) + curIndex);
+                        // 生成子域
+                        var newScope = Object.create(context.scope);
+                        newScope.$index = key;
+                        newScope[itemName] = value[key];
+                        // 开始编译新节点
+                        context.compiler.compile(newNode, newScope);
+                        // 索引自增1
+                        curIndex++;
+                    }
+                });
             }
         };
+        function cloneObject(target) {
+            // 如果对象有clone方法则直接调用clone方法
+            if (typeof target["clone"] == "function")
+                return target["clone"]();
+            var cls = (target.constructor || Object);
+            try {
+                var result = new cls();
+            }
+            catch (err) {
+                return target;
+            }
+            var keys = Object.keys(target);
+            for (var i in keys) {
+                var key = keys[i];
+                // parent属性不复制
+                if (key != "parent") {
+                    var value = target[key];
+                    if (value && typeof value == "object") {
+                        value = cloneObject(value);
+                    }
+                    result[key] = value;
+                }
+            }
+            return result;
+        }
     })(pixijs = ares.pixijs || (ares.pixijs = {}));
 })(ares || (ares = {}));
 /// <reference path="../Interfaces.ts"/>
@@ -164,7 +244,12 @@ var ares;
                 if (name)
                     this._nameDict[name] = node;
                 // 取到属性列表
-                var keys = Object.keys(node);
+                var keys = [];
+                for (var t in node) {
+                    if (t.indexOf("a_") == 0) {
+                        keys.push(t);
+                    }
+                }
                 // 把配置中的属性推入属性列表中
                 var conf = (this._config && this._config[name]);
                 for (var t in conf) {
@@ -177,55 +262,56 @@ var ares;
                 for (var i = 0, len = keys.length; i < len; i++) {
                     // 首先解析当前节点上面以a_开头的属性，将其认为是绑定属性
                     var key = keys[i];
-                    if (key.indexOf("a_") == 0) {
-                        var bIndex = 2;
-                        var eIndex = key.indexOf("$");
-                        if (eIndex < 0)
-                            eIndex = key.length;
-                        // 取到命令名
-                        var cmdName = key.substring(bIndex, eIndex);
-                        // 取到子命令名
-                        var subCmd = key.substr(eIndex + 1);
-                        // 取到命令字符串
-                        var exp;
-                        if (conf)
-                            exp = conf[key] || conf[cmdName] || node[key];
-                        else
-                            exp = node[key];
-                        // 用命令名取到Command
-                        var cmd = pixijs.commands[cmdName];
-                        // 如果没有找到命令，则认为是自定义命令，套用prop命令
-                        if (!cmd) {
-                            cmd = pixijs.commands["prop"];
-                            subCmd = cmdName || "";
+                    var bIndex = 2;
+                    var eIndex = key.indexOf("$");
+                    if (eIndex < 0)
+                        eIndex = key.length;
+                    // 取到命令名
+                    var cmdName = key.substring(bIndex, eIndex);
+                    // 取到命令字符串
+                    var exp;
+                    if (conf)
+                        exp = conf[key] || conf[cmdName] || node[key];
+                    else
+                        exp = node[key];
+                    // 如果属性是null则忽略
+                    if (!exp)
+                        continue;
+                    // 取到子命令名
+                    var subCmd = key.substr(eIndex + 1);
+                    // 用命令名取到Command
+                    var cmd = pixijs.commands[cmdName];
+                    // 如果没有找到命令，则认为是自定义命令，套用prop命令
+                    if (!cmd) {
+                        cmd = pixijs.commands["prop"];
+                        subCmd = cmdName || "";
+                    }
+                    // 推入数组
+                    cmdsToCompile.push({
+                        propName: key,
+                        cmd: cmd,
+                        ctx: {
+                            scope: scope,
+                            target: node,
+                            subCmd: subCmd,
+                            exp: exp,
+                            compiler: this,
+                            entity: this._entity
                         }
-                        // 推入数组
-                        cmdsToCompile.push({
-                            propName: key,
-                            cmd: cmd,
-                            ctx: {
-                                scope: scope,
-                                target: node,
-                                subCmd: subCmd,
-                                exp: exp,
-                                compiler: this,
-                                entity: this._entity
-                            }
-                        });
-                        // 如果是for或者if则设置懒编译
-                        if (cmdName == "if" || cmdName == "for") {
-                            hasLazyCompile = true;
-                            // 清空数组，仅留下自身的编译
-                            cmdsToCompile.splice(0, cmdsToCompile.length - 1);
-                            break;
-                        }
+                    });
+                    // 如果是for或者if则设置懒编译
+                    if (cmdName == "if" || cmdName == "for") {
+                        hasLazyCompile = true;
+                        // 清空数组，仅留下自身的编译
+                        cmdsToCompile.splice(0, cmdsToCompile.length - 1);
+                        break;
                     }
                 }
                 // 开始编译当前节点外部结构
                 for (var i = 0, len = cmdsToCompile.length; i < len; i++) {
                     var cmdToCompile = cmdsToCompile[i];
-                    // 移除属性
-                    delete cmdToCompile.ctx.target[cmdToCompile.propName];
+                    // 移除属性，要设置为null，因为for会以原始对象作为原型复制对象，如果delete属性的话无法删除原型对象上的属性
+                    cmdToCompile.ctx.target[cmdToCompile.propName] = null;
                     // 开始编译
                     cmdToCompile.cmd(cmdToCompile.ctx);
                 }
@@ -238,7 +324,7 @@ var ares;
                     // 然后递归解析子节点
                     if (node instanceof PIXI.Container) {
                         var children = node.children;
-                        for (var i = 0, len = children.length; i < len; i++) {
+                        for (var i = 0; i < children.length; i++) {
                             var child = children[i];
                             this.compile(child, scope);
                         }

@@ -29,14 +29,16 @@ window.onload = ()=>
 
 
     var testSkin:PIXI.Container = new PIXI.Container();
+    testSkin.name = "testSkin";
     stage.addChild(testSkin);
 
     var testSprite:PIXI.Sprite = new PIXI.Sprite();
+    testSprite.name = "testSprite";
     testSprite.texture = PIXI.Texture.fromImage("http://pic.qiantucdn.com/58pic/14/45/39/57i58PICI2K_1024.png");
     testSprite.width = testSprite.height = 200;
     testSprite.interactive = true;
     testSprite["a_on$click"] = "testFunc";
-    testSprite["a_if"] = "testIf";
+    testSprite["a_for"] = "i in testFor";
     testSkin.addChild(testSprite);
 
     var testText:PIXI.Text = new PIXI.Text("text: {{text}}");
@@ -51,7 +53,8 @@ window.onload = ()=>
         y: 0,
         scaleX: 1,
         testIf: false,
-        testFunc: function():void
+        testFor: [],
+        testFunc: function(evt:Event):void
         {
             this.text = "Fuck!!!";
             this.x = 100;
@@ -65,6 +68,7 @@ window.onload = ()=>
         {
             setTimeout(()=>{
                 this.testIf = true;
+                this.testFor = [1, 2, 3];
             }, 2000);
         }
     });

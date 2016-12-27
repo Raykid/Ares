@@ -212,7 +212,7 @@ namespace ares.html
                     newScope.$index = key;
                     newScope[itemName] = value[key];
                     // 开始编译新节点
-                    context.compiler.compile(pNode, newScope);
+                    context.compiler.compile(newNode, newScope);
                 }
             });
         }

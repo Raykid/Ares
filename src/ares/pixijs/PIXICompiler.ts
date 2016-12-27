@@ -53,7 +53,14 @@ namespace ares.pixijs
             var name:string = node.name;
             if(name) this._nameDict[name] = node;
             // 取到属性列表
-            var keys:string[] = Object.keys(node);
+            var keys:string[] = [];
+            for(var t in node)
+            {
+                if(t.indexOf("a_") == 0)
+                {
+                    keys.push(t);
+                }
+            }
             // 把配置中的属性推入属性列表中
             var conf:PIXIBindConfigCommands = (this._config && this._config[name]);
             for(var t in conf)
@@ -67,56 +74,55 @@ namespace ares.pixijs
             {
                 // 首先解析当前节点上面以a_开头的属性，将其认为是绑定属性
                 var key:string = keys[i];
-                if(key.indexOf("a_") == 0)
+                var bIndex:number = 2;
+                var eIndex:number = key.indexOf("$");
+                if(eIndex < 0) eIndex = key.length;
+                // 取到命令名
+                var cmdName:string = key.substring(bIndex, eIndex);
+                // 取到命令字符串
+                var exp:string;
+                if(conf) exp = conf[key] || conf[cmdName] || node[key];
+                else exp = node[key];
+                // 如果属性是null则忽略
+                if(!exp) continue;
+                // 取到子命令名
+                var subCmd:string = key.substr(eIndex + 1);
+                // 用命令名取到Command
+                var cmd:Command = commands[cmdName];
+                // 如果没有找到命令，则认为是自定义命令，套用prop命令
+                if(!cmd)
                 {
-                    var bIndex:number = 2;
-                    var eIndex:number = key.indexOf("$");
-                    if(eIndex < 0) eIndex = key.length;
-                    // 取到命令名
-                    var cmdName:string = key.substring(bIndex, eIndex);
-                    // 取到子命令名
-                    var subCmd:string = key.substr(eIndex + 1);
-                    // 取到命令字符串
-                    var exp:string;
-                    if(conf) exp = conf[key] || conf[cmdName] || node[key];
-                    else exp = node[key];
-                    // 用命令名取到Command
-                    var cmd:Command = commands[cmdName];
-                    // 如果没有找到命令，则认为是自定义命令，套用prop命令
-                    if(!cmd)
-                    {
-                        cmd = commands["prop"];
-                        subCmd = cmdName || "";
+                    cmd = commands["prop"];
+                    subCmd = cmdName || "";
+                }
+                // 推入数组
+                cmdsToCompile.push({
+                    propName: key,
+                    cmd: cmd,
+                    ctx: {
+                        scope: scope,
+                        target: node,
+                        subCmd: subCmd,
+                        exp: exp,
+                        compiler: this,
+                        entity: this._entity
                     }
-                    // 推入数组
-                    cmdsToCompile.push({
-                        propName: key,
-                        cmd: cmd,
-                        ctx: {
-                            scope: scope,
-                            target: node,
-                            subCmd: subCmd,
-                            exp: exp,
-                            compiler: this,
-                            entity: this._entity
-                        }
-                    });
-                    // 如果是for或者if则设置懒编译
-                    if(cmdName == "if" || cmdName == "for")
-                    {
-                        hasLazyCompile = true;
-                        // 清空数组，仅留下自身的编译
-                        cmdsToCompile.splice(0, cmdsToCompile.length - 1);
-                        break;
-                    }
+                });
+                // 如果是for或者if则设置懒编译
+                if(cmdName == "if" || cmdName == "for")
+                {
+                    hasLazyCompile = true;
+                    // 清空数组，仅留下自身的编译
+                    cmdsToCompile.splice(0, cmdsToCompile.length - 1);
+                    break;
                 }
             }
             // 开始编译当前节点外部结构
             for(var i:number = 0, len:number = cmdsToCompile.length; i < len; i++)
             {
                 var cmdToCompile:{propName:string, cmd:Command, ctx:CommandContext} = cmdsToCompile[i];
-                // 移除属性
-                delete cmdToCompile.ctx.target[cmdToCompile.propName];
+                // 移除属性，要设置为null，因为for会以原始对象作为原型复制对象，如果delete属性的话无法删除原型对象上的属性
+                cmdToCompile.ctx.target[cmdToCompile.propName] = null;
                 // 开始编译
                 cmdToCompile.cmd(cmdToCompile.ctx);
             }
@@ -132,7 +138,7 @@ namespace ares.pixijs
                 if(node instanceof PIXI.Container)
                 {
                     var children:PIXI.DisplayObject[] = (node as PIXI.Container).children;
-                    for(var i:number = 0, len:number = children.length; i < len; i++)
+                    for(var i:number = 0; i < children.length; i++)
                     {
                         var child:PIXI.DisplayObject = children[i];
                         this.compile(child, scope);

@@ -113,6 +113,98 @@ namespace ares.pixijs
                     }
                 }
             });
+        },
+        /** for命令 */
+        for: (context:CommandContext)=>
+        {
+            // 解析表达式
+            var reg:RegExp = /^\s*(\S+)\s+in\s+(\S+)\s*$/;
+            var res:RegExpExecArray = reg.exec(context.exp);
+            if(!res)
+            {
+                console.error("for命令表达式错误：" + context.exp);
+                return;
+            }
+            var itemName:string = res[1];
+            var arrName:string = res[2];
+            var parent:PIXI.Container = context.target.parent;
+            var sNode:PIXI.DisplayObject = new PIXI.DisplayObject();
+            sNode.interactive = sNode.interactiveChildren = false;
+            var eNode:PIXI.DisplayObject = new PIXI.DisplayObject();
+            eNode.interactive = eNode.interactiveChildren = false;
+            // 替换原始模板
+            var index:number = parent.getChildIndex(context.target);
+            parent.addChildAt(sNode, index);
+            parent.addChildAt(eNode, index + 1);
+            parent.removeChild(context.target);
+            // 添加订阅
+            context.entity.createWatcher(arrName, context.scope, (value:any)=>{
+                // 清理原始显示
+                var bIndex:number = parent.getChildIndex(sNode);
+                var eIndex:number = parent.getChildIndex(eNode);
+                for(var i:number = bIndex + 1; i < eIndex; i++)
+                {
+                    parent.removeChildAt(i).destroy();
+                }
+                // 如果是数字，构建一个数字列表
+                if(typeof value == "number")
+                {
+                    var temp:number[] = [];
+                    for(var i:number = 0; i < value; i++)
+                    {
+                        temp.push(i);
+                    }
+                    value = temp;
+                }
+                // 开始遍历
+                var curIndex:number = 0;
+                for(var key in value)
+                {
+                    // 拷贝一个target
+                    var newNode:PIXI.DisplayObject = cloneObject(context.target);
+                    // 添加到显示里
+                    parent.addChildAt(newNode, (bIndex + 1) + curIndex);
+                    // 生成子域
+                    var newScope:any = Object.create(context.scope);
+                    newScope.$index = key;
+                    newScope[itemName] = value[key];
+                    // 开始编译新节点
+                    context.compiler.compile(newNode, newScope);
+                    // 索引自增1
+                    curIndex ++;
+                }
+            });
         }
+    }
+
+    function cloneObject<T>(target:T):T
+    {
+        // 如果对象有clone方法则直接调用clone方法
+        if(typeof target["clone"] == "function") return target["clone"]();
+        var cls:any = (target.constructor || Object);
+        try
+        {
+            var result:T = new cls();
+        }
+        catch(err)
+        {
+            return target;
+        }
+        var keys:string[] = Object.keys(target);
+        for(var i in keys)
+        {
+            var key:string = keys[i];
+            // parent属性不复制
+            if(key != "parent")
+            {
+                var value:any = target[key];
+                if(value && typeof value == "object")
+                {
+                    value = cloneObject(value);
+                }
+                result[key] = value;
+            }
+        }
+        return result;
     }
 }
