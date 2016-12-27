@@ -121,7 +121,7 @@ namespace ares.pixijs
                 cmdToCompile.cmd(cmdToCompile.ctx);
             }
             // 如果没有懒编译则编译内部结构
-            if(!hasLazyCompile && Array.isArray(node["children"]))
+            if(!hasLazyCompile)
             {
                 // 如果是文本对象，则进行文本内容编译
                 if(node instanceof PIXI.Text)
@@ -129,11 +129,14 @@ namespace ares.pixijs
                     this.compileTextContent(node as PIXI.Text, scope);
                 }
                 // 然后递归解析子节点
-                var children:PIXI.DisplayObject[] = (node as PIXI.Container).children;
-                for(var i:number = 0, len:number = children.length; i < len; i++)
+                if(node instanceof PIXI.Container)
                 {
-                    var child:PIXI.DisplayObject = children[i];
-                    this.compile(child, scope);
+                    var children:PIXI.DisplayObject[] = (node as PIXI.Container).children;
+                    for(var i:number = 0, len:number = children.length; i < len; i++)
+                    {
+                        var child:PIXI.DisplayObject = children[i];
+                        this.compile(child, scope);
+                    }
                 }
             }
         }

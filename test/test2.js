@@ -498,16 +498,18 @@ var ares;
                     cmdToCompile.cmd(cmdToCompile.ctx);
                 }
                 // 如果没有懒编译则编译内部结构
-                if (!hasLazyCompile && Array.isArray(node["children"])) {
+                if (!hasLazyCompile) {
                     // 如果是文本对象，则进行文本内容编译
                     if (node instanceof PIXI.Text) {
                         this.compileTextContent(node, scope);
                     }
                     // 然后递归解析子节点
-                    var children = node.children;
-                    for (var i = 0, len = children.length; i < len; i++) {
-                        var child = children[i];
-                        this.compile(child, scope);
+                    if (node instanceof PIXI.Container) {
+                        var children = node.children;
+                        for (var i = 0, len = children.length; i < len; i++) {
+                            var child = children[i];
+                            this.compile(child, scope);
+                        }
                     }
                 }
             };
