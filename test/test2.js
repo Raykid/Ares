@@ -371,6 +371,13 @@ var ares;
     var pixijs;
     (function (pixijs) {
         pixijs.commands = {
+            /** 文本域命令 */
+            textContent: function (context) {
+                context.entity.createWatcher(context.exp, context.scope, function (value) {
+                    var text = context.target;
+                    text.text = value;
+                });
+            },
             /** 文本命令 */
             text: function (context) {
                 context.entity.createWatcher(context.exp, context.scope, function (value) {
@@ -406,10 +413,16 @@ var ares;
             PIXICompiler.prototype.compile = function (node, scope) {
                 var hasLazyCompile = false;
                 // 如果有名字就记下来
-                if (node.name)
-                    this._nameDict[node.name] = node;
-                // 遍历节点上的所有属性
+                var name = node.name;
+                if (name)
+                    this._nameDict[name] = node;
+                // 取到属性列表
                 var keys = Object.keys(node);
+                // 把配置中的属性推入属性列表中
+                var conf = this._config[name];
+                for (var t in conf)
+                    keys.push(t);
+                // 开始遍历属性列表
                 var cmdsToCompile = [];
                 for (var i = 0, len = keys.length; i < len; i++) {
                     // 首先解析当前节点上面以a_开头的属性，将其认为是绑定属性
@@ -427,7 +440,7 @@ var ares;
                             // 取到子命令名
                             var subCmd = key.substr(eIndex + 1);
                             // 取到命令字符串
-                            var exp = node[key];
+                            var exp = (conf || node)[key];
                             // 推入数组
                             cmdsToCompile.push({
                                 cmdName: cmdName,
@@ -461,6 +474,10 @@ var ares;
                 }
                 // 如果没有懒编译则编译内部结构
                 if (!hasLazyCompile && Array.isArray(node["children"])) {
+                    // 如果是文本对象，则进行文本内容编译
+                    if (node instanceof PIXI.Text) {
+                        this.compileTextContent(node, scope);
+                    }
                     // 然后递归解析子节点
                     var children = node.children;
                     for (var i = 0, len = children.length; i < len; i++) {
@@ -469,6 +486,29 @@ var ares;
                     }
                 }
             };
+            PIXICompiler.prototype.compileTextContent = function (text, scope) {
+                var value = text.text;
+                if (PIXICompiler._textExpReg.test(value)) {
+                    var exp = this.parseTextExp(value);
+                    var cmd = pixijs.commands["textContent"];
+                    cmd({
+                        scope: scope,
+                        target: text,
+                        subCmd: "",
+                        exp: exp,
+                        compiler: this,
+                        entity: this._entity
+                    });
+                }
+            };
+            PIXICompiler.prototype.parseTextExp = function (exp) {
+                var reg = PIXICompiler._textExpReg;
+                for (var result = reg.exec(exp); result != null; result = reg.exec(exp)) {
+                    exp = "`" + result[1] + "${" + result[2] + "}" + result[3] + "`";
+                }
+                return exp;
+            };
+            PIXICompiler._textExpReg = /(.*?)\{\{(.*?)\}\}(.*)/;
             return PIXICompiler;
         })();
         pixijs.PIXICompiler = PIXICompiler;
@@ -497,13 +537,13 @@ window.onload = function () {
     }
     var testSkin = new PIXI.Container();
     stage.addChild(testSkin);
-    var testText = new PIXI.Text();
+    var testText = new PIXI.Text("text: {{text}}");
     testText.name = "txt_test";
-    testText["a_text"] = "text";
+    //testText["a_text"] = "'ori: ' + text";
     testSkin.addChild(testText);
     ares.bind({
         text: "text"
-    }, new ares.pixijs.PIXICompiler(testSkin), {
+    }, new ares.pixijs.PIXICompiler(testSkin, {}), {
         inited: function () {
             var _this = this;
             setTimeout(function () {

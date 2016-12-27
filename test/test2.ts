@@ -31,14 +31,16 @@ window.onload = ()=>
     var testSkin:PIXI.Container = new PIXI.Container();
     stage.addChild(testSkin);
 
-    var testText:PIXI.Text = new PIXI.Text();
+    var testText:PIXI.Text = new PIXI.Text("text: {{text}}");
     testText.name = "txt_test";
-    testText["a_text"] = "text";
+    //testText["a_text"] = "'ori: ' + text";
     testSkin.addChild(testText);
 
     ares.bind({
         text: "text"
-    }, new ares.pixijs.PIXICompiler(testSkin), {
+    }, new ares.pixijs.PIXICompiler(testSkin, {
+        //txt_test: {a_text: "'conf: ' + text"}
+    }), {
         inited: function()
         {
             setTimeout(()=>{

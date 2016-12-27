@@ -20,6 +20,15 @@ namespace ares.pixijs
     }
 
     export const commands:{[name:string]:Command} = {
+        /** 文本域命令 */
+        textContent: (context:CommandContext)=>
+        {
+            context.entity.createWatcher(context.exp, context.scope, (value:string)=>
+            {
+                var text:PIXI.Text = context.target as PIXI.Text;
+                text.text = value;
+            });
+        },
         /** 文本命令 */
         text: (context:CommandContext)=>
         {

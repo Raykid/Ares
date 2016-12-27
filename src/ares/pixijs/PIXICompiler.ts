@@ -20,6 +20,8 @@ namespace ares.pixijs
 
     export class PIXICompiler implements Compiler
     {
+        private static _textExpReg:RegExp = /(.*?)\{\{(.*?)\}\}(.*)/;
+
         private _root:PIXI.DisplayObject;
         private _config:PIXICompilerConfig;
         private _entity:IAres;
@@ -43,9 +45,14 @@ namespace ares.pixijs
         {
             var hasLazyCompile:boolean = false;
             // 如果有名字就记下来
-            if(node.name) this._nameDict[node.name] = node;
-            // 遍历节点上的所有属性
+            var name:string = node.name;
+            if(name) this._nameDict[name] = node;
+            // 取到属性列表
             var keys:string[] = Object.keys(node);
+            // 把配置中的属性推入属性列表中
+            var conf:PIXICompilerConfigCommands = this._config[name];
+            for(var t in conf) keys.push(t);
+            // 开始遍历属性列表
             var cmdsToCompile:{cmdName:string, cmd:Command, ctx:CommandContext}[] = [];
             for(var i:number = 0, len:number = keys.length; i < len; i++)
             {
@@ -65,7 +72,7 @@ namespace ares.pixijs
                         // 取到子命令名
                         var subCmd:string = key.substr(eIndex + 1);
                         // 取到命令字符串
-                        var exp:string = node[key];
+                        var exp:string = (conf || node)[key];
                         // 推入数组
                         cmdsToCompile.push({
                             cmdName: cmdName,
@@ -102,6 +109,11 @@ namespace ares.pixijs
             // 如果没有懒编译则编译内部结构
             if(!hasLazyCompile && Array.isArray(node["children"]))
             {
+                // 如果是文本对象，则进行文本内容编译
+                if(node instanceof PIXI.Text)
+                {
+                    this.compileTextContent(node as PIXI.Text, scope);
+                }
                 // 然后递归解析子节点
                 var children:PIXI.DisplayObject[] = (node as PIXI.Container).children;
                 for(var i:number = 0, len:number = children.length; i < len; i++)
@@ -110,6 +122,34 @@ namespace ares.pixijs
                     this.compile(child, scope);
                 }
             }
+        }
+
+        private compileTextContent(text:PIXI.Text, scope:any):void
+        {
+            var value:string = text.text;
+            if(PIXICompiler._textExpReg.test(value))
+            {
+                var exp:string = this.parseTextExp(value);
+                var cmd:Command = commands["textContent"];
+                cmd({
+                    scope: scope,
+                    target: text,
+                    subCmd: "",
+                    exp: exp,
+                    compiler: this,
+                    entity: this._entity
+                });
+            }
+        }
+
+        private parseTextExp(exp:string):string
+        {
+            var reg:RegExp = PIXICompiler._textExpReg;
+            for(var result:RegExpExecArray = reg.exec(exp); result != null; result = reg.exec(exp))
+            {
+                exp = "`" + result[1] + "${" + result[2] + "}" + result[3] + "`";
+            }
+            return exp;
         }
     }
 }
