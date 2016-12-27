@@ -175,7 +175,7 @@ namespace ares.pixijs
                 }
             });
         }
-    }
+    };
 
     function cloneObject<T>(target:T):T
     {
