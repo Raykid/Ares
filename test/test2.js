@@ -378,11 +378,20 @@ var ares;
                     text.text = value;
                 });
             },
-            /** 文本命令 */
-            text: function (context) {
+            /** 修改任意属性命令 */
+            prop: function (context) {
+                var target = context.target;
                 context.entity.createWatcher(context.exp, context.scope, function (value) {
-                    var text = context.target;
-                    text.text = value;
+                    if (context.subCmd != "") {
+                        // 子命令形式
+                        target[context.subCmd] = value;
+                    }
+                    else {
+                        // 集成形式，遍历所有value的key，如果其表达式值为true则添加其类型
+                        for (var name in value) {
+                            target[name] = value[name];
+                        }
+                    }
                 });
             }
         };
@@ -400,6 +409,11 @@ var ares;
     var pixijs;
     (function (pixijs) {
         var PIXICompiler = (function () {
+            /**
+             * 创建PIXI绑定
+             * @param root 根显示对象，从这里传入的绑定数据属性名必须以“a_”开头
+             * @param config 绑定数据，从这里传入的绑定数据属性名可以不以“a_”开头
+             */
             function PIXICompiler(root, config) {
                 this._nameDict = {};
                 this._root = root;
@@ -419,9 +433,12 @@ var ares;
                 // 取到属性列表
                 var keys = Object.keys(node);
                 // 把配置中的属性推入属性列表中
-                var conf = this._config[name];
-                for (var t in conf)
+                var conf = (this._config && this._config[name]);
+                for (var t in conf) {
+                    if (t.indexOf("a_") != 0)
+                        t = "a_" + t;
                     keys.push(t);
+                }
                 // 开始遍历属性列表
                 var cmdsToCompile = [];
                 for (var i = 0, len = keys.length; i < len; i++) {
@@ -434,33 +451,40 @@ var ares;
                             eIndex = key.length;
                         // 取到命令名
                         var cmdName = key.substring(bIndex, eIndex);
+                        // 取到子命令名
+                        var subCmd = key.substr(eIndex + 1);
+                        // 取到命令字符串
+                        var exp;
+                        if (conf)
+                            exp = conf[key] || conf[cmdName] || node[key];
+                        else
+                            exp = node[key];
                         // 用命令名取到Command
                         var cmd = pixijs.commands[cmdName];
-                        if (cmd) {
-                            // 取到子命令名
-                            var subCmd = key.substr(eIndex + 1);
-                            // 取到命令字符串
-                            var exp = (conf || node)[key];
-                            // 推入数组
-                            cmdsToCompile.push({
-                                cmdName: cmdName,
-                                cmd: cmd,
-                                ctx: {
-                                    scope: scope,
-                                    target: node,
-                                    subCmd: subCmd,
-                                    exp: exp,
-                                    compiler: this,
-                                    entity: this._entity
-                                }
-                            });
-                            // 如果是for或者if则设置懒编译
-                            if (cmdName == "if" || cmdName == "for") {
-                                hasLazyCompile = true;
-                                // 清空数组，仅留下自身的编译
-                                cmdsToCompile.splice(0, cmdsToCompile.length - 1);
-                                break;
+                        // 如果没有找到命令，则认为是自定义命令，套用prop命令
+                        if (!cmd) {
+                            cmd = pixijs.commands["prop"];
+                            subCmd = cmdName || "";
+                        }
+                        // 推入数组
+                        cmdsToCompile.push({
+                            cmdName: cmdName,
+                            cmd: cmd,
+                            ctx: {
+                                scope: scope,
+                                target: node,
+                                subCmd: subCmd,
+                                exp: exp,
+                                compiler: this,
+                                entity: this._entity
                             }
+                        });
+                        // 如果是for或者if则设置懒编译
+                        if (cmdName == "if" || cmdName == "for") {
+                            hasLazyCompile = true;
+                            // 清空数组，仅留下自身的编译
+                            cmdsToCompile.splice(0, cmdsToCompile.length - 1);
+                            break;
                         }
                     }
                 }
@@ -539,15 +563,24 @@ window.onload = function () {
     stage.addChild(testSkin);
     var testText = new PIXI.Text("text: {{text}}");
     testText.name = "txt_test";
-    //testText["a_text"] = "'ori: ' + text";
+    testText["a_prop"] = "{x: x}";
+    testText["a_y"] = "y";
     testSkin.addChild(testText);
     ares.bind({
-        text: "text"
-    }, new ares.pixijs.PIXICompiler(testSkin, {}), {
+        text: "text",
+        x: 0,
+        y: 0,
+        scaleX: 1
+    }, new ares.pixijs.PIXICompiler(testSkin, {
+        txt_test: { scaleX: "scaleX" }
+    }), {
         inited: function () {
             var _this = this;
             setTimeout(function () {
                 _this.text = "Fuck!!!";
+                _this.x = 100;
+                _this.y = 200;
+                _this.scaleX = 2;
             }, 1000);
         }
     });

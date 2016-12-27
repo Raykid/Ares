@@ -8,14 +8,14 @@
  */
 namespace ares.pixijs
 {
-    export interface PIXICompilerConfig
+    export interface PIXIBindConfig
     {
-        [name:string]:PIXICompilerConfigCommands
+        [name:string]:PIXIBindConfigCommands
     }
 
-    export interface PIXICompilerConfigCommands
+    export interface PIXIBindConfigCommands
     {
-        [cmd:string]:string;
+        [cmd:string]:any;
     }
 
     export class PIXICompiler implements Compiler
@@ -23,12 +23,17 @@ namespace ares.pixijs
         private static _textExpReg:RegExp = /(.*?)\{\{(.*?)\}\}(.*)/;
 
         private _root:PIXI.DisplayObject;
-        private _config:PIXICompilerConfig;
+        private _config:PIXIBindConfig;
         private _entity:IAres;
 
         private _nameDict:{[name:string]:PIXI.DisplayObject} = {};
 
-        public constructor(root:PIXI.DisplayObject, config?:PIXICompilerConfig)
+        /**
+         * 创建PIXI绑定
+         * @param root 根显示对象，从这里传入的绑定数据属性名必须以“a_”开头
+         * @param config 绑定数据，从这里传入的绑定数据属性名可以不以“a_”开头
+         */
+        public constructor(root:PIXI.DisplayObject, config?:PIXIBindConfig)
         {
             this._root = root;
             this._config = config;
@@ -50,8 +55,12 @@ namespace ares.pixijs
             // 取到属性列表
             var keys:string[] = Object.keys(node);
             // 把配置中的属性推入属性列表中
-            var conf:PIXICompilerConfigCommands = this._config[name];
-            for(var t in conf) keys.push(t);
+            var conf:PIXIBindConfigCommands = (this._config && this._config[name]);
+            for(var t in conf)
+            {
+                if(t.indexOf("a_") != 0) t = "a_" + t;
+                keys.push(t);
+            }
             // 开始遍历属性列表
             var cmdsToCompile:{cmdName:string, cmd:Command, ctx:CommandContext}[] = [];
             for(var i:number = 0, len:number = keys.length; i < len; i++)
@@ -65,35 +74,40 @@ namespace ares.pixijs
                     if(eIndex < 0) eIndex = key.length;
                     // 取到命令名
                     var cmdName:string = key.substring(bIndex, eIndex);
+                    // 取到子命令名
+                    var subCmd:string = key.substr(eIndex + 1);
+                    // 取到命令字符串
+                    var exp:string;
+                    if(conf) exp = conf[key] || conf[cmdName] || node[key];
+                    else exp = node[key];
                     // 用命令名取到Command
                     var cmd:Command = commands[cmdName];
-                    if(cmd)
+                    // 如果没有找到命令，则认为是自定义命令，套用prop命令
+                    if(!cmd)
                     {
-                        // 取到子命令名
-                        var subCmd:string = key.substr(eIndex + 1);
-                        // 取到命令字符串
-                        var exp:string = (conf || node)[key];
-                        // 推入数组
-                        cmdsToCompile.push({
-                            cmdName: cmdName,
-                            cmd: cmd,
-                            ctx: {
-                                scope: scope,
-                                target: node,
-                                subCmd: subCmd,
-                                exp: exp,
-                                compiler: this,
-                                entity: this._entity
-                            }
-                        });
-                        // 如果是for或者if则设置懒编译
-                        if(cmdName == "if" || cmdName == "for")
-                        {
-                            hasLazyCompile = true;
-                            // 清空数组，仅留下自身的编译
-                            cmdsToCompile.splice(0, cmdsToCompile.length - 1);
-                            break;
+                        cmd = commands["prop"];
+                        subCmd = cmdName || "";
+                    }
+                    // 推入数组
+                    cmdsToCompile.push({
+                        cmdName: cmdName,
+                        cmd: cmd,
+                        ctx: {
+                            scope: scope,
+                            target: node,
+                            subCmd: subCmd,
+                            exp: exp,
+                            compiler: this,
+                            entity: this._entity
                         }
+                    });
+                    // 如果是for或者if则设置懒编译
+                    if(cmdName == "if" || cmdName == "for")
+                    {
+                        hasLazyCompile = true;
+                        // 清空数组，仅留下自身的编译
+                        cmdsToCompile.splice(0, cmdsToCompile.length - 1);
+                        break;
                     }
                 }
             }

@@ -33,18 +33,25 @@ window.onload = ()=>
 
     var testText:PIXI.Text = new PIXI.Text("text: {{text}}");
     testText.name = "txt_test";
-    //testText["a_text"] = "'ori: ' + text";
+    testText["a_prop"] = "{x: x}";
+    testText["a_y"] = "y";
     testSkin.addChild(testText);
 
     ares.bind({
-        text: "text"
+        text: "text",
+        x: 0,
+        y: 0,
+        scaleX: 1
     }, new ares.pixijs.PIXICompiler(testSkin, {
-        //txt_test: {a_text: "'conf: ' + text"}
+        txt_test: {scaleX: "scaleX"}
     }), {
         inited: function()
         {
             setTimeout(()=>{
                 this.text = "Fuck!!!";
+                this.x = 100;
+                this.y = 200;
+                this.scaleX = 2;
             }, 1000);
         }
     });
