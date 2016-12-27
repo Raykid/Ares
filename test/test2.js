@@ -394,6 +394,57 @@ var ares;
                         }
                     }
                 });
+            },
+            /** 绑定事件 */
+            on: function (context) {
+                if (context.subCmd != "") {
+                    var handler = context.scope[context.exp] || window[context.exp];
+                    if (typeof handler == "function") {
+                        // 是函数名形式
+                        context.target.on(context.subCmd, handler, context.scope);
+                    }
+                    else {
+                        // 是方法执行或者表达式方式
+                        context.target.on(context.subCmd, function (evt) {
+                            // 创建一个临时的子域，用于保存参数
+                            var scope = Object.create(context.scope);
+                            scope.$event = evt;
+                            ares.utils.runExp(context.exp, scope);
+                        });
+                    }
+                }
+            },
+            /** if命令 */
+            if: function (context) {
+                // 记录一个是否编译过的flag
+                var compiled = false;
+                // 插入一个占位元素
+                var refNode = new PIXI.DisplayObject();
+                refNode.interactive = refNode.interactiveChildren = false;
+                var parent = context.target.parent;
+                var index = parent.getChildIndex(context.target);
+                parent.addChildAt(refNode, index);
+                // 只有在条件为true时才启动编译
+                context.entity.createWatcher(context.exp, context.scope, function (value) {
+                    if (value == true) {
+                        // 启动编译
+                        if (!compiled) {
+                            context.compiler.compile(context.target, context.scope);
+                            compiled = true;
+                        }
+                        // 插入节点
+                        if (!context.target.parent) {
+                            var index = refNode.parent.getChildIndex(refNode);
+                            refNode.parent.addChildAt(context.target, index);
+                        }
+                    }
+                    else {
+                        // 移除元素
+                        if (context.target.parent) {
+                            context.target.parent.removeChild(context.target);
+                        }
+                    }
+                });
             }
         };
     })(pixijs = ares.pixijs || (ares.pixijs = {}));
@@ -469,7 +520,7 @@ var ares;
                         }
                         // 推入数组
                         cmdsToCompile.push({
-                            cmdName: cmdName,
+                            propName: key,
                             cmd: cmd,
                             ctx: {
                                 scope: scope,
@@ -493,7 +544,7 @@ var ares;
                 for (var i = 0, len = cmdsToCompile.length; i < len; i++) {
                     var cmdToCompile = cmdsToCompile[i];
                     // 移除属性
-                    delete cmdToCompile.ctx.target[cmdToCompile.cmdName];
+                    delete cmdToCompile.ctx.target[cmdToCompile.propName];
                     // 开始编译
                     cmdToCompile.cmd(cmdToCompile.ctx);
                 }
@@ -563,6 +614,13 @@ window.onload = function () {
     }
     var testSkin = new PIXI.Container();
     stage.addChild(testSkin);
+    var testSprite = new PIXI.Sprite();
+    testSprite.texture = PIXI.Texture.fromImage("http://pic.qiantucdn.com/58pic/14/45/39/57i58PICI2K_1024.png");
+    testSprite.width = testSprite.height = 200;
+    testSprite.interactive = true;
+    testSprite["a_on$click"] = "testFunc";
+    testSprite["a_if"] = "testIf";
+    testSkin.addChild(testSprite);
     var testText = new PIXI.Text("text: {{text}}");
     testText.name = "txt_test";
     testText["a_prop"] = "{x: x}";
@@ -572,18 +630,22 @@ window.onload = function () {
         text: "text",
         x: 0,
         y: 0,
-        scaleX: 1
+        scaleX: 1,
+        testIf: false,
+        testFunc: function () {
+            this.text = "Fuck!!!";
+            this.x = 100;
+            this.y = 200;
+            this.scaleX = 2;
+        }
     }, new ares.pixijs.PIXICompiler(testSkin, {
         txt_test: { scaleX: "scaleX" }
     }), {
         inited: function () {
             var _this = this;
             setTimeout(function () {
-                _this.text = "Fuck!!!";
-                _this.x = 100;
-                _this.y = 200;
-                _this.scaleX = 2;
-            }, 1000);
+                _this.testIf = true;
+            }, 2000);
         }
     });
 };

@@ -62,7 +62,7 @@ namespace ares.pixijs
                 keys.push(t);
             }
             // 开始遍历属性列表
-            var cmdsToCompile:{cmdName:string, cmd:Command, ctx:CommandContext}[] = [];
+            var cmdsToCompile:{propName:string, cmd:Command, ctx:CommandContext}[] = [];
             for(var i:number = 0, len:number = keys.length; i < len; i++)
             {
                 // 首先解析当前节点上面以a_开头的属性，将其认为是绑定属性
@@ -90,7 +90,7 @@ namespace ares.pixijs
                     }
                     // 推入数组
                     cmdsToCompile.push({
-                        cmdName: cmdName,
+                        propName: key,
                         cmd: cmd,
                         ctx: {
                             scope: scope,
@@ -114,9 +114,9 @@ namespace ares.pixijs
             // 开始编译当前节点外部结构
             for(var i:number = 0, len:number = cmdsToCompile.length; i < len; i++)
             {
-                var cmdToCompile:{cmdName:string, cmd:Command, ctx:CommandContext} = cmdsToCompile[i];
+                var cmdToCompile:{propName:string, cmd:Command, ctx:CommandContext} = cmdsToCompile[i];
                 // 移除属性
-                delete cmdToCompile.ctx.target[cmdToCompile.cmdName];
+                delete cmdToCompile.ctx.target[cmdToCompile.propName];
                 // 开始编译
                 cmdToCompile.cmd(cmdToCompile.ctx);
             }

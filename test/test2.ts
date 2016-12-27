@@ -31,6 +31,14 @@ window.onload = ()=>
     var testSkin:PIXI.Container = new PIXI.Container();
     stage.addChild(testSkin);
 
+    var testSprite:PIXI.Sprite = new PIXI.Sprite();
+    testSprite.texture = PIXI.Texture.fromImage("http://pic.qiantucdn.com/58pic/14/45/39/57i58PICI2K_1024.png");
+    testSprite.width = testSprite.height = 200;
+    testSprite.interactive = true;
+    testSprite["a_on$click"] = "testFunc";
+    testSprite["a_if"] = "testIf";
+    testSkin.addChild(testSprite);
+
     var testText:PIXI.Text = new PIXI.Text("text: {{text}}");
     testText.name = "txt_test";
     testText["a_prop"] = "{x: x}";
@@ -41,18 +49,23 @@ window.onload = ()=>
         text: "text",
         x: 0,
         y: 0,
-        scaleX: 1
+        scaleX: 1,
+        testIf: false,
+        testFunc: function():void
+        {
+            this.text = "Fuck!!!";
+            this.x = 100;
+            this.y = 200;
+            this.scaleX = 2;
+        }
     }, new ares.pixijs.PIXICompiler(testSkin, {
         txt_test: {scaleX: "scaleX"}
     }), {
         inited: function()
         {
             setTimeout(()=>{
-                this.text = "Fuck!!!";
-                this.x = 100;
-                this.y = 200;
-                this.scaleX = 2;
-            }, 1000);
+                this.testIf = true;
+            }, 2000);
         }
     });
 };
