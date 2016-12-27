@@ -37,10 +37,6 @@ namespace ares.html
             if(node.nodeType == 3)
             {
                 // 是个文本节点
-                if(typeof this.compileTextContent != "function")
-                {
-                    alert("fuck");
-                }
                 this.compileTextContent(node, scope);
             }
             else
