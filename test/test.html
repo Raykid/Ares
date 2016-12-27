@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Ares Test</title>
-    <script src="../dist/ares.min.js"></script>
-    <script src="../dist/ares_html.min.js"></script>
+    <script src="pixi.js"></script>
     <script src="test2.js"></script>
 
     <style type="text/css">
@@ -14,12 +13,6 @@
 </head>
 <body>
     <div id="div_root">
-        <div a-on:click="testFunc($event);">111 {{text}} 222</div>
-        <div a-text="'你好：' + text" a-attr="{class: testCls}"></div>
-        <div a-text="'你好：' + test.text" a-attr:class="testCls"></div>
-        <div a-html="testHTML" a-css="{test1: testCls=='test1', test2: testCls=='test2'}"></div>
-        <h1 a-if="testIf">asdf{{testIfText}}asdf</h1>
-        <p a-for="a in testArr">{{a}}</p>
     </div>
 </body>
 </html>

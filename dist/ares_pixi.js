@@ -1,0 +1,158 @@
+/**
+ * Created by Raykid on 2016/12/22.
+ */
+var ares;
+(function (ares) {
+    var utils;
+    (function (utils) {
+        /**
+         * 创建一个表达式求值方法，用于未来执行
+         * @param exp 表达式
+         * @returns {Function} 创建的方法
+         */
+        function createEvalFunc(exp) {
+            return Function("scope", "with(scope){return " + exp + "}");
+        }
+        utils.createEvalFunc = createEvalFunc;
+        /**
+         * 表达式求值，无法执行多条语句
+         * @param exp 表达式
+         * @param scope 表达式的作用域
+         * @returns {any} 返回值
+         */
+        function evalExp(exp, scope) {
+            return createEvalFunc(exp)(scope);
+        }
+        utils.evalExp = evalExp;
+        /**
+         * 创建一个执行方法，用于未来执行
+         * @param exp 表达式
+         * @returns {Function} 创建的方法
+         */
+        function createRunFunc(exp) {
+            return Function("scope", "with(scope){" + exp + "}");
+        }
+        utils.createRunFunc = createRunFunc;
+        /**
+         * 直接执行表达式，不求值。该方法可以执行多条语句
+         * @param exp 表达式
+         * @param scope 表达式的作用域
+         */
+        function runExp(exp, scope) {
+            createRunFunc(exp)(scope);
+        }
+        utils.runExp = runExp;
+    })(utils = ares.utils || (ares.utils = {}));
+})(ares || (ares = {}));
+/**
+ * Created by Raykid on 2016/12/27.
+ */
+var ares;
+(function (ares) {
+    var pixijs;
+    (function (pixijs) {
+        pixijs.commands = {
+            /** 文本命令 */
+            text: function (context) {
+                context.entity.createWatcher(context.exp, context.scope, function (value) {
+                    var text = context.target;
+                    text.text = value;
+                });
+            }
+        };
+    })(pixijs = ares.pixijs || (ares.pixijs = {}));
+})(ares || (ares = {}));
+/// <reference path="../Interfaces.ts"/>
+/// <reference path="../Utils.ts"/>
+/// <reference path="PIXICommands.ts"/>
+/// <reference path="pixi.js.d.ts"/>
+/**
+ * Created by Raykid on 2016/12/27.
+ */
+var ares;
+(function (ares) {
+    var pixijs;
+    (function (pixijs) {
+        var PIXICompiler = (function () {
+            function PIXICompiler(root, config) {
+                this._nameDict = {};
+                this._root = root;
+                this._config = config;
+            }
+            PIXICompiler.prototype.init = function (entity) {
+                this._entity = entity;
+                // 开始编译root节点
+                this.compile(this._root, entity.data);
+            };
+            PIXICompiler.prototype.compile = function (node, scope) {
+                var hasLazyCompile = false;
+                // 如果有名字就记下来
+                if (node.name)
+                    this._nameDict[node.name] = node;
+                // 遍历节点上的所有属性
+                var keys = Object.keys(node);
+                var cmdsToCompile = [];
+                for (var i = 0, len = keys.length; i < len; i++) {
+                    // 首先解析当前节点上面以a_开头的属性，将其认为是绑定属性
+                    var key = keys[i];
+                    if (key.indexOf("a_") == 0) {
+                        var bIndex = 2;
+                        var eIndex = key.indexOf("$");
+                        if (eIndex < 0)
+                            eIndex = key.length;
+                        // 取到命令名
+                        var cmdName = key.substring(bIndex, eIndex);
+                        // 用命令名取到Command
+                        var cmd = pixijs.commands[cmdName];
+                        if (cmd) {
+                            // 取到子命令名
+                            var subCmd = key.substr(eIndex + 1);
+                            // 取到命令字符串
+                            var exp = node[key];
+                            // 推入数组
+                            cmdsToCompile.push({
+                                cmdName: cmdName,
+                                cmd: cmd,
+                                ctx: {
+                                    scope: scope,
+                                    target: node,
+                                    subCmd: subCmd,
+                                    exp: exp,
+                                    compiler: this,
+                                    entity: this._entity
+                                }
+                            });
+                            // 如果是for或者if则设置懒编译
+                            if (cmdName == "if" || cmdName == "for") {
+                                hasLazyCompile = true;
+                                // 清空数组，仅留下自身的编译
+                                cmdsToCompile.splice(0, cmdsToCompile.length - 1);
+                                break;
+                            }
+                        }
+                    }
+                }
+                // 开始编译当前节点外部结构
+                for (var i = 0, len = cmdsToCompile.length; i < len; i++) {
+                    var cmdToCompile = cmdsToCompile[i];
+                    // 移除属性
+                    delete cmdToCompile.ctx.target[cmdToCompile.cmdName];
+                    // 开始编译
+                    cmdToCompile.cmd(cmdToCompile.ctx);
+                }
+                // 如果没有懒编译则编译内部结构
+                if (!hasLazyCompile && Array.isArray(node["children"])) {
+                    // 然后递归解析子节点
+                    var children = node.children;
+                    for (var i = 0, len = children.length; i < len; i++) {
+                        var child = children[i];
+                        this.compile(child, scope);
+                    }
+                }
+            };
+            return PIXICompiler;
+        })();
+        pixijs.PIXICompiler = PIXICompiler;
+    })(pixijs = ares.pixijs || (ares.pixijs = {}));
+})(ares || (ares = {}));
+//# sourceMappingURL=ares_pixi.js.map
