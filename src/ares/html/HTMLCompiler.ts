@@ -118,8 +118,7 @@ namespace ares.html
             if(HTMLCompiler._textExpReg.test(node.nodeValue))
             {
                 var exp:string = this.parseTextExp(node.nodeValue);
-                var cmd:Command = ares.html.commands["textContent"];
-                cmd({
+                textContent({
                     scope: scope,
                     target: node,
                     subCmd: "",

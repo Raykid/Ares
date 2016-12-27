@@ -19,16 +19,17 @@ namespace ares.pixijs
         [name:string]:any;
     }
 
-    export const commands:{[name:string]:Command} = {
-        /** 文本域命令 */
-        textContent: (context:CommandContext)=>
+    /** 文本域命令 */
+    export function textContent(context:CommandContext):void
+    {
+        context.entity.createWatcher(context.exp, context.scope, (value:string)=>
         {
-            context.entity.createWatcher(context.exp, context.scope, (value:string)=>
-            {
-                var text:PIXI.Text = context.target as PIXI.Text;
-                text.text = value;
-            });
-        },
+            var text:PIXI.Text = context.target as PIXI.Text;
+            text.text = value;
+        });
+    }
+
+    export const commands:{[name:string]:Command} = {
         /** 修改任意属性命令 */
         prop: (context:CommandContext)=>
         {

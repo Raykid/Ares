@@ -144,8 +144,7 @@ namespace ares.pixijs
             if(PIXICompiler._textExpReg.test(value))
             {
                 var exp:string = this.parseTextExp(value);
-                var cmd:Command = commands["textContent"];
-                cmd({
+                textContent({
                     scope: scope,
                     target: text,
                     subCmd: "",

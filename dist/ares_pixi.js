@@ -51,14 +51,15 @@ var ares;
 (function (ares) {
     var pixijs;
     (function (pixijs) {
+        /** 文本域命令 */
+        function textContent(context) {
+            context.entity.createWatcher(context.exp, context.scope, function (value) {
+                var text = context.target;
+                text.text = value;
+            });
+        }
+        pixijs.textContent = textContent;
         pixijs.commands = {
-            /** 文本域命令 */
-            textContent: function (context) {
-                context.entity.createWatcher(context.exp, context.scope, function (value) {
-                    var text = context.target;
-                    text.text = value;
-                });
-            },
             /** 修改任意属性命令 */
             prop: function (context) {
                 var target = context.target;
@@ -195,8 +196,7 @@ var ares;
                 var value = text.text;
                 if (PIXICompiler._textExpReg.test(value)) {
                     var exp = this.parseTextExp(value);
-                    var cmd = pixijs.commands["textContent"];
-                    cmd({
+                    pixijs.textContent({
                         scope: scope,
                         target: text,
                         subCmd: "",

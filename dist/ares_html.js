@@ -51,13 +51,14 @@ var ares;
 (function (ares) {
     var html;
     (function (html) {
+        /** 文本域命令 */
+        function textContent(context) {
+            context.entity.createWatcher(context.exp, context.scope, function (value) {
+                context.target.nodeValue = value;
+            });
+        }
+        html.textContent = textContent;
         html.commands = {
-            /** 文本域命令 */
-            textContent: function (context) {
-                context.entity.createWatcher(context.exp, context.scope, function (value) {
-                    context.target.nodeValue = value;
-                });
-            },
             /** 文本命令 */
             text: function (context) {
                 context.entity.createWatcher(context.exp, context.scope, function (value) {
@@ -318,8 +319,7 @@ var ares;
             HTMLCompiler.prototype.compileTextContent = function (node, scope) {
                 if (HTMLCompiler._textExpReg.test(node.nodeValue)) {
                     var exp = this.parseTextExp(node.nodeValue);
-                    var cmd = ares.html.commands["textContent"];
-                    cmd({
+                    html.textContent({
                         scope: scope,
                         target: node,
                         subCmd: "",
