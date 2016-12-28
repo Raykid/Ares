@@ -65,7 +65,7 @@ namespace ares.pixijs
             var conf:PIXIBindConfigCommands = (this._config && this._config[name]);
             for(var t in conf)
             {
-                if(t.indexOf("a-") != 0 && t.indexOf("a_") != 0) t = "a_" + t;
+                if(t.indexOf("a-") != 0 && t.indexOf("a_") != 0) t = "a-" + t;
                 keys.push(t);
             }
             // 开始遍历属性列表
