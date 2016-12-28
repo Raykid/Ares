@@ -3,6 +3,22 @@
  */
 declare module ares.pixijs
 {
+    export interface Command
+    {
+        (context?:CommandContext):void;
+    }
+
+    export interface CommandContext
+    {
+        scope:any;
+        target:PIXI.DisplayObject;
+        subCmd:string;
+        exp:string;
+        compiler:Compiler;
+        entity:IAres;
+        [name:string]:any;
+    }
+
     export interface PIXIBindConfig
     {
         [name:string]:PIXIBindConfigCommands
@@ -12,6 +28,13 @@ declare module ares.pixijs
     {
         [cmd:string]:any;
     }
+
+    /**
+     * 提供给外部的可以注入自定义命令的接口
+     * @param name
+     * @param command
+     */
+    export function addCommand(name:string, command:Command):void;
 
     export class PIXICompiler
     {

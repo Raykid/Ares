@@ -51,6 +51,16 @@ var ares;
 (function (ares) {
     var pixijs;
     (function (pixijs) {
+        /**
+         * 提供给外部的可以注入自定义命令的接口
+         * @param name
+         * @param command
+         */
+        function addCommand(name, command) {
+            if (!pixijs.commands[name])
+                pixijs.commands[name] = command;
+        }
+        pixijs.addCommand = addCommand;
         /** 文本域命令 */
         function textContent(context) {
             context.entity.createWatcher(context.target, context.exp, context.scope, function (value) {

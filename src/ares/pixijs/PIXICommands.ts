@@ -19,6 +19,16 @@ namespace ares.pixijs
         [name:string]:any;
     }
 
+    /**
+     * 提供给外部的可以注入自定义命令的接口
+     * @param name
+     * @param command
+     */
+    export function addCommand(name:string, command:Command):void
+    {
+        if(!commands[name]) commands[name] = command;
+    }
+
     /** 文本域命令 */
     export function textContent(context:CommandContext):void
     {

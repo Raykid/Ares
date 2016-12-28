@@ -29,6 +29,7 @@ window.onload = function () {
     testSprite["a-on:click"] = "testFunc";
     testSprite["a-for"] = "item in testFor";
     testSprite["a-x"] = "$target.x + $index * 200";
+    testSprite["a-fuck:fuckyou"] = "afsdf";
     testSprite.x = 200;
     testSkin.addChild(testSprite);
     var testText = new PIXI.Text("text: {{text}}, {{item}}");

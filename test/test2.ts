@@ -27,8 +27,6 @@ window.onload = ()=>
         requestAnimationFrame(render);
     }
 
-
-
     var testSkin:PIXI.Container = new PIXI.Container();
     stage.addChild(testSkin);
 
@@ -39,6 +37,7 @@ window.onload = ()=>
     testSprite["a-on:click"] = "testFunc";
     testSprite["a-for"] = "item in testFor";
     testSprite["a-x"] = "$target.x + $index * 200";
+    testSprite["a-fuck:fuckyou"] = "afsdf";
     testSprite.x = 200;
     testSkin.addChild(testSprite);
 

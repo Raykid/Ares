@@ -51,6 +51,16 @@ var ares;
 (function (ares) {
     var html;
     (function (html) {
+        /**
+         * 提供给外部的可以注入自定义命令的接口
+         * @param name
+         * @param command
+         */
+        function addCommand(name, command) {
+            if (!html.commands[name])
+                html.commands[name] = command;
+        }
+        html.addCommand = addCommand;
         /** 文本域命令 */
         function textContent(context) {
             context.entity.createWatcher(context.target, context.exp, context.scope, function (value) {
