@@ -379,7 +379,7 @@ var ares;
             };
             PIXICompiler._textExpReg = /(.*?)\{\{(.*?)\}\}(.*)/;
             return PIXICompiler;
-        })();
+        }());
         pixijs.PIXICompiler = PIXICompiler;
     })(pixijs = ares.pixijs || (ares.pixijs = {}));
 })(ares || (ares = {}));
