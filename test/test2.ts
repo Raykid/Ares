@@ -37,11 +37,13 @@ window.onload = ()=>
     testSprite.width = testSprite.height = 200;
     testSprite.interactive = true;
     testSprite["a-on:click"] = "testFunc";
-    testSprite["a-for"] = "i in testFor";
+    testSprite["a-for"] = "item in testFor";
+    testSprite["a-x"] = "$index * 200";
     testSkin.addChild(testSprite);
 
-    var testText:PIXI.Text = new PIXI.Text("text: {{text}}, {{i}}");
-    testText["a_for"] = "i in testFor";
+    var testText:PIXI.Text = new PIXI.Text("text: {{text}}, {{item}}");
+    testText["a_for"] = "item in testFor";
+    testText["a-y"] = "$index * 100";
     testSkin.addChild(testText);
 
     ares.bind({

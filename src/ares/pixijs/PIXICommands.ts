@@ -179,13 +179,22 @@ namespace ares.pixijs
 
     function cloneObject<T>(target:T):T
     {
-
         // Text对象要特殊处理
         if(target instanceof PIXI.Text)
         {
             var temp:any = new PIXI.Text();
             temp.style = cloneObject(target["style"]);
             temp.text = target["text"];
+            // 将所有a_和a-开头的属性复制过去
+            var keys:string[] = Object.keys(target);
+            for(var i in keys)
+            {
+                var key:string = keys[i];
+                if(key.indexOf("a-") == 0 || key.indexOf("a_") == 0)
+                {
+                    temp[key] = target[key];
+                }
+            }
             return temp;
         }
         // 如果对象有clone方法则直接调用clone方法

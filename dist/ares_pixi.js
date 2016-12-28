@@ -189,6 +189,14 @@ var ares;
                 var temp = new PIXI.Text();
                 temp.style = cloneObject(target["style"]);
                 temp.text = target["text"];
+                // 将所有a_和a-开头的属性复制过去
+                var keys = Object.keys(target);
+                for (var i in keys) {
+                    var key = keys[i];
+                    if (key.indexOf("a-") == 0 || key.indexOf("a_") == 0) {
+                        temp[key] = target[key];
+                    }
+                }
                 return temp;
             }
             // 如果对象有clone方法则直接调用clone方法
@@ -371,7 +379,7 @@ var ares;
             };
             PIXICompiler._textExpReg = /(.*?)\{\{(.*?)\}\}(.*)/;
             return PIXICompiler;
-        }());
+        })();
         pixijs.PIXICompiler = PIXICompiler;
     })(pixijs = ares.pixijs || (ares.pixijs = {}));
 })(ares || (ares = {}));
