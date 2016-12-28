@@ -22,6 +22,9 @@ namespace ares
     {
         /** 获取ViewModel */
         data:any;
+        /** 获取编译器 */
+        compiler:Compiler;
+
         /**
          * 创建一个订阅者
          * @param exp 表达式

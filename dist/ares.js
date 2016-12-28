@@ -344,6 +344,14 @@ var ares;
             enumerable: true,
             configurable: true
         });
+        Object.defineProperty(Ares.prototype, "compiler", {
+            /** 获取编译器 */
+            get: function () {
+                return this._compiler;
+            },
+            enumerable: true,
+            configurable: true
+        });
         Ares.prototype.doInited = function (data, compiler, options) {
             // 记录变异对象
             this._data = ares.Mutator.mutate(data);

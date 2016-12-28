@@ -184,6 +184,13 @@ var ares;
             }
         };
         function cloneObject(target) {
+            // Text对象要特殊处理
+            if (target instanceof PIXI.Text) {
+                var temp = new PIXI.Text();
+                temp.style = cloneObject(target["style"]);
+                temp.text = target["text"];
+                return temp;
+            }
             // 如果对象有clone方法则直接调用clone方法
             if (typeof target["clone"] == "function")
                 return target["clone"]();
@@ -192,18 +199,29 @@ var ares;
                 var result = new cls();
             }
             catch (err) {
-                return target;
+                return null;
             }
             var keys = Object.keys(target);
             for (var i in keys) {
                 var key = keys[i];
                 // parent属性不复制
-                if (key != "parent") {
+                if (key == "parent")
+                    continue;
+                // children属性要特殊处理
+                if (key == "children") {
+                    var children = target["children"];
+                    for (var j in children) {
+                        var child = cloneObject(children[j]);
+                        result["addChild"](child);
+                    }
+                }
+                else {
                     var value = target[key];
                     if (value && typeof value == "object") {
                         value = cloneObject(value);
                     }
-                    result[key] = value;
+                    if (value !== null)
+                        result[key] = value;
                 }
             }
             return result;
@@ -274,9 +292,6 @@ var ares;
                         exp = conf[key] || conf[cmdName] || node[key];
                     else
                         exp = node[key];
-                    // 如果属性是null则忽略
-                    if (!exp)
-                        continue;
                     // 取到子命令名
                     var subCmd = key.substr(eIndex + 1);
                     // 用命令名取到Command
@@ -310,8 +325,8 @@ var ares;
                 // 开始编译当前节点外部结构
                 for (var i = 0, len = cmdsToCompile.length; i < len; i++) {
                     var cmdToCompile = cmdsToCompile[i];
-                    // 移除属性，要设置为null，因为for会以原始对象作为原型复制对象，如果delete属性的话无法删除原型对象上的属性
-                    cmdToCompile.ctx.target[cmdToCompile.propName] = null;
+                    // 移除属性
+                    delete cmdToCompile.ctx.target[cmdToCompile.propName];
                     // 开始编译
                     cmdToCompile.cmd(cmdToCompile.ctx);
                 }

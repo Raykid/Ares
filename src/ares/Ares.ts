@@ -31,6 +31,12 @@ namespace ares
             return this._data;
         }
 
+        /** 获取编译器 */
+        public get compiler():Compiler
+        {
+            return this._compiler;
+        }
+
         public constructor(data:any, compiler:ares.Compiler, options?:ares.AresOptions)
         {
             // 判断DOM是否已经生成完毕

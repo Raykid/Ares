@@ -344,6 +344,14 @@ var ares;
             enumerable: true,
             configurable: true
         });
+        Object.defineProperty(Ares.prototype, "compiler", {
+            /** 获取编译器 */
+            get: function () {
+                return this._compiler;
+            },
+            enumerable: true,
+            configurable: true
+        });
         Ares.prototype.doInited = function (data, compiler, options) {
             // 记录变异对象
             this._data = ares.Mutator.mutate(data);
@@ -488,7 +496,6 @@ var ares;
                     for (var key in value) {
                         // 拷贝一个target
                         var newNode = cloneObject(context.target);
-                        newNode.x += curIndex * 200;
                         // 添加到显示里
                         parent.addChildAt(newNode, (bIndex + 1) + curIndex);
                         // 生成子域
@@ -504,6 +511,13 @@ var ares;
             }
         };
         function cloneObject(target) {
+            // Text对象要特殊处理
+            if (target instanceof PIXI.Text) {
+                var temp = new PIXI.Text();
+                temp.style = cloneObject(target["style"]);
+                temp.text = target["text"];
+                return temp;
+            }
             // 如果对象有clone方法则直接调用clone方法
             if (typeof target["clone"] == "function")
                 return target["clone"]();
@@ -512,18 +526,29 @@ var ares;
                 var result = new cls();
             }
             catch (err) {
-                return target;
+                return null;
             }
             var keys = Object.keys(target);
             for (var i in keys) {
                 var key = keys[i];
                 // parent属性不复制
-                if (key != "parent") {
+                if (key == "parent")
+                    continue;
+                // children属性要特殊处理
+                if (key == "children") {
+                    var children = target["children"];
+                    for (var j in children) {
+                        var child = cloneObject(children[j]);
+                        result["addChild"](child);
+                    }
+                }
+                else {
                     var value = target[key];
                     if (value && typeof value == "object") {
                         value = cloneObject(value);
                     }
-                    result[key] = value;
+                    if (value !== null)
+                        result[key] = value;
                 }
             }
             return result;
@@ -594,9 +619,6 @@ var ares;
                         exp = conf[key] || conf[cmdName] || node[key];
                     else
                         exp = node[key];
-                    // 如果属性是null则忽略
-                    if (!exp)
-                        continue;
                     // 取到子命令名
                     var subCmd = key.substr(eIndex + 1);
                     // 用命令名取到Command
@@ -630,8 +652,8 @@ var ares;
                 // 开始编译当前节点外部结构
                 for (var i = 0, len = cmdsToCompile.length; i < len; i++) {
                     var cmdToCompile = cmdsToCompile[i];
-                    // 移除属性，要设置为null，因为for会以原始对象作为原型复制对象，如果delete属性的话无法删除原型对象上的属性
-                    cmdToCompile.ctx.target[cmdToCompile.propName] = null;
+                    // 移除属性
+                    delete cmdToCompile.ctx.target[cmdToCompile.propName];
                     // 开始编译
                     cmdToCompile.cmd(cmdToCompile.ctx);
                 }
@@ -700,33 +722,22 @@ window.onload = function () {
         requestAnimationFrame(render);
     }
     var testSkin = new PIXI.Container();
-    testSkin.name = "testSkin";
     stage.addChild(testSkin);
     var testSprite = new PIXI.Sprite();
-    testSprite.name = "testSprite";
     testSprite.texture = PIXI.Texture.fromImage("http://pic.qiantucdn.com/58pic/14/45/39/57i58PICI2K_1024.png");
     testSprite.width = testSprite.height = 200;
     testSprite.interactive = true;
     testSprite["a_on$click"] = "testFunc";
     testSprite["a_for"] = "i in testFor";
     testSkin.addChild(testSprite);
-    var testText = new PIXI.Text("text: {{text}}");
-    testText.name = "txt_test";
-    testText["a_prop"] = "{x: x}";
-    testText["a_y"] = "y";
+    var testText = new PIXI.Text("text: {{text + ', ' + i}}");
+    testText["a_for"] = "i in testFor";
     testSkin.addChild(testText);
     ares.bind({
         text: "text",
-        x: 0,
-        y: 0,
-        scaleX: 1,
-        testIf: false,
         testFor: [],
         testFunc: function (evt) {
             this.text = "Fuck!!!";
-            this.x = 100;
-            this.y = 200;
-            this.scaleX = 2;
         }
     }, new ares.pixijs.PIXICompiler(testSkin, {
         txt_test: { scaleX: "scaleX" }
@@ -734,8 +745,7 @@ window.onload = function () {
         inited: function () {
             var _this = this;
             setTimeout(function () {
-                _this.testIf = true;
-                _this.testFor = [1, 2, 3];
+                _this.testFor = ["asdf", "ajsdf", 323];
             }, 2000);
         }
     });

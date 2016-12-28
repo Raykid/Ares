@@ -83,8 +83,6 @@ namespace ares.pixijs
                 var exp:string;
                 if(conf) exp = conf[key] || conf[cmdName] || node[key];
                 else exp = node[key];
-                // 如果属性是null则忽略
-                if(!exp) continue;
                 // 取到子命令名
                 var subCmd:string = key.substr(eIndex + 1);
                 // 用命令名取到Command
@@ -121,8 +119,8 @@ namespace ares.pixijs
             for(var i:number = 0, len:number = cmdsToCompile.length; i < len; i++)
             {
                 var cmdToCompile:{propName:string, cmd:Command, ctx:CommandContext} = cmdsToCompile[i];
-                // 移除属性，要设置为null，因为for会以原始对象作为原型复制对象，如果delete属性的话无法删除原型对象上的属性
-                cmdToCompile.ctx.target[cmdToCompile.propName] = null;
+                // 移除属性
+                delete cmdToCompile.ctx.target[cmdToCompile.propName];
                 // 开始编译
                 cmdToCompile.cmd(cmdToCompile.ctx);
             }

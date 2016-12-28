@@ -179,6 +179,15 @@ namespace ares.pixijs
 
     function cloneObject<T>(target:T):T
     {
+
+        // Text对象要特殊处理
+        if(target instanceof PIXI.Text)
+        {
+            var temp:any = new PIXI.Text();
+            temp.style = cloneObject(target["style"]);
+            temp.text = target["text"];
+            return temp;
+        }
         // 如果对象有clone方法则直接调用clone方法
         if(typeof target["clone"] == "function") return target["clone"]();
         var cls:any = (target.constructor || Object);
@@ -188,21 +197,32 @@ namespace ares.pixijs
         }
         catch(err)
         {
-            return target;
+            return null;
         }
         var keys:string[] = Object.keys(target);
         for(var i in keys)
         {
             var key:string = keys[i];
             // parent属性不复制
-            if(key != "parent")
+            if(key == "parent") continue;
+            // children属性要特殊处理
+            if(key == "children")
+            {
+                var children:PIXI.DisplayObject[] = target["children"];
+                for(var j in children)
+                {
+                    var child:PIXI.DisplayObject = cloneObject(children[j]);
+                    result["addChild"](child);
+                }
+            }
+            else
             {
                 var value:any = target[key];
                 if(value && typeof value == "object")
                 {
                     value = cloneObject(value);
                 }
-                result[key] = value;
+                if(value !== null) result[key] = value;
             }
         }
         return result;
