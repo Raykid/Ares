@@ -591,14 +591,14 @@ var ares;
                 // 取到属性列表
                 var keys = [];
                 for (var t in node) {
-                    if (t.indexOf("a_") == 0) {
+                    if (t.indexOf("a-") == 0 || t.indexOf("a_") == 0) {
                         keys.push(t);
                     }
                 }
                 // 把配置中的属性推入属性列表中
                 var conf = (this._config && this._config[name]);
                 for (var t in conf) {
-                    if (t.indexOf("a_") != 0)
+                    if (t.indexOf("a-") != 0 && t.indexOf("a_") != 0)
                         t = "a_" + t;
                     keys.push(t);
                 }
@@ -608,7 +608,9 @@ var ares;
                     // 首先解析当前节点上面以a_开头的属性，将其认为是绑定属性
                     var key = keys[i];
                     var bIndex = 2;
-                    var eIndex = key.indexOf("$");
+                    var eIndex = key.indexOf(":");
+                    if (eIndex < 0)
+                        eIndex = key.indexOf("$");
                     if (eIndex < 0)
                         eIndex = key.length;
                     // 取到命令名
@@ -727,8 +729,8 @@ window.onload = function () {
     testSprite.texture = PIXI.Texture.fromImage("http://pic.qiantucdn.com/58pic/14/45/39/57i58PICI2K_1024.png");
     testSprite.width = testSprite.height = 200;
     testSprite.interactive = true;
-    testSprite["a_on$click"] = "testFunc";
-    testSprite["a_for"] = "i in testFor";
+    testSprite["a-on:click"] = "testFunc";
+    testSprite["a-for"] = "i in testFor";
     testSkin.addChild(testSprite);
     var testText = new PIXI.Text("text: {{text}}, {{i}}");
     testText["a_for"] = "i in testFor";

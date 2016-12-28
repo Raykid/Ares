@@ -56,7 +56,7 @@ namespace ares.pixijs
             var keys:string[] = [];
             for(var t in node)
             {
-                if(t.indexOf("a_") == 0)
+                if(t.indexOf("a-") == 0 || t.indexOf("a_") == 0)
                 {
                     keys.push(t);
                 }
@@ -65,7 +65,7 @@ namespace ares.pixijs
             var conf:PIXIBindConfigCommands = (this._config && this._config[name]);
             for(var t in conf)
             {
-                if(t.indexOf("a_") != 0) t = "a_" + t;
+                if(t.indexOf("a-") != 0 && t.indexOf("a_") != 0) t = "a_" + t;
                 keys.push(t);
             }
             // 开始遍历属性列表
@@ -75,7 +75,8 @@ namespace ares.pixijs
                 // 首先解析当前节点上面以a_开头的属性，将其认为是绑定属性
                 var key:string = keys[i];
                 var bIndex:number = 2;
-                var eIndex:number = key.indexOf("$");
+                var eIndex:number = key.indexOf(":");
+                if(eIndex < 0) eIndex = key.indexOf("$");
                 if(eIndex < 0) eIndex = key.length;
                 // 取到命令名
                 var cmdName:string = key.substring(bIndex, eIndex);

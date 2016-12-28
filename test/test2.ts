@@ -36,8 +36,8 @@ window.onload = ()=>
     testSprite.texture = PIXI.Texture.fromImage("http://pic.qiantucdn.com/58pic/14/45/39/57i58PICI2K_1024.png");
     testSprite.width = testSprite.height = 200;
     testSprite.interactive = true;
-    testSprite["a_on$click"] = "testFunc";
-    testSprite["a_for"] = "i in testFor";
+    testSprite["a-on:click"] = "testFunc";
+    testSprite["a-for"] = "i in testFor";
     testSkin.addChild(testSprite);
 
     var testText:PIXI.Text = new PIXI.Text("text: {{text}}, {{i}}");
