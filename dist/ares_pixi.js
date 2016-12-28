@@ -53,7 +53,7 @@ var ares;
     (function (pixijs) {
         /** 文本域命令 */
         function textContent(context) {
-            context.entity.createWatcher(context.exp, context.scope, function (value) {
+            context.entity.createWatcher(context.target, context.exp, context.scope, function (value) {
                 var text = context.target;
                 text.text = value;
             });
@@ -63,7 +63,7 @@ var ares;
             /** 修改任意属性命令 */
             prop: function (context) {
                 var target = context.target;
-                context.entity.createWatcher(context.exp, context.scope, function (value) {
+                context.entity.createWatcher(context.target, context.exp, context.scope, function (value) {
                     if (context.subCmd != "") {
                         // 子命令形式
                         target[context.subCmd] = value;
@@ -90,6 +90,7 @@ var ares;
                             // 创建一个临时的子域，用于保存参数
                             var scope = Object.create(context.scope);
                             scope.$event = evt;
+                            scope.$target = context.target;
                             ares.utils.runExp(context.exp, scope);
                         });
                     }
@@ -106,7 +107,7 @@ var ares;
                 var index = parent.getChildIndex(context.target);
                 parent.addChildAt(refNode, index);
                 // 只有在条件为true时才启动编译
-                context.entity.createWatcher(context.exp, context.scope, function (value) {
+                context.entity.createWatcher(context.target, context.exp, context.scope, function (value) {
                     if (value == true) {
                         // 启动编译
                         if (!compiled) {
@@ -149,7 +150,7 @@ var ares;
                 parent.addChildAt(eNode, index + 1);
                 parent.removeChild(context.target);
                 // 添加订阅
-                context.entity.createWatcher(arrName, context.scope, function (value) {
+                context.entity.createWatcher(context.target, arrName, context.scope, function (value) {
                     // 清理原始显示
                     var bIndex = parent.getChildIndex(sNode);
                     var eIndex = parent.getChildIndex(eNode);
@@ -184,21 +185,8 @@ var ares;
             }
         };
         function cloneObject(target) {
-            // Text对象要特殊处理
-            if (target instanceof PIXI.Text) {
-                var temp = new PIXI.Text();
-                temp.style = cloneObject(target["style"]);
-                temp.text = target["text"];
-                // 将所有a_和a-开头的属性复制过去
-                var keys = Object.keys(target);
-                for (var i in keys) {
-                    var key = keys[i];
-                    if (key.indexOf("a-") == 0 || key.indexOf("a_") == 0) {
-                        temp[key] = target[key];
-                    }
-                }
-                return temp;
-            }
+            if (!target || typeof target != "object")
+                return target;
             // 如果对象有clone方法则直接调用clone方法
             if (typeof target["clone"] == "function")
                 return target["clone"]();
@@ -214,6 +202,9 @@ var ares;
                 var key = keys[i];
                 // parent属性不复制
                 if (key == "parent")
+                    continue;
+                // Text组件不能复制_texture属性
+                if (key == "_texture" && target instanceof PIXI.Text)
                     continue;
                 // children属性要特殊处理
                 if (key == "children") {

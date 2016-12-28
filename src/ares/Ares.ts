@@ -67,9 +67,9 @@ namespace ares
             }
         }
 
-        public createWatcher(exp:string, scope:any, callback:WatcherCallback):IWatcher
+        public createWatcher(target:any, exp:string, scope:any, callback:WatcherCallback):IWatcher
         {
-            return new Watcher(exp, scope, callback);
+            return new Watcher(target, exp, scope, callback);
         }
     }
 }

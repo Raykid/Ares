@@ -20,16 +20,18 @@ namespace ares
 
         private _value:any;
 
+        private _target:any;
         private _exp:string;
         private _scope:any;
         private _expFunc:(scope:any)=>any;
         private _callback:WatcherCallback;
 
-        public constructor(exp:string, scope:any, callback:WatcherCallback)
+        public constructor(target:any, exp:string, scope:any, callback:WatcherCallback)
         {
             // 生成一个全局唯一的ID
             this._uid = Watcher._uid ++;
-            // 记录表达式和作用域
+            // 记录作用目标、表达式和作用域
+            this._target = target;
             this._exp = exp;
             this._scope = scope;
             // 将表达式和作用域解析为一个Function
@@ -49,6 +51,8 @@ namespace ares
             var value:any = null;
             // 记录自身
             Watcher.updating = this;
+            // 设置作用目标
+            this._scope.$target = this._target;
             // 表达式求值
             try
             {
@@ -59,6 +63,8 @@ namespace ares
                 // 输出错误日志
                 console.error("表达式求值错误，exp：" + this._exp + "，scope：" + JSON.stringify(this._scope));
             }
+            // 移除作用目标
+            this._scope.$target = null;
             // 移除自身记录
             Watcher.updating = null;
             return value;

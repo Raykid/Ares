@@ -22,7 +22,7 @@ namespace ares.pixijs
     /** 文本域命令 */
     export function textContent(context:CommandContext):void
     {
-        context.entity.createWatcher(context.exp, context.scope, (value:string)=>
+        context.entity.createWatcher(context.target, context.exp, context.scope, (value:string)=>
         {
             var text:PIXI.Text = context.target as PIXI.Text;
             text.text = value;
@@ -34,7 +34,7 @@ namespace ares.pixijs
         prop: (context:CommandContext)=>
         {
             var target:PIXI.DisplayObject = context.target;
-            context.entity.createWatcher(context.exp, context.scope, (value:any)=>
+            context.entity.createWatcher(context.target, context.exp, context.scope, (value:any)=>
             {
                 if(context.subCmd != "")
                 {
@@ -70,6 +70,7 @@ namespace ares.pixijs
                         // 创建一个临时的子域，用于保存参数
                         var scope:any = Object.create(context.scope);
                         scope.$event = evt;
+                        scope.$target = context.target;
                         ares.utils.runExp(context.exp, scope);
                     });
                 }
@@ -87,7 +88,7 @@ namespace ares.pixijs
             var index:number = parent.getChildIndex(context.target);
             parent.addChildAt(refNode, index);
             // 只有在条件为true时才启动编译
-            context.entity.createWatcher(context.exp, context.scope, (value:boolean)=>
+            context.entity.createWatcher(context.target, context.exp, context.scope, (value:boolean)=>
             {
                 if(value == true)
                 {
@@ -138,7 +139,7 @@ namespace ares.pixijs
             parent.addChildAt(eNode, index + 1);
             parent.removeChild(context.target);
             // 添加订阅
-            context.entity.createWatcher(arrName, context.scope, (value:any)=>{
+            context.entity.createWatcher(context.target, arrName, context.scope, (value:any)=>{
                 // 清理原始显示
                 var bIndex:number = parent.getChildIndex(sNode);
                 var eIndex:number = parent.getChildIndex(eNode);
@@ -179,24 +180,7 @@ namespace ares.pixijs
 
     function cloneObject<T>(target:T):T
     {
-        // Text对象要特殊处理
-        if(target instanceof PIXI.Text)
-        {
-            var temp:any = new PIXI.Text();
-            temp.style = cloneObject(target["style"]);
-            temp.text = target["text"];
-            // 将所有a_和a-开头的属性复制过去
-            var keys:string[] = Object.keys(target);
-            for(var i in keys)
-            {
-                var key:string = keys[i];
-                if(key.indexOf("a-") == 0 || key.indexOf("a_") == 0)
-                {
-                    temp[key] = target[key];
-                }
-            }
-            return temp;
-        }
+        if(!target || typeof target != "object") return target;
         // 如果对象有clone方法则直接调用clone方法
         if(typeof target["clone"] == "function") return target["clone"]();
         var cls:any = (target.constructor || Object);
@@ -213,7 +197,9 @@ namespace ares.pixijs
         {
             var key:string = keys[i];
             // parent属性不复制
-            if(key == "parent") continue;
+            if(key == "parent") continue
+            // Text组件不能复制_texture属性
+            if(key == "_texture" && target instanceof PIXI.Text) continue;
             // children属性要特殊处理
             if(key == "children")
             {

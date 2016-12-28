@@ -31,11 +31,12 @@ declare module ares
         data:any;
         /**
          * 创建一个订阅者
+         * @param target 作用目标，指表达式所在的显示对象
          * @param exp 表达式
          * @param scope 作用域
          * @param callback 订阅器回调
          */
-        createWatcher(exp:string, scope:any, callback:WatcherCallback):IWatcher;
+        createWatcher(target:any, exp:string, scope:any, callback:WatcherCallback):IWatcher;
     }
 
     export interface AresOptions

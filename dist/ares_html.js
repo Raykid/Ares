@@ -53,7 +53,7 @@ var ares;
     (function (html) {
         /** 文本域命令 */
         function textContent(context) {
-            context.entity.createWatcher(context.exp, context.scope, function (value) {
+            context.entity.createWatcher(context.target, context.exp, context.scope, function (value) {
                 context.target.nodeValue = value;
             });
         }
@@ -61,13 +61,13 @@ var ares;
         html.commands = {
             /** 文本命令 */
             text: function (context) {
-                context.entity.createWatcher(context.exp, context.scope, function (value) {
+                context.entity.createWatcher(context.target, context.exp, context.scope, function (value) {
                     context.target.textContent = value;
                 });
             },
             /** HTML文本命令 */
             html: function (context) {
-                context.entity.createWatcher(context.exp, context.scope, function (value) {
+                context.entity.createWatcher(context.target, context.exp, context.scope, function (value) {
                     var target = context.target;
                     target.innerHTML = value;
                     // 设置完成后需要重新编译一下当前节点的所有子节点
@@ -83,7 +83,7 @@ var ares;
                 // 记录原始class值
                 var oriCls = target.getAttribute("class");
                 // 生成订阅器
-                context.entity.createWatcher(context.exp, context.scope, function (params) {
+                context.entity.createWatcher(context.target, context.exp, context.scope, function (params) {
                     if (typeof params == "string") {
                         // 直接赋值形式
                         if (oriCls)
@@ -110,7 +110,7 @@ var ares;
             /** 修改任意属性命令 */
             attr: function (context) {
                 var target = context.target;
-                context.entity.createWatcher(context.exp, context.scope, function (value) {
+                context.entity.createWatcher(context.target, context.exp, context.scope, function (value) {
                     if (context.subCmd != "") {
                         // 子命令形式
                         target.setAttribute(context.subCmd, value);
@@ -138,6 +138,7 @@ var ares;
                             // 创建一个临时的子域，用于保存参数
                             var scope = Object.create(context.scope);
                             scope.$event = evt;
+                            scope.$target = context.target;
                             ares.utils.runExp(context.exp, scope);
                         });
                     }
@@ -151,7 +152,7 @@ var ares;
                 var refNode = document.createTextNode("");
                 context.target.parentNode.insertBefore(refNode, context.target);
                 // 只有在条件为true时才启动编译
-                context.entity.createWatcher(context.exp, context.scope, function (value) {
+                context.entity.createWatcher(context.target, context.exp, context.scope, function (value) {
                     if (value == true) {
                         // 启动编译
                         if (!compiled) {
@@ -190,7 +191,7 @@ var ares;
                 pNode.replaceChild(eNode, context.target);
                 pNode.insertBefore(sNode, eNode);
                 // 添加订阅
-                context.entity.createWatcher(arrName, context.scope, function (value) {
+                context.entity.createWatcher(context.target, arrName, context.scope, function (value) {
                     // 清理原始显示
                     range.setStart(sNode, 0);
                     range.setEnd(eNode, 0);
