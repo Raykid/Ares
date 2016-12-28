@@ -197,7 +197,7 @@ namespace ares.pixijs
         {
             var key:string = keys[i];
             // parent属性不复制
-            if(key == "parent") continue
+            if(key == "parent") continue;
             // Text组件不能复制_texture属性
             if(key == "_texture" && target instanceof PIXI.Text) continue;
             // children属性要特殊处理
