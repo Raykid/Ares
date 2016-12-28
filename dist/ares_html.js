@@ -332,9 +332,9 @@ var ares;
             HTMLCompiler.prototype.parseTextExp = function (exp) {
                 var reg = HTMLCompiler._textExpReg;
                 for (var result = reg.exec(exp); result != null; result = reg.exec(exp)) {
-                    exp = "`" + result[1] + "${" + result[2] + "}" + result[3] + "`";
+                    exp = result[1] + "${" + result[2] + "}" + result[3];
                 }
-                return exp;
+                return "`" + exp + "`";
             };
             HTMLCompiler._textExpReg = /(.*?)\{\{(.*?)\}\}(.*)/;
             return HTMLCompiler;

@@ -134,9 +134,9 @@ namespace ares.html
             var reg:RegExp = HTMLCompiler._textExpReg;
             for(var result:RegExpExecArray = reg.exec(exp); result != null; result = reg.exec(exp))
             {
-                exp = "`" + result[1] + "${" + result[2] + "}" + result[3] + "`";
+                exp = result[1] + "${" + result[2] + "}" + result[3];
             }
-            return exp;
+            return "`" + exp + "`";
         }
     }
 }

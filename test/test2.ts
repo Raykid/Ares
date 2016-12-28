@@ -40,7 +40,7 @@ window.onload = ()=>
     testSprite["a_for"] = "i in testFor";
     testSkin.addChild(testSprite);
 
-    var testText:PIXI.Text = new PIXI.Text("text: {{text + ', ' + i}}");
+    var testText:PIXI.Text = new PIXI.Text("text: {{text}}, {{i}}");
     testText["a_for"] = "i in testFor";
     testSkin.addChild(testText);
 

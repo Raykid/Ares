@@ -167,9 +167,9 @@ namespace ares.pixijs
             var reg:RegExp = PIXICompiler._textExpReg;
             for(var result:RegExpExecArray = reg.exec(exp); result != null; result = reg.exec(exp))
             {
-                exp = "`" + result[1] + "${" + result[2] + "}" + result[3] + "`";
+                exp = result[1] + "${" + result[2] + "}" + result[3];
             }
-            return exp;
+            return "`" + exp + "`";
         }
     }
 }
