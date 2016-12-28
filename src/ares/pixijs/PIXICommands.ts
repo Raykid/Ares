@@ -212,11 +212,7 @@ namespace ares.pixijs
             }
             else
             {
-                var value:any = target[key];
-                if(value && typeof value == "object")
-                {
-                    value = cloneObject(value);
-                }
+                var value:any = cloneObject(target[key]);
                 if(value !== null) result[key] = value;
             }
         }

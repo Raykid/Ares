@@ -215,10 +215,7 @@ var ares;
                     }
                 }
                 else {
-                    var value = target[key];
-                    if (value && typeof value == "object") {
-                        value = cloneObject(value);
-                    }
+                    var value = cloneObject(target[key]);
                     if (value !== null)
                         result[key] = value;
                 }
