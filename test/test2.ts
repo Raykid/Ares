@@ -1,7 +1,7 @@
-/// <reference path="../src/ares/Ares.ts"/>
-/// <reference path="../src/ares/pixijs/PIXICompiler.ts"/>
+/// <reference path="../dist/ares.d.ts"/>
+/// <reference path="../dist/ares_pixi.d.ts"/>
+/// <reference path="../src/ares/pixijs/pixi.js.d.ts"/>
 
-import IAres = ares.IAres;
 /**
  * Created by Raykid on 2016/12/23.
  */

@@ -338,7 +338,7 @@ var ares;
             };
             HTMLCompiler._textExpReg = /(.*?)\{\{(.*?)\}\}(.*)/;
             return HTMLCompiler;
-        })();
+        }());
         html.HTMLCompiler = HTMLCompiler;
     })(html = ares.html || (ares.html = {}));
 })(ares || (ares = {}));

@@ -6,9 +6,11 @@ declare interface Array<T> {
     $set(index: any, val: T): T;
 }
 
-declare namespace ares
+declare module ares
 {
-    interface Compiler
+    export function bind(data:any, compiler:ares.Compiler, options?:ares.AresOptions):ares.IAres;
+
+    export interface Compiler
     {
         /**
          * 初始化编译器
@@ -23,7 +25,7 @@ declare namespace ares
         compile(target:any, scope:any):void;
     }
 
-    interface IAres
+    export interface IAres
     {
         /** 获取ViewModel */
         data:any;
@@ -36,12 +38,12 @@ declare namespace ares
         createWatcher(exp:string, scope:any, callback:WatcherCallback):IWatcher;
     }
 
-    interface AresOptions
+    export interface AresOptions
     {
         inited:(entity?:IAres)=>void;
     }
 
-    interface IWatcher
+    export interface IWatcher
     {
         /**
          * 获取到表达式当前最新值
@@ -55,15 +57,13 @@ declare namespace ares
         update(extra?:any):void
     }
 
-    interface WatcherCallback
+    export interface WatcherCallback
     {
         (newValue?:any, oldValue?:any, extra?:any):void;
     }
 }
 
-declare interface AresStatic
+declare module "ares"
 {
-    bind(data:any, compiler:ares.Compiler, options?:ares.AresOptions):ares.IAres;
+    export = ares;
 }
-
-declare var ares:AresStatic;
