@@ -27,7 +27,7 @@ var ares;
             }
         };
         return Dep;
-    })();
+    }());
     ares.Dep = Dep;
 })(ares || (ares = {}));
 /**
@@ -125,7 +125,7 @@ var ares;
         Watcher.updating = null;
         Watcher._uid = 0;
         return Watcher;
-    })();
+    }());
     ares.Watcher = Watcher;
 })(ares || (ares = {}));
 /// <reference path="Dep.ts"/>
@@ -148,19 +148,19 @@ var ares;
             if (!data || typeof data != "object")
                 return;
             // 是个复杂类型对象，但是以前变异过了就不再重做一遍了
-            if (data.__ares_mutated__)
-                return data;
-            // 针对每个内部变量都进行一次变异
-            for (var key in data) {
-                Mutator.mutateObject(data, key, data[key]);
+            if (!data.__ares_mutated__) {
+                // 针对每个内部变量都进行一次变异
+                for (var key in data) {
+                    Mutator.mutateObject(data, key, data[key]);
+                }
+                // 打一个标记表示已经变异过了
+                Object.defineProperty(data, "__ares_mutated__", {
+                    value: true,
+                    writable: false,
+                    enumerable: false,
+                    configurable: false
+                });
             }
-            // 打一个标记表示已经变异过了
-            Object.defineProperty(data, "__ares_mutated__", {
-                value: true,
-                writable: false,
-                enumerable: false,
-                configurable: false
-            });
             return data;
         };
         Mutator.mutateObject = function (data, key, value) {
@@ -271,7 +271,7 @@ var ares;
             "reverse"
         ];
         return Mutator;
-    })();
+    }());
     ares.Mutator = Mutator;
 })(ares || (ares = {}));
 /**
@@ -383,7 +383,7 @@ var ares;
             return new ares.Watcher(target, exp, scope, callback);
         };
         return Ares;
-    })();
+    }());
     ares.Ares = Ares;
 })(ares || (ares = {}));
 //# sourceMappingURL=ares.js.map
