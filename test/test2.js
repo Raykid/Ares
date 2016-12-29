@@ -1,4 +1,5 @@
 /// <reference path="../dist/ares.d.ts"/>
+/// <reference path="../dist/ares_html.d.ts"/>
 /// <reference path="../dist/ares_pixi.d.ts"/>
 /// <reference path="../src/ares/pixijs/pixi.js.d.ts"/>
 /**
@@ -29,7 +30,6 @@ window.onload = function () {
     testSprite["a-on:click"] = "testFunc";
     testSprite["a-for"] = "item in testFor";
     testSprite["a-x"] = "$target.x + $index * 200";
-    testSprite["a-fuck:fuckyou"] = "afsdf";
     testSprite.x = 200;
     testSkin.addChild(testSprite);
     var testText = new PIXI.Text("text: {{text}}, {{item}}");
@@ -37,21 +37,17 @@ window.onload = function () {
     testText["a-y"] = "$target.y + $index * 100";
     testText.y = 300;
     testSkin.addChild(testText);
-    ares.bind({
+    var data = {
         text: "text",
         testFor: [],
         testFunc: function (evt) {
             this.text = "Fuck!!!";
         }
-    }, new ares.pixijs.PIXICompiler(testSkin, {
-        txt_test: { scaleX: "scaleX" }
-    }), {
-        inited: function () {
-            var _this = this;
-            setTimeout(function () {
-                _this.testFor = ["asdf", "ajsdf", 323];
-            }, 2000);
-        }
-    });
+    };
+    //ares.bind(data, new ares.pixijs.PIXICompiler(testSkin));
+    ares.bind(data, new ares.html.HTMLCompiler("#div_root"));
+    setTimeout(function () {
+        data.testFor = ["asdf", "ajsdf", 323];
+    }, 2000);
 };
 //# sourceMappingURL=test2.js.map

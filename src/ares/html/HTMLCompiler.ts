@@ -11,22 +11,21 @@ namespace ares.html
     {
         private static _textExpReg:RegExp = /(.*?)\{\{(.*?)\}\}(.*)/;
 
-        private _idOrElement:string|HTMLElement;
+        private _selectorsOrElement:string|HTMLElement;
         private _root:HTMLElement;
         private _entity:IAres;
 
-        public constructor(idOrElement:string|HTMLElement)
+        public constructor(selectorsOrElement:string|HTMLElement)
         {
-            this._idOrElement = idOrElement;
+            this._selectorsOrElement = selectorsOrElement;
         }
 
         public init(entity:IAres):void
         {
-            if(typeof this._idOrElement == "string")
-                this._root = document.getElementById(this._idOrElement as string) ||
-                    document.getElementsByName(this._idOrElement as string)[0] as HTMLElement;
+            if(typeof this._selectorsOrElement == "string")
+                this._root = document.querySelector(this._selectorsOrElement as string) as HTMLElement;
             else
-                this._root = this._idOrElement as HTMLElement;
+                this._root = this._selectorsOrElement as HTMLElement;
             this._entity = entity;
             // 开始编译root节点
             this.compile(this._root, entity.data);

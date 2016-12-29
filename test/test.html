@@ -5,6 +5,7 @@
     <title>Ares Test</title>
     <script src="pixi.js"></script>
     <script src="../dist/ares.js"></script>
+    <script src="../dist/ares_html.js"></script>
     <script src="../dist/ares_pixi.js"></script>
     <script src="test2.js"></script>
 
@@ -15,6 +16,7 @@
 </head>
 <body>
     <div id="div_root">
+        <div a-for="item in testFor">{{$index}}, {{item}}, {{text}}</div>
     </div>
 </body>
 </html>

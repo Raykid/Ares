@@ -28,7 +28,7 @@ declare module ares.html
 
     export class HTMLCompiler
     {
-        constructor(idOrElement:string|HTMLElement);
+        constructor(selectorsOrElement:string|HTMLElement);
         compile(node:Node, scope:any):void;
         init(entity:IAres):void;
     }

@@ -243,15 +243,14 @@ var ares;
     var html;
     (function (html) {
         var HTMLCompiler = (function () {
-            function HTMLCompiler(idOrElement) {
-                this._idOrElement = idOrElement;
+            function HTMLCompiler(selectorsOrElement) {
+                this._selectorsOrElement = selectorsOrElement;
             }
             HTMLCompiler.prototype.init = function (entity) {
-                if (typeof this._idOrElement == "string")
-                    this._root = document.getElementById(this._idOrElement) ||
-                        document.getElementsByName(this._idOrElement)[0];
+                if (typeof this._selectorsOrElement == "string")
+                    this._root = document.querySelector(this._selectorsOrElement);
                 else
-                    this._root = this._idOrElement;
+                    this._root = this._selectorsOrElement;
                 this._entity = entity;
                 // 开始编译root节点
                 this.compile(this._root, entity.data);
@@ -349,7 +348,7 @@ var ares;
             };
             HTMLCompiler._textExpReg = /(.*?)\{\{(.*?)\}\}(.*)/;
             return HTMLCompiler;
-        }());
+        })();
         html.HTMLCompiler = HTMLCompiler;
     })(html = ares.html || (ares.html = {}));
 })(ares || (ares = {}));
