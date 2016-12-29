@@ -3,9 +3,9 @@
     "module": "commonjs",
     "target": "es5",
     "sourceMap": true,
-    "outFile": "test2.js"
+    "outFile": "test.js"
   },
   "files": [
-    "test2.ts"
+    "test.ts"
   ]
 }

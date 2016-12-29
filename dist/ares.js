@@ -27,7 +27,7 @@ var ares;
             }
         };
         return Dep;
-    }());
+    })();
     ares.Dep = Dep;
 })(ares || (ares = {}));
 /**
@@ -125,7 +125,7 @@ var ares;
         Watcher.updating = null;
         Watcher._uid = 0;
         return Watcher;
-    }());
+    })();
     ares.Watcher = Watcher;
 })(ares || (ares = {}));
 /// <reference path="Dep.ts"/>
@@ -271,7 +271,7 @@ var ares;
             "reverse"
         ];
         return Mutator;
-    }());
+    })();
     ares.Mutator = Mutator;
 })(ares || (ares = {}));
 /**
@@ -383,7 +383,7 @@ var ares;
             return new ares.Watcher(target, exp, scope, callback);
         };
         return Ares;
-    }());
+    })();
     ares.Ares = Ares;
 })(ares || (ares = {}));
 //# sourceMappingURL=ares.js.map
