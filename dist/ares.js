@@ -147,10 +147,20 @@ var ares;
             // 如果是简单类型，则啥也不做
             if (!data || typeof data != "object")
                 return;
-            // 是个复杂类型对象，针对每个内部变量都进行一次变异
+            // 是个复杂类型对象，但是以前变异过了就不再重做一遍了
+            if (data.__ares_mutated__)
+                return data;
+            // 针对每个内部变量都进行一次变异
             for (var key in data) {
                 Mutator.mutateObject(data, key, data[key]);
             }
+            // 打一个标记表示已经变异过了
+            Object.defineProperty(data, "__ares_mutated__", {
+                value: true,
+                writable: false,
+                enumerable: false,
+                configurable: false
+            });
             return data;
         };
         Mutator.mutateObject = function (data, key, value) {

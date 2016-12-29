@@ -56,7 +56,7 @@ window.onload = ()=>
         }
     };
 
-    //ares.bind(data, new ares.pixijs.PIXICompiler(testSkin));
+    ares.bind(data, new ares.pixijs.PIXICompiler(testSkin));
 
     ares.bind(data, new ares.html.HTMLCompiler("#div_root"));
 

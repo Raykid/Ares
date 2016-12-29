@@ -44,7 +44,7 @@ window.onload = function () {
             this.text = "Fuck!!!";
         }
     };
-    //ares.bind(data, new ares.pixijs.PIXICompiler(testSkin));
+    ares.bind(data, new ares.pixijs.PIXICompiler(testSkin));
     ares.bind(data, new ares.html.HTMLCompiler("#div_root"));
     setTimeout(function () {
         data.testFor = ["asdf", "ajsdf", 323];
