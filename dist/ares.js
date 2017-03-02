@@ -38,6 +38,7 @@ var ares;
 (function (ares) {
     var Watcher = (function () {
         function Watcher(target, exp, scope, callback) {
+            this._disposed = false;
             // 生成一个全局唯一的ID
             this._uid = Watcher._uid++;
             // 记录作用目标、表达式和作用域
@@ -64,6 +65,8 @@ var ares;
          * @returns {any} 最新值
          */
         Watcher.prototype.getValue = function () {
+            if (this._disposed)
+                return null;
             var value = null;
             // 记录自身
             Watcher.updating = this;
@@ -88,11 +91,25 @@ var ares;
          * @param extra 可能的额外数据
          */
         Watcher.prototype.update = function (extra) {
+            if (this._disposed)
+                return;
             var value = this.getValue();
             if (!Watcher.isEqual(value, this._value)) {
                 this._callback && this._callback(value, this._value, extra);
                 this._value = Watcher.deepCopy(value);
             }
+        };
+        /** 销毁订阅者 */
+        Watcher.prototype.dispose = function () {
+            if (this._disposed)
+                return;
+            this._value = null;
+            this._target = null;
+            this._exp = null;
+            this._scope = null;
+            this._expFunc = null;
+            this._callback = null;
+            this._disposed = true;
         };
         /**
          * 是否相等，包括基础类型和对象/数组的对比

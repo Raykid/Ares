@@ -26,6 +26,8 @@ namespace ares
         private _expFunc:(scope:any)=>any;
         private _callback:WatcherCallback;
 
+        private _disposed:boolean = false;
+
         public constructor(target:any, exp:string, scope:any, callback:WatcherCallback)
         {
             // 生成一个全局唯一的ID
@@ -48,6 +50,7 @@ namespace ares
          */
         public getValue():any
         {
+            if(this._disposed) return null;
             var value:any = null;
             // 记录自身
             Watcher.updating = this;
@@ -76,12 +79,25 @@ namespace ares
          */
         public update(extra?:any):void
         {
+            if(this._disposed) return;
             var value:any = this.getValue();
             if(!Watcher.isEqual(value, this._value))
             {
                 this._callback && this._callback(value, this._value, extra);
                 this._value = Watcher.deepCopy(value);
             }
+        }
+        /** 销毁订阅者 */
+        public dispose():void
+        {
+            if(this._disposed) return;
+            this._value = null;
+            this._target = null;
+            this._exp = null;
+            this._scope = null;
+            this._expFunc = null;
+            this._callback = null;
+            this._disposed = true;
         }
 
         /**

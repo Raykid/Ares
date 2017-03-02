@@ -56,6 +56,8 @@ declare module ares
          * @param extra 可能的额外数据
          */
         update(extra?:any):void
+        /** 销毁订阅者 */
+        dispose():void;
     }
 
     export interface WatcherCallback

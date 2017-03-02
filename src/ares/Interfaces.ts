@@ -46,12 +46,14 @@ namespace ares
          * 获取到表达式当前最新值
          * @returns {any} 最新值
          */
-        getValue():any
+        getValue():any;
         /**
          * 当依赖的数据有更新时调用该方法
          * @param extra 可能的额外数据
          */
-        update(extra?:any):void
+        update(extra?:any):void;
+        /** 销毁订阅者 */
+        dispose():void;
     }
 
     export interface WatcherCallback
