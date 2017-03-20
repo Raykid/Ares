@@ -39,21 +39,6 @@ namespace ares
 
         public constructor(data:any, compiler:ares.Compiler, options?:ares.AresOptions)
         {
-            // 判断DOM是否已经生成完毕
-            if(document.body)
-            {
-                // 如果DOM已经生成完毕，则直接执行初始化
-                this.doInited(data, compiler, options);
-            }
-            else
-            {
-                // 如果DOM还没生成完毕，则等待生成完毕后再执行初始化
-                window.onload = this.doInited.bind(this, data, compiler, options);
-            }
-        }
-
-        private doInited(data:any, compiler:ares.Compiler, options:ares.AresOptions):void
-        {
             // 记录变异对象
             this._data = ares.Mutator.mutate(data);
             this._compiler = compiler;
@@ -73,3 +58,6 @@ namespace ares
         }
     }
 }
+// 为了nodejs模块
+declare var module:{exports: any};
+module.exports = ares;

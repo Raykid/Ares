@@ -27,7 +27,7 @@ var ares;
             }
         };
         return Dep;
-    })();
+    }());
     ares.Dep = Dep;
 })(ares || (ares = {}));
 /**
@@ -142,7 +142,7 @@ var ares;
         Watcher.updating = null;
         Watcher._uid = 0;
         return Watcher;
-    })();
+    }());
     ares.Watcher = Watcher;
 })(ares || (ares = {}));
 /// <reference path="Dep.ts"/>
@@ -288,7 +288,7 @@ var ares;
             "reverse"
         ];
         return Mutator;
-    })();
+    }());
     ares.Mutator = Mutator;
 })(ares || (ares = {}));
 /**
@@ -358,14 +358,15 @@ var ares;
     ares.bind = bind;
     var Ares = (function () {
         function Ares(data, compiler, options) {
-            // 判断DOM是否已经生成完毕
-            if (document.body) {
-                // 如果DOM已经生成完毕，则直接执行初始化
-                this.doInited(data, compiler, options);
-            }
-            else {
-                // 如果DOM还没生成完毕，则等待生成完毕后再执行初始化
-                window.onload = this.doInited.bind(this, data, compiler, options);
+            // 记录变异对象
+            this._data = ares.Mutator.mutate(data);
+            this._compiler = compiler;
+            this._options = options;
+            // 初始化Compiler
+            this._compiler.init(this);
+            // 调用回调
+            if (this._options && this._options.inited) {
+                this._options.inited.call(this._data, this);
             }
         }
         Object.defineProperty(Ares.prototype, "data", {
@@ -384,23 +385,12 @@ var ares;
             enumerable: true,
             configurable: true
         });
-        Ares.prototype.doInited = function (data, compiler, options) {
-            // 记录变异对象
-            this._data = ares.Mutator.mutate(data);
-            this._compiler = compiler;
-            this._options = options;
-            // 初始化Compiler
-            this._compiler.init(this);
-            // 调用回调
-            if (this._options && this._options.inited) {
-                this._options.inited.call(this._data, this);
-            }
-        };
         Ares.prototype.createWatcher = function (target, exp, scope, callback) {
             return new ares.Watcher(target, exp, scope, callback);
         };
         return Ares;
-    })();
+    }());
     ares.Ares = Ares;
 })(ares || (ares = {}));
+module.exports = ares;
 //# sourceMappingURL=ares.js.map
