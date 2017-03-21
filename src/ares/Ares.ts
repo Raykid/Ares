@@ -59,5 +59,5 @@ namespace ares
     }
 }
 // 为了nodejs模块
-declare var module:{exports: any};
+var module:any = module || {};
 module.exports = ares;

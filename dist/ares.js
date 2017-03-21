@@ -392,5 +392,7 @@ var ares;
     }());
     ares.Ares = Ares;
 })(ares || (ares = {}));
+// 为了nodejs模块
+var module = module || {};
 module.exports = ares;
 //# sourceMappingURL=ares.js.map
