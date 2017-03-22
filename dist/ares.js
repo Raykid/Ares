@@ -71,7 +71,13 @@ var ares;
             // 记录自身
             Watcher.updating = this;
             // 设置作用目标
-            this._scope.$target = this._target;
+            // 这里一定要用defineProperty将目标定义在当前节点上，否则会影响context.scope
+            Object.defineProperty(this._scope, "$target", {
+                configurable: true,
+                enumerable: false,
+                value: this._target,
+                writable: false
+            });
             // 表达式求值
             try {
                 value = this._expFunc(this._scope);
@@ -81,7 +87,7 @@ var ares;
                 console.error("表达式求值错误，exp：" + this._exp + "，scope：" + JSON.stringify(this._scope));
             }
             // 移除作用目标
-            this._scope.$target = null;
+            delete this._scope["$target"];
             // 移除自身记录
             Watcher.updating = null;
             return value;
@@ -138,11 +144,11 @@ var ares;
                 return from;
             }
         };
-        /** 记录当前正在执行update方法的Watcher引用 */
-        Watcher.updating = null;
-        Watcher._uid = 0;
         return Watcher;
     }());
+    /** 记录当前正在执行update方法的Watcher引用 */
+    Watcher.updating = null;
+    Watcher._uid = 0;
     ares.Watcher = Watcher;
 })(ares || (ares = {}));
 /// <reference path="Dep.ts"/>
@@ -231,7 +237,7 @@ var ares;
                     value: function () {
                         var args = [];
                         for (var _i = 0; _i < arguments.length; _i++) {
-                            args[_i - 0] = arguments[_i];
+                            args[_i] = arguments[_i];
                         }
                         // 首先调用原始方法，获取返回值
                         var result = oriMethod.apply(this, args);
@@ -277,18 +283,18 @@ var ares;
             });
             return result;
         };
-        // 记录数组中会造成数据更新的所有方法名
-        Mutator._arrMethods = [
-            "push",
-            "pop",
-            "unshift",
-            "shift",
-            "splice",
-            "sort",
-            "reverse"
-        ];
         return Mutator;
     }());
+    // 记录数组中会造成数据更新的所有方法名
+    Mutator._arrMethods = [
+        "push",
+        "pop",
+        "unshift",
+        "shift",
+        "splice",
+        "sort",
+        "reverse"
+    ];
     ares.Mutator = Mutator;
 })(ares || (ares = {}));
 /**

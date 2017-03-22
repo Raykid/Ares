@@ -55,7 +55,13 @@ namespace ares
             // 记录自身
             Watcher.updating = this;
             // 设置作用目标
-            this._scope.$target = this._target;
+            // 这里一定要用defineProperty将目标定义在当前节点上，否则会影响context.scope
+            Object.defineProperty(this._scope, "$target", {
+                configurable: true,
+                enumerable: false,
+                value: this._target,
+                writable: false
+            });
             // 表达式求值
             try
             {
@@ -67,7 +73,7 @@ namespace ares
                 console.error("表达式求值错误，exp：" + this._exp + "，scope：" + JSON.stringify(this._scope));
             }
             // 移除作用目标
-            this._scope.$target = null;
+            delete this._scope["$target"];
             // 移除自身记录
             Watcher.updating = null;
             return value;
