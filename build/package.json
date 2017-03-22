@@ -2,7 +2,7 @@
   "name": "ares",
   "version": "1.0.0",
   "description": "An MVVM framework for everything.",
-  "main": "test/test.ts",
+  "main": "test/test.html",
   "dependencies": {
     "typescript": "^2.2.1",
     "uglifyjs": "^2.4.10"
