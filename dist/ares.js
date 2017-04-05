@@ -80,7 +80,7 @@ var ares;
             });
             // 表达式求值
             try {
-                value = this._expFunc(this._scope);
+                value = this._expFunc.call(this._scope, this._scope);
             }
             catch (err) {
                 // 输出错误日志
