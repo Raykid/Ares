@@ -22,6 +22,8 @@ declare module ares
 
     export interface Compiler
     {
+        /** 传递给编译器的皮肤对象 */
+        root:any;
         /**
          * 初始化编译器
          * @param entity Ares实例

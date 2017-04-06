@@ -54,7 +54,7 @@ namespace ares
 
         public createWatcher(target:any, exp:string, scope:any, callback:WatcherCallback):IWatcher
         {
-            return new Watcher(target, exp, scope, callback);
+            return new Watcher(this, target, exp, scope, callback);
         }
     }
 }

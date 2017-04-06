@@ -20,6 +20,7 @@ namespace ares
 
         private _value:any;
 
+        private _entity:ares.IAres;
         private _target:any;
         private _exp:string;
         private _scope:any;
@@ -28,8 +29,10 @@ namespace ares
 
         private _disposed:boolean = false;
 
-        public constructor(target:any, exp:string, scope:any, callback:WatcherCallback)
+        public constructor(entity:ares.IAres, target:any, exp:string, scope:any, callback:WatcherCallback)
         {
+            // 记录entity
+            this._entity = entity;
             // 生成一个全局唯一的ID
             this._uid = Watcher._uid ++;
             // 记录作用目标、表达式和作用域
@@ -54,7 +57,14 @@ namespace ares
             var value:any = null;
             // 记录自身
             Watcher.updating = this;
-            // 设置作用目标
+            // 设置通用属性
+            // 这里一定要用defineProperty将目标定义在当前节点上，否则会影响context.scope
+            Object.defineProperty(this._scope, "$root", {
+                configurable: true,
+                enumerable: false,
+                value: this._entity.compiler.root,
+                writable: false
+            });
             // 这里一定要用defineProperty将目标定义在当前节点上，否则会影响context.scope
             Object.defineProperty(this._scope, "$target", {
                 configurable: true,
@@ -72,7 +82,8 @@ namespace ares
                 // 输出错误日志
                 console.error("表达式求值错误，exp：" + this._exp + "，scope：" + JSON.stringify(this._scope));
             }
-            // 移除作用目标
+            // 移除通用属性
+            delete this._scope["$root"];
             delete this._scope["$target"];
             // 移除自身记录
             Watcher.updating = null;
