@@ -1,0 +1,11 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "target": "es5",
+    "sourceMap": true,
+    "outFile": "../../../dist/ares_pixi.js"
+  },
+  "files": [
+    "PIXICompiler.ts"
+  ]
+}

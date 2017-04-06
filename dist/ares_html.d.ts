@@ -1,7 +1,7 @@
 /**
- * Created by Raykid on 2016/12/28.
+ * Created by Raykid on 2016/12/23.
  */
-declare module ares.pixijs
+declare module ares.html
 {
     export interface Command
     {
@@ -11,22 +11,12 @@ declare module ares.pixijs
     export interface CommandContext
     {
         scope:any;
-        target:PIXI.DisplayObject;
+        target:Node;
         subCmd:string;
         exp:string;
         compiler:Compiler;
         entity:IAres;
         [name:string]:any;
-    }
-
-    export interface PIXIBindConfig
-    {
-        [name:string]:PIXIBindConfigCommands
-    }
-
-    export interface PIXIBindConfigCommands
-    {
-        [cmd:string]:any;
     }
 
     /**
@@ -36,15 +26,16 @@ declare module ares.pixijs
      */
     export function addCommand(name:string, command:Command):void;
 
-    export class PIXICompiler
+    export class HTMLCompiler
     {
-        constructor(root:PIXI.DisplayObject, config?:PIXIBindConfig);
-        compile(node:PIXI.DisplayObject, scope:any):void;
+        root:HTMLElement;
+        constructor(selectorsOrElement:string|HTMLElement);
+        compile(node:Node, scope:any):void;
         init(entity:IAres):void;
     }
 }
 
-declare module "ares.pixijs"
+declare module "ares.html"
 {
-    export = ares.pixijs;
+    export = ares.html;
 }

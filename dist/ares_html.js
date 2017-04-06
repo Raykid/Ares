@@ -3,52 +3,6 @@
  */
 var ares;
 (function (ares) {
-    var utils;
-    (function (utils) {
-        /**
-         * 创建一个表达式求值方法，用于未来执行
-         * @param exp 表达式
-         * @returns {Function} 创建的方法
-         */
-        function createEvalFunc(exp) {
-            return Function("scope", "with(scope){return " + exp + "}");
-        }
-        utils.createEvalFunc = createEvalFunc;
-        /**
-         * 表达式求值，无法执行多条语句
-         * @param exp 表达式
-         * @param scope 表达式的作用域
-         * @returns {any} 返回值
-         */
-        function evalExp(exp, scope) {
-            return createEvalFunc(exp)(scope);
-        }
-        utils.evalExp = evalExp;
-        /**
-         * 创建一个执行方法，用于未来执行
-         * @param exp 表达式
-         * @returns {Function} 创建的方法
-         */
-        function createRunFunc(exp) {
-            return Function("scope", "with(scope){" + exp + "}");
-        }
-        utils.createRunFunc = createRunFunc;
-        /**
-         * 直接执行表达式，不求值。该方法可以执行多条语句
-         * @param exp 表达式
-         * @param scope 表达式的作用域
-         */
-        function runExp(exp, scope) {
-            createRunFunc(exp)(scope);
-        }
-        utils.runExp = runExp;
-    })(utils = ares.utils || (ares.utils = {}));
-})(ares || (ares = {}));
-/**
- * Created by Raykid on 2016/12/22.
- */
-var ares;
-(function (ares) {
     var html;
     (function (html) {
         /**
@@ -222,8 +176,19 @@ var ares;
                         pNode.insertBefore(newNode, eNode);
                         // 生成子域
                         var newScope = Object.create(context.scope);
-                        newScope.$index = key;
-                        newScope[itemName] = value[key];
+                        // 这里一定要用defineProperty将目标定义在当前节点上，否则会影响context.scope
+                        Object.defineProperty(newScope, "$index", {
+                            configurable: true,
+                            enumerable: false,
+                            value: (value instanceof Array ? parseInt(key) : key),
+                            writable: false
+                        });
+                        Object.defineProperty(newScope, itemName, {
+                            configurable: true,
+                            enumerable: true,
+                            value: value[key],
+                            writable: false
+                        });
                         // 开始编译新节点
                         context.compiler.compile(newNode, newScope);
                     }
@@ -232,9 +197,8 @@ var ares;
         };
     })(html = ares.html || (ares.html = {}));
 })(ares || (ares = {}));
-/// <reference path="../Interfaces.ts"/>
-/// <reference path="../Utils.ts"/>
 /// <reference path="HTMLCommands.ts"/>
+/// <reference path="../../../dist/ares.d.ts"/>
 /**
  * Created by Raykid on 2016/12/22.
  */
@@ -246,6 +210,13 @@ var ares;
             function HTMLCompiler(selectorsOrElement) {
                 this._selectorsOrElement = selectorsOrElement;
             }
+            Object.defineProperty(HTMLCompiler.prototype, "root", {
+                get: function () {
+                    return this._root;
+                },
+                enumerable: true,
+                configurable: true
+            });
             HTMLCompiler.prototype.init = function (entity) {
                 if (typeof this._selectorsOrElement == "string")
                     this._root = document.querySelector(this._selectorsOrElement);
@@ -346,10 +317,13 @@ var ares;
                 }
                 return "`" + exp + "`";
             };
-            HTMLCompiler._textExpReg = /(.*?)\{\{(.*?)\}\}(.*)/;
             return HTMLCompiler;
         }());
+        HTMLCompiler._textExpReg = /(.*?)\{\{(.*?)\}\}(.*)/;
         html.HTMLCompiler = HTMLCompiler;
     })(html = ares.html || (ares.html = {}));
 })(ares || (ares = {}));
+// 为了nodejs模块
+var module = module || {};
+module.exports = ares.html;
 //# sourceMappingURL=ares_html.js.map

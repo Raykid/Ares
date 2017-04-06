@@ -1,50 +1,4 @@
 /**
- * Created by Raykid on 2016/12/22.
- */
-var ares;
-(function (ares) {
-    var utils;
-    (function (utils) {
-        /**
-         * 创建一个表达式求值方法，用于未来执行
-         * @param exp 表达式
-         * @returns {Function} 创建的方法
-         */
-        function createEvalFunc(exp) {
-            return Function("scope", "with(scope){return " + exp + "}");
-        }
-        utils.createEvalFunc = createEvalFunc;
-        /**
-         * 表达式求值，无法执行多条语句
-         * @param exp 表达式
-         * @param scope 表达式的作用域
-         * @returns {any} 返回值
-         */
-        function evalExp(exp, scope) {
-            return createEvalFunc(exp)(scope);
-        }
-        utils.evalExp = evalExp;
-        /**
-         * 创建一个执行方法，用于未来执行
-         * @param exp 表达式
-         * @returns {Function} 创建的方法
-         */
-        function createRunFunc(exp) {
-            return Function("scope", "with(scope){" + exp + "}");
-        }
-        utils.createRunFunc = createRunFunc;
-        /**
-         * 直接执行表达式，不求值。该方法可以执行多条语句
-         * @param exp 表达式
-         * @param scope 表达式的作用域
-         */
-        function runExp(exp, scope) {
-            createRunFunc(exp)(scope);
-        }
-        utils.runExp = runExp;
-    })(utils = ares.utils || (ares.utils = {}));
-})(ares || (ares = {}));
-/**
  * Created by Raykid on 2016/12/27.
  */
 var ares;
@@ -117,7 +71,12 @@ var ares;
                 var index = parent.getChildIndex(context.target);
                 parent.addChildAt(refNode, index);
                 // 只有在条件为true时才启动编译
-                context.entity.createWatcher(context.target, context.exp, context.scope, function (value) {
+                var watcher = context.entity.createWatcher(context.target, context.exp, context.scope, function (value) {
+                    // 如果refNode被从显示列表移除了，则表示该if指令要作废了
+                    if (!refNode.parent) {
+                        watcher.dispose();
+                        return;
+                    }
                     if (value == true) {
                         // 启动编译
                         if (!compiled) {
@@ -160,7 +119,12 @@ var ares;
                 parent.addChildAt(eNode, index + 1);
                 parent.removeChild(context.target);
                 // 添加订阅
-                context.entity.createWatcher(context.target, arrName, context.scope, function (value) {
+                var watcher = context.entity.createWatcher(context.target, arrName, context.scope, function (value) {
+                    // 如果refNode被从显示列表移除了，则表示该if指令要作废了
+                    if (!sNode.parent) {
+                        watcher.dispose();
+                        return;
+                    }
                     // 清理原始显示
                     var bIndex = parent.getChildIndex(sNode);
                     var eIndex = parent.getChildIndex(eNode);
@@ -179,13 +143,24 @@ var ares;
                     var curIndex = 0;
                     for (var key in value) {
                         // 拷贝一个target
-                        var newNode = cloneObject(context.target);
+                        var newNode = cloneObject(context.target, true);
                         // 添加到显示里
                         parent.addChildAt(newNode, (bIndex + 1) + curIndex);
                         // 生成子域
                         var newScope = Object.create(context.scope);
-                        newScope.$index = key;
-                        newScope[itemName] = value[key];
+                        // 这里一定要用defineProperty将目标定义在当前节点上，否则会影响context.scope
+                        Object.defineProperty(newScope, "$index", {
+                            configurable: true,
+                            enumerable: false,
+                            value: (value instanceof Array ? parseInt(key) : key),
+                            writable: false
+                        });
+                        Object.defineProperty(newScope, itemName, {
+                            configurable: true,
+                            enumerable: true,
+                            value: value[key],
+                            writable: false
+                        });
                         // 开始编译新节点
                         context.compiler.compile(newNode, newScope);
                         // 索引自增1
@@ -194,50 +169,97 @@ var ares;
                 });
             }
         };
-        function cloneObject(target) {
+        function cloneObject(target, deep) {
+            var result;
+            // 基础类型直接返回
             if (!target || typeof target != "object")
                 return target;
             // 如果对象有clone方法则直接调用clone方法
             if (typeof target["clone"] == "function")
                 return target["clone"]();
+            // 浅表复制单独处理
+            if (!deep) {
+                result = Object.create(target["__proto__"] || null);
+                for (var k in target) {
+                    result[k] = target[k];
+                }
+                return result;
+            }
+            // 下面是深表复制了
             var cls = (target.constructor || Object);
             try {
-                var result = new cls();
+                result = new cls();
             }
             catch (err) {
                 return null;
             }
+            // 打个标签
+            target["__ares_cloning__"] = result;
             var keys = Object.keys(target);
             for (var i in keys) {
                 var key = keys[i];
-                // parent属性不复制
-                if (key == "parent")
+                // 标签不复制
+                if (key == "__ares_cloning__")
                     continue;
-                // Text组件不能复制_texture属性
+                // Text的_texture属性不复制
                 if (key == "_texture" && target instanceof PIXI.Text)
                     continue;
-                // children属性要特殊处理
-                if (key == "children") {
+                // 显示对象的parent属性要特殊处理
+                if (key == "parent" && target instanceof PIXI.DisplayObject) {
+                    if (target["parent"] && target["parent"]["__ares_cloning__"]) {
+                        // 如果target的parent正在被复制，则使用复制后的parent
+                        result["parent"] = target["parent"]["__ares_cloning__"];
+                    }
+                    else {
+                        // 如果target的parent没有被复制，则直接使用当前parent
+                        result["parent"] = target["parent"];
+                    }
+                    continue;
+                }
+                // EventEmitter的_events属性要进行浅表复制
+                if (key == "_events" && target instanceof PIXI.utils.EventEmitter) {
+                    result["_events"] = cloneObject(target["_events"], false);
+                    // 如果target的某个监听里的context就是target本身，则将result的context改为result本身
+                    for (var k in target["_events"]) {
+                        var temp = target["_events"][k];
+                        if (temp.context == target) {
+                            result["_events"][k].context = result;
+                        }
+                    }
+                    continue;
+                }
+                // 显示对象的children属性要特殊处理
+                if (key == "children" && target instanceof PIXI.DisplayObject) {
                     var children = target["children"];
                     for (var j in children) {
-                        var child = cloneObject(children[j]);
+                        var child = cloneObject(children[j], true);
                         result["addChild"](child);
                     }
                 }
                 else {
-                    var value = cloneObject(target[key]);
-                    if (value !== null)
-                        result[key] = value;
+                    var oriValue = target[key];
+                    if (oriValue && oriValue["__ares_cloning__"]) {
+                        // 已经复制过的对象不再复制，直接使用之
+                        result[key] = oriValue["__ares_cloning__"];
+                        continue;
+                    }
+                    else {
+                        // 还没复制过的对象，复制之
+                        var value = cloneObject(oriValue, true);
+                        if (value !== null)
+                            result[key] = value;
+                    }
                 }
             }
+            // 移除标签
+            delete target["__ares_cloning__"];
             return result;
         }
     })(pixijs = ares.pixijs || (ares.pixijs = {}));
 })(ares || (ares = {}));
-/// <reference path="../Interfaces.ts"/>
-/// <reference path="../Utils.ts"/>
 /// <reference path="PIXICommands.ts"/>
 /// <reference path="pixi.js.d.ts"/>
+/// <reference path="../../../dist/ares.d.ts"/>
 /**
  * Created by Raykid on 2016/12/27.
  */
@@ -256,6 +278,13 @@ var ares;
                 this._root = root;
                 this._config = config;
             }
+            Object.defineProperty(PIXICompiler.prototype, "root", {
+                get: function () {
+                    return this._root;
+                },
+                enumerable: true,
+                configurable: true
+            });
             PIXICompiler.prototype.init = function (entity) {
                 this._entity = entity;
                 // 开始编译root节点
@@ -375,10 +404,13 @@ var ares;
                 }
                 return "`" + exp + "`";
             };
-            PIXICompiler._textExpReg = /(.*?)\{\{(.*?)\}\}(.*)/;
             return PIXICompiler;
         }());
+        PIXICompiler._textExpReg = /(.*?)\{\{(.*?)\}\}(.*)/;
         pixijs.PIXICompiler = PIXICompiler;
     })(pixijs = ares.pixijs || (ares.pixijs = {}));
 })(ares || (ares = {}));
+// 为了nodejs模块
+var module = module || {};
+module.exports = ares.pixijs;
 //# sourceMappingURL=ares_pixi.js.map

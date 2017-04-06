@@ -1,7 +1,7 @@
 /// <reference path="../dist/ares.d.ts"/>
-/// <reference path="ares_html.d.ts"/>
-/// <reference path="ares_pixi.d.ts"/>
-/// <reference path="pixi.js.d.ts"/>
+/// <reference path="../dist/ares_html.d.ts"/>
+/// <reference path="../dist/ares_pixi.d.ts"/>
+/// <reference path="../src/ares/pixijs/pixi.js.d.ts"/>
 /**
  * Created by Raykid on 2016/12/23.
  */
