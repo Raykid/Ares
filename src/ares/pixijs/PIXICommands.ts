@@ -287,22 +287,20 @@ namespace ares.pixijs
                     var child:PIXI.DisplayObject = cloneObject(children[j], true);
                     result["addChild"](child);
                 }
+                continue;
+            }
+            // 通用处理
+            var oriValue:any = target[key];
+            if(oriValue && oriValue["__ares_cloning__"])
+            {
+                // 已经复制过的对象不再复制，直接使用之
+                result[key] = oriValue["__ares_cloning__"];
             }
             else
             {
-                var oriValue:any = target[key];
-                if(oriValue && oriValue["__ares_cloning__"])
-                {
-                    // 已经复制过的对象不再复制，直接使用之
-                    result[key] = oriValue["__ares_cloning__"];
-                    continue;
-                }
-                else
-                {
-                    // 还没复制过的对象，复制之
-                    var value:any = cloneObject(oriValue, true);
-                    if(value !== null) result[key] = value;
-                }
+                // 还没复制过的对象，复制之
+                var value:any = cloneObject(oriValue, true);
+                if(value !== null) result[key] = value;
             }
         }
         // 移除标签

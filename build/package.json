@@ -4,7 +4,7 @@
   "description": "An MVVM framework for everything.",
   "main": "test/test.html",
   "dependencies": {
-    "typescript": "^2.2.1",
+    "typescript": "^2.2.2",
     "uglifyjs": "^2.4.10"
   },
   "devDependencies": {},
