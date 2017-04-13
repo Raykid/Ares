@@ -320,7 +320,23 @@ var ares;
          * @returns {Function} 创建的方法
          */
         function createEvalFunc(exp) {
-            return Function("scope", "with(scope){return " + exp + "}");
+            var func;
+            try {
+                func = Function("scope", "with(scope){return " + exp + "}");
+            }
+            catch (err) {
+                // 可能是某些版本的解释器不认识模板字符串，将模板字符串变成普通字符串
+                var sepStr = (exp.indexOf('"') < 0 ? '"' : "'");
+                // 将exp中的·替换为'
+                var reg = /([^\\]?)`/g;
+                exp = exp.replace(reg, "$1" + sepStr);
+                // 将exp中${...}替换为" + ... + "的形式
+                reg = /\$\{(.*?)\}/g;
+                exp = exp.replace(reg, sepStr + "+($1)+" + sepStr);
+                // 重新生成方法并返回
+                func = Function("scope", "with(scope){return " + exp + "}");
+            }
+            return func;
         }
         utils.createEvalFunc = createEvalFunc;
         /**
@@ -339,7 +355,7 @@ var ares;
          * @returns {Function} 创建的方法
          */
         function createRunFunc(exp) {
-            return Function("scope", "with(scope){" + exp + "}");
+            return createEvalFunc("function(){" + exp + "}");
         }
         utils.createRunFunc = createRunFunc;
         /**
