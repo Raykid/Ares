@@ -1,6 +1,7 @@
 /// <reference path="../dist/ares.d.ts"/>
 /// <reference path="../dist/ares_html.d.ts"/>
 /// <reference path="../dist/ares_pixi.d.ts"/>
+/// <reference path="../dist/ares_template.d.ts"/>
 /// <reference path="../src/ares/pixijs/pixi.js.d.ts"/>
 /**
  * Created by Raykid on 2016/12/23.
@@ -46,6 +47,9 @@ window.onload = function () {
     };
     ares.bind(data, new ares.pixijs.PIXICompiler(testSkin));
     ares.bind(data, new ares.html.HTMLCompiler("#div_root"));
+    ares.bind(data, new ares.template.TemplateCompiler("abc$a-{for: i in 10}'$a-{i}'$a-{end for}def", function (text) {
+        console.log(text);
+    }));
     setTimeout(function () {
         data.testFor = ["asdf", "ajsdf", 323];
     }, 2000);

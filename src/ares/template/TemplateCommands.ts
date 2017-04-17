@@ -103,6 +103,16 @@ namespace ares.template
             }
             context.entity.createWatcher(context.node, res[2], context.scope, (value:any)=>
             {
+                // 如果是数字，构建一个数字列表
+                if(typeof value == "number")
+                {
+                    var temp:number[] = [];
+                    for(var i:number = 0; i < value; i++)
+                    {
+                        temp.push(i);
+                    }
+                    value = temp;
+                }
                 var result:string = "";
                 if(value)
                 {

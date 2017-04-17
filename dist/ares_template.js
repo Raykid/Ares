@@ -69,6 +69,14 @@ var ares;
                     return;
                 }
                 context.entity.createWatcher(context.node, res[2], context.scope, function (value) {
+                    // 如果是数字，构建一个数字列表
+                    if (typeof value == "number") {
+                        var temp = [];
+                        for (var i = 0; i < value; i++) {
+                            temp.push(i);
+                        }
+                        value = temp;
+                    }
                     var result = "";
                     if (value) {
                         for (var key in value) {
@@ -312,7 +320,7 @@ var ares;
                 }
             };
             return TemplateCompiler;
-        }());
+        })();
         template_1.TemplateCompiler = TemplateCompiler;
     })(template = ares.template || (ares.template = {}));
 })(ares || (ares = {}));

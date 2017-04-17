@@ -403,9 +403,9 @@ var ares;
                 }
                 return "`" + exp + "`";
             };
+            PIXICompiler._textExpReg = /(.*?)\{\{(.*?)\}\}(.*)/;
             return PIXICompiler;
-        }());
-        PIXICompiler._textExpReg = /(.*?)\{\{(.*?)\}\}(.*)/;
+        })();
         pixijs.PIXICompiler = PIXICompiler;
     })(pixijs = ares.pixijs || (ares.pixijs = {}));
 })(ares || (ares = {}));
