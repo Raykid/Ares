@@ -27,7 +27,7 @@ var ares;
             }
         };
         return Dep;
-    })();
+    }());
     ares.Dep = Dep;
 })(ares || (ares = {}));
 /**
@@ -154,11 +154,11 @@ var ares;
                 return from;
             }
         };
-        /** 记录当前正在执行update方法的Watcher引用 */
-        Watcher.updating = null;
-        Watcher._uid = 0;
         return Watcher;
-    })();
+    }());
+    /** 记录当前正在执行update方法的Watcher引用 */
+    Watcher.updating = null;
+    Watcher._uid = 0;
     ares.Watcher = Watcher;
 })(ares || (ares = {}));
 /// <reference path="Dep.ts"/>
@@ -247,7 +247,7 @@ var ares;
                     value: function () {
                         var args = [];
                         for (var _i = 0; _i < arguments.length; _i++) {
-                            args[_i - 0] = arguments[_i];
+                            args[_i] = arguments[_i];
                         }
                         // 首先调用原始方法，获取返回值
                         var result = oriMethod.apply(this, args);
@@ -293,18 +293,18 @@ var ares;
             });
             return result;
         };
-        // 记录数组中会造成数据更新的所有方法名
-        Mutator._arrMethods = [
-            "push",
-            "pop",
-            "unshift",
-            "shift",
-            "splice",
-            "sort",
-            "reverse"
-        ];
         return Mutator;
-    })();
+    }());
+    // 记录数组中会造成数据更新的所有方法名
+    Mutator._arrMethods = [
+        "push",
+        "pop",
+        "unshift",
+        "shift",
+        "splice",
+        "sort",
+        "reverse"
+    ];
     ares.Mutator = Mutator;
 })(ares || (ares = {}));
 /**
@@ -421,7 +421,7 @@ var ares;
             return new ares.Watcher(this, target, exp, scope, callback);
         };
         return Ares;
-    })();
+    }());
     ares.Ares = Ares;
 })(ares || (ares = {}));
 // 为了nodejs模块

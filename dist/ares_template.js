@@ -320,7 +320,7 @@ var ares;
                 }
             };
             return TemplateCompiler;
-        })();
+        }());
         template_1.TemplateCompiler = TemplateCompiler;
     })(template = ares.template || (ares.template = {}));
 })(ares || (ares = {}));
