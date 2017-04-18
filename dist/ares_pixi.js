@@ -342,11 +342,7 @@ var ares;
                 var keys = [];
                 for (var t in node) {
                     if (t.indexOf("a-") == 0 || t.indexOf("a_") == 0) {
-                        // 如果是TPL则需要优先解析
-                        if (t == "a-tpl" || t == "a_tpl")
-                            keys.unshift(t);
-                        else
-                            keys.push(t);
+                        keys.push(t);
                     }
                 }
                 // 把配置中的属性推入属性列表中
@@ -354,11 +350,7 @@ var ares;
                 for (var t in conf) {
                     if (t.indexOf("a-") != 0 && t.indexOf("a_") != 0)
                         t = "a-" + t;
-                    // 如果是TPL则需要优先解析
-                    if (t == "a-tpl" || t == "a_tpl")
-                        keys.unshift(t);
-                    else
-                        keys.push(t);
+                    keys.push(t);
                 }
                 // 开始遍历属性列表
                 var cmdsToCompile = [];
@@ -389,7 +381,7 @@ var ares;
                         subCmd = cmdName || "";
                     }
                     // 推入数组
-                    cmdsToCompile.push({
+                    var cmdToCompile = {
                         propName: key,
                         cmd: cmd,
                         ctx: {
@@ -400,7 +392,12 @@ var ares;
                             compiler: this,
                             entity: this._entity
                         }
-                    });
+                    };
+                    // 如果是tpl命令则需要提前
+                    if (cmdName == "tpl")
+                        cmdsToCompile.unshift(cmdToCompile);
+                    else
+                        cmdsToCompile.push(cmdToCompile);
                     // 如果是for或者if则设置懒编译
                     if (cmdName == "if" || cmdName == "for") {
                         hasLazyCompile = true;
