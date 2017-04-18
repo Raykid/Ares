@@ -5,7 +5,12 @@ namespace ares.pixijs
 {
     export interface Command
     {
-        (context?:CommandContext):void;
+        /**
+         * 执行命令
+         * @param context 命令上下文
+         * @return {PIXI.DisplayObject} 要替换原显示节点的显示节点
+         */
+        (context?:CommandContext):PIXI.DisplayObject;
     }
 
     export interface CommandContext
@@ -14,7 +19,7 @@ namespace ares.pixijs
         target:PIXI.DisplayObject;
         subCmd:string;
         exp:string;
-        compiler:Compiler;
+        compiler:PIXICompiler;
         entity:IAres;
         [name:string]:any;
     }
@@ -40,6 +45,26 @@ namespace ares.pixijs
     }
 
     export const commands:{[name:string]:Command} = {
+        /** 模板替换命令 */
+        tpl: (context:CommandContext)=>
+        {
+            // 取到模板对象
+            var template:PIXI.DisplayObject = context.compiler.getTemplate(context.exp);
+            if(!template) return;
+            // 拷贝模板
+            template = cloneObject(template, true);
+            // 使用模板添加到与目标相同的位置
+            var target:PIXI.DisplayObject = context.target;
+            var parent:PIXI.Container = target.parent;
+            parent.addChildAt(template, parent.getChildIndex(target));
+            // 移除并销毁目标，清理内存
+            parent.removeChild(target);
+            target.destroy();
+            // 启动编译
+            context.compiler.compile(template, context.scope);
+            // 返回替换节点
+            return template;
+        },
         /** 修改任意属性命令 */
         prop: (context:CommandContext)=>
         {
@@ -60,6 +85,8 @@ namespace ares.pixijs
                     }
                 }
             });
+            // 返回节点
+            return target;
         },
         /** 绑定事件 */
         on: (context:CommandContext)=>
@@ -85,6 +112,8 @@ namespace ares.pixijs
                     });
                 }
             }
+            // 返回节点
+            return context.target;
         },
         /** if命令 */
         if: (context:CommandContext)=>
@@ -130,6 +159,8 @@ namespace ares.pixijs
                     }
                 }
             });
+            // 返回节点
+            return context.target;
         },
         /** for命令 */
         for: (context:CommandContext)=>
@@ -165,7 +196,7 @@ namespace ares.pixijs
                 // 清理原始显示
                 var bIndex:number = parent.getChildIndex(sNode);
                 var eIndex:number = parent.getChildIndex(eNode);
-                for(var i:number = bIndex + 1; i < eIndex; i++)
+                for(var i:number = eIndex - 1; i > bIndex; i--)
                 {
                     parent.removeChildAt(i).destroy();
                 }
@@ -208,6 +239,8 @@ namespace ares.pixijs
                     curIndex ++;
                 }
             });
+            // 返回节点
+            return context.target;
         }
     };
 

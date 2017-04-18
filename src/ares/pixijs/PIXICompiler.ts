@@ -26,7 +26,9 @@ namespace ares.pixijs
         private _entity:IAres;
 
         private _nameDict:{[name:string]:PIXI.DisplayObject} = {};
+        private _tplDict:{[name:string]:PIXI.DisplayObject};
 
+        /** 获取根显示对象 */
         public get root():PIXI.DisplayObject
         {
             return this._root;
@@ -36,11 +38,13 @@ namespace ares.pixijs
          * 创建PIXI绑定
          * @param root 根显示对象，从这里传入的绑定数据属性名必须以“a_”开头
          * @param config 绑定数据，从这里传入的绑定数据属性名可以不以“a_”开头
+         * @param tplDict 模板字典，可以在这里给出模板定义表
          */
-        public constructor(root:PIXI.DisplayObject, config?:PIXIBindConfig)
+        public constructor(root:PIXI.DisplayObject, config?:PIXIBindConfig, tplDict?:{[name:string]:PIXI.DisplayObject})
         {
             this._root = root;
             this._config = config;
+            this._tplDict = tplDict || {};
         }
 
         public init(entity:IAres):void
@@ -52,6 +56,19 @@ namespace ares.pixijs
 
         public compile(node:PIXI.DisplayObject, scope:any):void
         {
+            // 首先判断是否是模板，是的话就记下来，但是不编译
+            var tplName:string = node["a-tplName"] || node["a_tplName"];
+            if(tplName && this.setTemplate(tplName, node))
+            {
+                // 移除a-tpl和a_tpl属性
+                delete node["a-tplName"];
+                delete node["a_tplName"];
+                // 将这个节点从显示列表中移除
+                node.parent && node.parent.removeChild(node);
+                // 不编译，直接返回
+                return;
+            }
+            // 开始编译
             var hasLazyCompile:boolean = false;
             // 如果有名字就记下来
             var name:string = node.name;
@@ -62,7 +79,11 @@ namespace ares.pixijs
             {
                 if(t.indexOf("a-") == 0 || t.indexOf("a_") == 0)
                 {
-                    keys.push(t);
+                    // 如果是TPL则需要优先解析
+                    if(t == "a-tpl" || t == "a_tpl")
+                        keys.unshift(t);
+                    else
+                        keys.push(t);
                 }
             }
             // 把配置中的属性推入属性列表中
@@ -70,7 +91,11 @@ namespace ares.pixijs
             for(var t in conf)
             {
                 if(t.indexOf("a-") != 0 && t.indexOf("a_") != 0) t = "a-" + t;
-                keys.push(t);
+                // 如果是TPL则需要优先解析
+                if(t == "a-tpl" || t == "a_tpl")
+                    keys.unshift(t);
+                else
+                    keys.push(t);
             }
             // 开始遍历属性列表
             var cmdsToCompile:{propName:string, cmd:Command, ctx:CommandContext}[] = [];
@@ -124,10 +149,12 @@ namespace ares.pixijs
             for(var i:number = 0, len:number = cmdsToCompile.length; i < len; i++)
             {
                 var cmdToCompile:{propName:string, cmd:Command, ctx:CommandContext} = cmdsToCompile[i];
+                // 更新target属性
+                cmdToCompile.ctx.target = node;
                 // 移除属性
                 delete cmdToCompile.ctx.target[cmdToCompile.propName];
                 // 开始编译
-                cmdToCompile.cmd(cmdToCompile.ctx);
+                node = cmdToCompile.cmd(cmdToCompile.ctx);
             }
             // 如果没有懒编译则编译内部结构
             if(!hasLazyCompile)
@@ -141,13 +168,52 @@ namespace ares.pixijs
                 if(node instanceof PIXI.Container)
                 {
                     var children:PIXI.DisplayObject[] = (node as PIXI.Container).children;
-                    for(var i:number = 0; i < children.length; i++)
+                    var nextChild:PIXI.DisplayObject;
+                    for(var i:number = 0, len:number = children.length; i < len; i++)
                     {
                         var child:PIXI.DisplayObject = children[i];
+                        // 记录下一个子节点
+                        nextChild = children[i + 1];
+                        // 开始编译
                         this.compile(child, scope);
+                        // 重置索引值和长度值
+                        var nextI:number = children.indexOf(nextChild);
+                        if(nextI >= 0 && nextI != i + 1)
+                        {
+                            i = nextI - 1;
+                            len = children.length;
+                        }
                     }
                 }
             }
+        }
+
+        /**
+         * 获取模板对象
+         * @param name 模板名称
+         * @returns {PIXI.DisplayObject|undefined} 如果模板名称存在则返回模板对象
+         */
+        public getTemplate(name:string):PIXI.DisplayObject
+        {
+            return this._tplDict[name];
+        }
+
+        /**
+         * 设置模板
+         * @param name 模板名称
+         * @param tpl 模板对象
+         * @returns {PIXI.DisplayObject|null} 如果成功设置了模板则返回模板对象，否则返回null（如已存在同名模板）
+         */
+        public setTemplate(name:string, tpl:PIXI.DisplayObject):PIXI.DisplayObject
+        {
+            // 非空判断
+            if(!name || !tpl) return null;
+            // 如果已经有了模板定义则返回null
+            if(this._tplDict[name]) return null;
+            // 添加模板定义
+            this._tplDict[name] = tpl;
+            // 返回模板对象
+            return tpl;
         }
 
         private compileTextContent(text:PIXI.Text, scope:any):void

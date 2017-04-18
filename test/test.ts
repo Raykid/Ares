@@ -29,43 +29,56 @@ window.onload = ()=>
         requestAnimationFrame(render);
     }
 
-    var testSkin:PIXI.Container = new PIXI.Container();
-    stage.addChild(testSkin);
+    PIXI.loader.add("http://pic.qiantucdn.com/58pic/14/45/39/57i58PICI2K_1024.png");
+    PIXI.loader.load(()=>{
+        var testSkin:PIXI.Container = new PIXI.Container();
+        stage.addChild(testSkin);
 
-    var testSprite:PIXI.Sprite = new PIXI.Sprite();
-    testSprite.texture = PIXI.Texture.fromImage("http://pic.qiantucdn.com/58pic/14/45/39/57i58PICI2K_1024.png");
-    testSprite.width = testSprite.height = 200;
-    testSprite.interactive = true;
-    testSprite["a-on:click"] = "testFunc";
-    testSprite["a-for"] = "item in testFor";
-    testSprite["a-x"] = "$target.x + $index * 200";
-    testSprite.x = 200;
-    testSkin.addChild(testSprite);
+        var testSprite:PIXI.Sprite = new PIXI.Sprite();
+        testSprite.texture = PIXI.Texture.fromImage("http://pic.qiantucdn.com/58pic/14/45/39/57i58PICI2K_1024.png");
+        testSprite.width = testSprite.height = 200;
+        testSprite.interactive = true;
+        testSprite["a-on:click"] = "testFunc";
+        testSprite["a-for"] = "item in testFor";
+        testSprite["a-x"] = "$target.x + $index * 200";
+        testSprite.x = 200;
+        testSkin.addChild(testSprite);
 
-    var testText:PIXI.Text = new PIXI.Text("text: {{text}}, {{item}}");
-    testText["a_for"] = "item in testFor";
-    testText["a-y"] = "$target.y + $index * 100";
-    testText.y = 300;
-    testSkin.addChild(testText);
+        var testText:PIXI.Text = new PIXI.Text("text: {{text}}，{{item}}");
+        testText["a-tplName"] = "testTpl";
+        testText.y = 300;
+        testSkin.addChild(testText);
 
-    var data:any = {
-        text: "text",
-        testFor: [],
-        testFunc: function(evt:Event):void
-        {
-            this.text = "Fuck!!!";
-        }
-    };
+        var testTpl:PIXI.Sprite = new PIXI.Sprite();
+        testTpl["a-tpl"] = "testTpl";
+        testTpl["a-for"] = "item in testFor";
+        testTpl["a-x"] = "$index * 200";
+        testTpl["a_y"] = "$target.y + $index * 100";
+        testSkin.addChild(testTpl);
 
-    ares.bind(data, new ares.pixijs.PIXICompiler(testSkin));
+        var data:any = {
+            text: "text",
+            testFor: [1, 2, 3],
+            testFunc: function(evt:Event):void
+            {
+                this.text = "Fuck!!!";
+            }
+        };
 
-    ares.bind(data, new ares.html.HTMLCompiler("#div_root"));
+        ares.bind(data, new ares.pixijs.PIXICompiler(testSkin));
 
-    ares.bind(data, new ares.template.TemplateCompiler("abc$a-{for: i in 10}'$a-{i}'$a-{end for}def", (text:string)=>{
-        console.log(text);
-    }))
+        ares.bind(data, new ares.html.HTMLCompiler("#div_root"));
 
-    setTimeout(()=>{
-        data.testFor = ["asdf", "ajsdf", 323];
-    }, 2000);
+        ares.bind(data, new ares.template.TemplateCompiler("abc$a-{for: i in 10}'$a-{i}'$a-{end for}def", (text:string)=>{
+            console.log(text);
+        }))
+
+        setTimeout(()=>{
+            data.testFor = [3, "jasdf"];
+        }, 2000);
+
+        setTimeout(()=>{
+            data.testFor = ["kn", "j111", "14171a"];
+        }, 4000);
+    });
 };

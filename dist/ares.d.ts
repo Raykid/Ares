@@ -53,7 +53,7 @@ declare module ares
 
     export interface AresOptions
     {
-        inited:(entity?:IAres)=>void;
+        inited?:(entity?:IAres)=>void;
     }
 
     export interface IWatcher

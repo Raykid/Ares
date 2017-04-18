@@ -22,36 +22,47 @@ window.onload = function () {
         // 计划下一次渲染
         requestAnimationFrame(render);
     }
-    var testSkin = new PIXI.Container();
-    stage.addChild(testSkin);
-    var testSprite = new PIXI.Sprite();
-    testSprite.texture = PIXI.Texture.fromImage("http://pic.qiantucdn.com/58pic/14/45/39/57i58PICI2K_1024.png");
-    testSprite.width = testSprite.height = 200;
-    testSprite.interactive = true;
-    testSprite["a-on:click"] = "testFunc";
-    testSprite["a-for"] = "item in testFor";
-    testSprite["a-x"] = "$target.x + $index * 200";
-    testSprite.x = 200;
-    testSkin.addChild(testSprite);
-    var testText = new PIXI.Text("text: {{text}}, {{item}}");
-    testText["a_for"] = "item in testFor";
-    testText["a-y"] = "$target.y + $index * 100";
-    testText.y = 300;
-    testSkin.addChild(testText);
-    var data = {
-        text: "text",
-        testFor: [],
-        testFunc: function (evt) {
-            this.text = "Fuck!!!";
-        }
-    };
-    ares.bind(data, new ares.pixijs.PIXICompiler(testSkin));
-    ares.bind(data, new ares.html.HTMLCompiler("#div_root"));
-    ares.bind(data, new ares.template.TemplateCompiler("abc$a-{for: i in 10}'$a-{i}'$a-{end for}def", function (text) {
-        console.log(text);
-    }));
-    setTimeout(function () {
-        data.testFor = ["asdf", "ajsdf", 323];
-    }, 2000);
+    PIXI.loader.add("http://pic.qiantucdn.com/58pic/14/45/39/57i58PICI2K_1024.png");
+    PIXI.loader.load(function () {
+        var testSkin = new PIXI.Container();
+        stage.addChild(testSkin);
+        var testSprite = new PIXI.Sprite();
+        testSprite.texture = PIXI.Texture.fromImage("http://pic.qiantucdn.com/58pic/14/45/39/57i58PICI2K_1024.png");
+        testSprite.width = testSprite.height = 200;
+        testSprite.interactive = true;
+        testSprite["a-on:click"] = "testFunc";
+        testSprite["a-for"] = "item in testFor";
+        testSprite["a-x"] = "$target.x + $index * 200";
+        testSprite.x = 200;
+        testSkin.addChild(testSprite);
+        var testText = new PIXI.Text("text: {{text}}，{{item}}");
+        testText["a-tplName"] = "testTpl";
+        testText.y = 300;
+        testSkin.addChild(testText);
+        var testTpl = new PIXI.Sprite();
+        testTpl["a-tpl"] = "testTpl";
+        testTpl["a-for"] = "item in testFor";
+        testTpl["a-x"] = "$index * 200";
+        testTpl["a_y"] = "$target.y + $index * 100";
+        testSkin.addChild(testTpl);
+        var data = {
+            text: "text",
+            testFor: [1, 2, 3],
+            testFunc: function (evt) {
+                this.text = "Fuck!!!";
+            }
+        };
+        ares.bind(data, new ares.pixijs.PIXICompiler(testSkin));
+        ares.bind(data, new ares.html.HTMLCompiler("#div_root"));
+        ares.bind(data, new ares.template.TemplateCompiler("abc$a-{for: i in 10}'$a-{i}'$a-{end for}def", function (text) {
+            console.log(text);
+        }));
+        setTimeout(function () {
+            data.testFor = [3, "jasdf"];
+        }, 2000);
+        setTimeout(function () {
+            data.testFor = ["kn", "j111", "14171a"];
+        }, 4000);
+    });
 };
 //# sourceMappingURL=test.js.map
