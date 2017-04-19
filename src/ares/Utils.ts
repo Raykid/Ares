@@ -49,7 +49,7 @@ namespace ares.utils
      */
     export function createRunFunc(exp:string):(scope:any)=>void
     {
-        return createEvalFunc("function(){" + exp + "}");
+        return createEvalFunc("(function(){" + exp + "})()");
     }
 
     /**

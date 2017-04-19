@@ -355,7 +355,7 @@ var ares;
          * @returns {Function} 创建的方法
          */
         function createRunFunc(exp) {
-            return createEvalFunc("function(){" + exp + "}");
+            return createEvalFunc("(function(){" + exp + "})()");
         }
         utils.createRunFunc = createRunFunc;
         /**
