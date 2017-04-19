@@ -80,7 +80,7 @@ namespace ares
             catch(err)
             {
                 // 输出错误日志
-                console.error("表达式求值错误\nerr: " + err.toString() + "\nexp：" + this._exp + "，scope：" + JSON.stringify(this._scope));
+                console.warn("表达式求值错误\nerr: " + err.toString() + "\nexp：" + this._exp + "，scope：" + JSON.stringify(this._scope));
             }
             // 移除通用属性
             delete this._scope["$root"];
