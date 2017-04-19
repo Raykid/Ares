@@ -48,9 +48,12 @@ namespace ares.pixijs
         /** 模板替换命令 */
         tpl: (context:CommandContext)=>
         {
-            // 取到模板对象
+            // 优先从本地模板库取到模板对象
             var template:PIXI.DisplayObject = context.compiler.getTemplate(context.exp);
-            if(!template) return;
+            // 本地模板库没有找到，去全局模板库里取
+            if(!template) template = ares.pixijs.getTemplate(context.exp);
+            // 仍然没有找到，放弃
+            if(!template) return context.target;
             // 拷贝模板
             template = cloneObject(template, true);
             // 使用模板添加到与目标相同的位置

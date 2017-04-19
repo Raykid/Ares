@@ -35,8 +35,9 @@ window.onload = function () {
         testSprite["a-x"] = "$target.x + $index * 200";
         testSprite.x = 200;
         testSkin.addChild(testSprite);
-        var testText = new PIXI.Text("text: {{text}}，{{item}}");
+        var testText = new PIXI.Text("text: {{text}}");
         testText["a-tplName"] = "testTpl";
+        testText["a-tplGlobal"] = "true";
         testText.y = 300;
         testSkin.addChild(testText);
         var testTpl = new PIXI.Sprite();
@@ -57,6 +58,11 @@ window.onload = function () {
         ares.bind(data, new ares.template.TemplateCompiler("abc$a-{for: i in 10}'$a-{i}'$a-{end for}def", function (text) {
             console.log(text);
         }));
+        var testSkin2 = new PIXI.Container();
+        testSkin2["a-tpl"] = "testTpl";
+        testSkin2["a-y"] = 100;
+        stage.addChild(testSkin2);
+        ares.bind(data, new ares.pixijs.PIXICompiler(testSkin2));
         setTimeout(function () {
             data.testFor = [3, "jasdf"];
         }, 2000);

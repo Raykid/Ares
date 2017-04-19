@@ -26,10 +26,14 @@ var ares;
         pixijs.commands = {
             /** 模板替换命令 */
             tpl: function (context) {
-                // 取到模板对象
+                // 优先从本地模板库取到模板对象
                 var template = context.compiler.getTemplate(context.exp);
+                // 本地模板库没有找到，去全局模板库里取
                 if (!template)
-                    return;
+                    template = ares.pixijs.getTemplate(context.exp);
+                // 仍然没有找到，放弃
+                if (!template)
+                    return context.target;
                 // 拷贝模板
                 template = cloneObject(template, true);
                 // 使用模板添加到与目标相同的位置
@@ -294,6 +298,35 @@ var ares;
 (function (ares) {
     var pixijs;
     (function (pixijs) {
+        var _tplDict = {};
+        /**
+         * 获取全局模板对象，该模板在任何地方都生效
+         * @param name 模板名称
+         * @returns {PIXI.DisplayObject|undefined} 如果模板名称存在则返回模板对象
+         */
+        function getTemplate(name) {
+            return _tplDict[name];
+        }
+        pixijs.getTemplate = getTemplate;
+        /**
+         * 设置全局模板对象，该模板在任何地方都生效
+         * @param name 模板名称
+         * @param tpl 模板对象
+         * @returns {PIXI.DisplayObject|null} 如果成功设置了模板则返回模板对象，否则返回null（如已存在同名模板）
+         */
+        function setTemplate(name, tpl) {
+            // 非空判断
+            if (!name || !tpl)
+                return null;
+            // 如果已经有了模板定义则返回null
+            if (_tplDict[name])
+                return null;
+            // 添加模板定义
+            _tplDict[name] = tpl;
+            // 返回模板对象
+            return tpl;
+        }
+        pixijs.setTemplate = setTemplate;
         var PIXICompiler = (function () {
             /**
              * 创建PIXI绑定
@@ -315,29 +348,7 @@ var ares;
                 enumerable: true,
                 configurable: true
             });
-            PIXICompiler.prototype.init = function (entity) {
-                this._entity = entity;
-                // 开始编译root节点
-                this.compile(this._root, entity.data);
-            };
-            PIXICompiler.prototype.compile = function (node, scope) {
-                // 首先判断是否是模板，是的话就记下来，但是不编译
-                var tplName = node["a-tplName"] || node["a_tplName"];
-                if (tplName && this.setTemplate(tplName, node)) {
-                    // 移除a-tpl和a_tpl属性
-                    delete node["a-tplName"];
-                    delete node["a_tplName"];
-                    // 将这个节点从显示列表中移除
-                    node.parent && node.parent.removeChild(node);
-                    // 不编译，直接返回
-                    return;
-                }
-                // 开始编译
-                var hasLazyCompile = false;
-                // 如果有名字就记下来
-                var name = node.name;
-                if (name)
-                    this._nameDict[name] = node;
+            PIXICompiler.prototype.parseCmd = function (node) {
                 // 取到属性列表
                 var keys = [];
                 for (var t in node) {
@@ -346,14 +357,14 @@ var ares;
                     }
                 }
                 // 把配置中的属性推入属性列表中
-                var conf = (this._config && this._config[name]);
+                var conf = (this._config && this._config[node.name]);
                 for (var t in conf) {
                     if (t.indexOf("a-") != 0 && t.indexOf("a_") != 0)
                         t = "a-" + t;
                     keys.push(t);
                 }
                 // 开始遍历属性列表
-                var cmdsToCompile = [];
+                var cmdNameDict = {};
                 for (var i = 0, len = keys.length; i < len; i++) {
                     // 首先解析当前节点上面以a_开头的属性，将其认为是绑定属性
                     var key = keys[i];
@@ -373,6 +384,67 @@ var ares;
                         exp = node[key];
                     // 取到子命令名
                     var subCmd = key.substr(eIndex + 1);
+                    // 填充字典
+                    cmdNameDict[cmdName] = {
+                        cmdName: cmdName,
+                        subCmd: subCmd,
+                        propName: key,
+                        exp: exp
+                    };
+                }
+                return cmdNameDict;
+            };
+            PIXICompiler.prototype.parseTpl = function (node) {
+                var tplName = node["a-tplName"] || node["a_tplName"];
+                if (tplName) {
+                    var callback = function () {
+                        // 移除tpl相关属性
+                        delete node["a-tplName"];
+                        delete node["a_tplName"];
+                        delete node["a-tplGlobal"];
+                        delete node["a_tplGlobal"];
+                        // 将这个节点从显示列表中移除
+                        node.parent && node.parent.removeChild(node);
+                    };
+                    if (node["a-tplGlobal"] == "true" || node["a_tplGlobal"] == "true") {
+                        if (ares.pixijs.setTemplate(tplName, node)) {
+                            callback();
+                            return true;
+                        }
+                    }
+                    else {
+                        if (this.setTemplate(tplName, node)) {
+                            callback();
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            };
+            PIXICompiler.prototype.init = function (entity) {
+                this._entity = entity;
+                // 开始编译root节点
+                this.compile(this._root, entity.data);
+            };
+            PIXICompiler.prototype.compile = function (node, scope) {
+                // 首先判断是否是模板，是的话就设置模板，但是不编译
+                if (this.parseTpl(node))
+                    return;
+                // 开始编译
+                var hasLazyCompile = false;
+                // 如果有名字就记下来
+                var name = node.name;
+                if (name)
+                    this._nameDict[name] = node;
+                // 开始遍历属性列表
+                var cmdDict = this.parseCmd(node);
+                var cmdsToCompile = [];
+                for (var cmdName in cmdDict) {
+                    var cmdData = cmdDict[cmdName];
+                    // 取到子命令名
+                    var subCmd = cmdData.subCmd;
+                    // 取到命令字符串
+                    var exp = cmdData.exp;
                     // 用命令名取到Command
                     var cmd = pixijs.commands[cmdName];
                     // 如果没有找到命令，则认为是自定义命令，套用prop命令
@@ -382,7 +454,7 @@ var ares;
                     }
                     // 推入数组
                     var cmdToCompile = {
-                        propName: key,
+                        propName: cmdData.propName,
                         cmd: cmd,
                         ctx: {
                             scope: scope,
@@ -443,7 +515,7 @@ var ares;
                 }
             };
             /**
-             * 获取模板对象
+             * 获取模板对象，该模板只在该PIXICompiler内部生效
              * @param name 模板名称
              * @returns {PIXI.DisplayObject|undefined} 如果模板名称存在则返回模板对象
              */
@@ -451,7 +523,7 @@ var ares;
                 return this._tplDict[name];
             };
             /**
-             * 设置模板
+             * 设置模板，该模板只在该PIXICompiler内部生效
              * @param name 模板名称
              * @param tpl 模板对象
              * @returns {PIXI.DisplayObject|null} 如果成功设置了模板则返回模板对象，否则返回null（如已存在同名模板）

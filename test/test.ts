@@ -44,8 +44,9 @@ window.onload = ()=>
         testSprite.x = 200;
         testSkin.addChild(testSprite);
 
-        var testText:PIXI.Text = new PIXI.Text("text: {{text}}，{{item}}");
+        var testText:PIXI.Text = new PIXI.Text("text: {{text}}");
         testText["a-tplName"] = "testTpl";
+        testText["a-tplGlobal"] = "true";
         testText.y = 300;
         testSkin.addChild(testText);
 
@@ -71,7 +72,13 @@ window.onload = ()=>
 
         ares.bind(data, new ares.template.TemplateCompiler("abc$a-{for: i in 10}'$a-{i}'$a-{end for}def", (text:string)=>{
             console.log(text);
-        }))
+        }));
+
+        var testSkin2:PIXI.Container = new PIXI.Container();
+        testSkin2["a-tpl"] = "testTpl";
+        testSkin2["a-y"] = 100;
+        stage.addChild(testSkin2);
+        ares.bind(data, new ares.pixijs.PIXICompiler(testSkin2));
 
         setTimeout(()=>{
             data.testFor = [3, "jasdf"];
