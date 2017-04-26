@@ -327,4 +327,3 @@ var ares;
 // 为了nodejs模块
 var module = module || {};
 module.exports = ares.template;
-//# sourceMappingURL=ares_template.js.map
