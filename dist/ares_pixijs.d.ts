@@ -1,4 +1,3 @@
-/// <reference path="../src/ares/pixijs/pixi.js.d.ts" />
 /// <reference path="ares.d.ts" />
 /**
  * Created by Raykid on 2016/12/27.
