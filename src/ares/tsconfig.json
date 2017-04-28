@@ -3,9 +3,9 @@
     "module": "commonjs",
     "target": "es5",
     "sourceMap": true,
-    "outFile": "../dist/ares.js"
+    "declaration": true
   },
   "files": [
-    "ares/Ares.ts"
+    "Ares.ts"
   ]
 }

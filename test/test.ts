@@ -1,13 +1,28 @@
-/// <reference path="../dist/ares.d.ts"/>
-/// <reference path="../dist/ares_html.d.ts"/>
-/// <reference path="../dist/ares_pixi.d.ts"/>
-/// <reference path="../dist/ares_template.d.ts"/>
 /// <reference path="../src/ares/pixijs/pixi.js.d.ts"/>
+// /// <reference path="../dist/ares.d.ts"/>
+// /// <reference path="../dist/ares_html.d.ts"/>
+// /// <reference path="../dist/ares_pixijs.d.ts"/>
+// /// <reference path="../dist/ares_template.d.ts"/>
+
+import * as ares from "../src/ares/Ares";
+import * as ares_html from "../src/ares/html/HTMLCompiler";
+import * as ares_pixijs from "../src/ares/pixijs/PIXICompiler";
+import * as ares_template from "../src/ares/template/TemplateCompiler";
 
 /**
  * Created by Raykid on 2016/12/23.
  */
-window.onload = ()=>
+if(document.body)
+{
+    go();
+}
+else
+{
+    window.onload = go;
+}
+
+
+function go():void
 {
     var renderer:PIXI.SystemRenderer = PIXI.autoDetectRenderer(800, 600, {backgroundColor:0xeeeeee});
     document.getElementById("div_root").appendChild(renderer.view);
@@ -66,11 +81,11 @@ window.onload = ()=>
             }
         };
 
-        ares.bind(data, new ares.pixijs.PIXICompiler(testSkin));
+        ares.bind(data, new ares_pixijs.PIXICompiler(testSkin));
 
-        ares.bind(data, new ares.html.HTMLCompiler("#div_root"));
+        ares.bind(data, new ares_html.HTMLCompiler("#div_root"));
 
-        ares.bind(data, new ares.template.TemplateCompiler("abc$a-{for: i in 10}'$a-{i}'$a-{end for}def", (text:string)=>{
+        ares.bind(data, new ares_template.TemplateCompiler("abc$a-{for: i in 10}'$a-{i}'$a-{end for}def", (text:string)=>{
             console.log(text);
         }));
 
@@ -78,7 +93,7 @@ window.onload = ()=>
         testSkin2["a-tpl"] = "testTpl";
         testSkin2["a-y"] = 100;
         stage.addChild(testSkin2);
-        ares.bind(data, new ares.pixijs.PIXICompiler(testSkin2));
+        ares.bind(data, new ares_pixijs.PIXICompiler(testSkin2));
 
         setTimeout(()=>{
             data.testFor = [3, "jasdf"];
@@ -88,4 +103,4 @@ window.onload = ()=>
             data.testFor = ["kn", "j111", "14171a"];
         }, 4000);
     });
-};
+}

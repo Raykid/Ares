@@ -1,63 +1,58 @@
-/// <reference path="Interfaces.ts"/>
-/// <reference path="Mutator.ts"/>
-/// <reference path="Utils.ts"/>
-
 /**
  * Created by Raykid on 2016/12/16.
  */
-namespace ares
+
+import {IAres, Compiler, AresOptions, IWatcher, WatcherCallback} from "./Interfaces";
+import {Mutator} from "./Mutator";
+import {Watcher} from "./Watcher";
+
+/**
+ * 将数据模型和视图进行绑定
+ * @param model 数据模型
+ * @param compiler 视图解析器，不同类型的视图需要使用不同的解析器解析后方可使用
+ * @param options 一些额外参数
+ * @returns {core.AresEntity} 绑定实体对象
+ */
+export function bind(data:any, compiler:Compiler, options?:AresOptions):IAres
 {
-    /**
-     * 将数据模型和视图进行绑定
-     * @param model 数据模型
-     * @param compiler 视图解析器，不同类型的视图需要使用不同的解析器解析后方可使用
-     * @param options 一些额外参数
-     * @returns {core.AresEntity} 绑定实体对象
-     */
-    export function bind(data:any, compiler:Compiler, options?:ares.AresOptions):ares.IAres
+    return new Ares(data, compiler, options);
+}
+
+export class Ares implements IAres
+{
+    private _data:any;
+    private _compiler:Compiler;
+    private _options:any;
+
+    /** 获取ViewModel */
+    public get data():any
     {
-        return new Ares(data, compiler, options);
+        return this._data;
     }
 
-    export class Ares implements IAres
+    /** 获取编译器 */
+    public get compiler():Compiler
     {
-        private _data:any;
-        private _compiler:Compiler;
-        private _options:any;
+        return this._compiler;
+    }
 
-        /** 获取ViewModel */
-        public get data():any
+    public constructor(data:any, compiler:Compiler, options?:AresOptions)
+    {
+        // 记录变异对象
+        this._data = Mutator.mutate(data);
+        this._compiler = compiler;
+        this._options = options;
+        // 初始化Compiler
+        this._compiler.init(this);
+        // 调用回调
+        if(this._options && this._options.inited)
         {
-            return this._data;
+            this._options.inited.call(this._data, this);
         }
+    }
 
-        /** 获取编译器 */
-        public get compiler():Compiler
-        {
-            return this._compiler;
-        }
-
-        public constructor(data:any, compiler:ares.Compiler, options?:ares.AresOptions)
-        {
-            // 记录变异对象
-            this._data = ares.Mutator.mutate(data);
-            this._compiler = compiler;
-            this._options = options;
-            // 初始化Compiler
-            this._compiler.init(this);
-            // 调用回调
-            if(this._options && this._options.inited)
-            {
-                this._options.inited.call(this._data, this);
-            }
-        }
-
-        public createWatcher(target:any, exp:string, scope:any, callback:WatcherCallback):IWatcher
-        {
-            return new Watcher(this, target, exp, scope, callback);
-        }
+    public createWatcher(target:any, exp:string, scope:any, callback:WatcherCallback):IWatcher
+    {
+        return new Watcher(this, target, exp, scope, callback);
     }
 }
-// 为了nodejs模块
-var module:any = module || {};
-module.exports = ares;

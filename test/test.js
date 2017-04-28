@@ -1,74 +1,1701 @@
-/// <reference path="../dist/ares.d.ts"/>
-/// <reference path="../dist/ares_html.d.ts"/>
-/// <reference path="../dist/ares_pixi.d.ts"/>
-/// <reference path="../dist/ares_template.d.ts"/>
-/// <reference path="../src/ares/pixijs/pixi.js.d.ts"/>
-/**
- * Created by Raykid on 2016/12/23.
- */
-window.onload = function () {
-    var renderer = PIXI.autoDetectRenderer(800, 600, { backgroundColor: 0xeeeeee });
-    document.getElementById("div_root").appendChild(renderer.view);
-    var stage = new PIXI.Container();
-    render();
-    function render() {
+define("src/ares/Interfaces", ["require", "exports"], function (require, exports) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+});
+define("src/ares/Utils", ["require", "exports"], function (require, exports) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    /**
+     * Created by Raykid on 2016/12/22.
+     */
+    /**
+     * 创建一个表达式求值方法，用于未来执行
+     * @param exp 表达式
+     * @returns {Function} 创建的方法
+     */
+    function createEvalFunc(exp) {
+        var func;
         try {
-            // 渲染Stage
-            renderer.render(stage);
+            func = Function("scope", "with(scope){return " + exp + "}");
         }
         catch (err) {
-            console.error(err.toString());
+            // 可能是某些版本的解释器不认识模板字符串，将模板字符串变成普通字符串
+            var sepStr = (exp.indexOf('"') < 0 ? '"' : "'");
+            // 将exp中的·替换为'
+            var reg = /([^\\]?)`/g;
+            exp = exp.replace(reg, "$1" + sepStr);
+            // 将exp中${...}替换为" + ... + "的形式
+            reg = /\$\{(.*?)\}/g;
+            exp = exp.replace(reg, sepStr + "+($1)+" + sepStr);
+            // 重新生成方法并返回
+            func = Function("scope", "with(scope){return " + exp + "}");
         }
-        // 计划下一次渲染
-        requestAnimationFrame(render);
+        return func;
     }
-    PIXI.loader.add("http://pic.qiantucdn.com/58pic/14/45/39/57i58PICI2K_1024.png");
-    PIXI.loader.load(function () {
-        var testSkin = new PIXI.Container();
-        stage.addChild(testSkin);
-        var testSprite = new PIXI.Sprite();
-        testSprite.texture = PIXI.Texture.fromImage("http://pic.qiantucdn.com/58pic/14/45/39/57i58PICI2K_1024.png");
-        testSprite.width = testSprite.height = 200;
-        testSprite.interactive = true;
-        testSprite["a-on:click"] = "testFunc";
-        testSprite["a-for"] = "item in testFor";
-        testSprite["a-x"] = "$target.x + $index * 200";
-        testSprite.x = 200;
-        testSkin.addChild(testSprite);
-        var testText = new PIXI.Text("text: {{text}}");
-        testText["a-tplName"] = "testTpl";
-        testText["a-tplGlobal"] = "true";
-        testText.y = 300;
-        testSkin.addChild(testText);
-        var testTpl = new PIXI.Sprite();
-        testTpl["a-tpl"] = "testTpl";
-        testTpl["a-for"] = "item in testFor";
-        testTpl["a-x"] = "$index * 200";
-        testTpl["a_y"] = "$target.y + $index * 100";
-        testSkin.addChild(testTpl);
-        var data = {
-            text: "text",
-            testFor: [1, 2, 3],
-            testFunc: function (evt) {
-                this.text = "Fuck!!!";
+    exports.createEvalFunc = createEvalFunc;
+    /**
+     * 表达式求值，无法执行多条语句
+     * @param exp 表达式
+     * @param scope 表达式的作用域
+     * @returns {any} 返回值
+     */
+    function evalExp(exp, scope) {
+        return createEvalFunc(exp)(scope);
+    }
+    exports.evalExp = evalExp;
+    /**
+     * 创建一个执行方法，用于未来执行
+     * @param exp 表达式
+     * @returns {Function} 创建的方法
+     */
+    function createRunFunc(exp) {
+        return createEvalFunc("(function(){" + exp + "})()");
+    }
+    exports.createRunFunc = createRunFunc;
+    /**
+     * 直接执行表达式，不求值。该方法可以执行多条语句
+     * @param exp 表达式
+     * @param scope 表达式的作用域
+     */
+    function runExp(exp, scope) {
+        createRunFunc(exp)(scope);
+    }
+    exports.runExp = runExp;
+});
+define("src/ares/Watcher", ["require", "exports", "src/ares/Utils"], function (require, exports, Utils_1) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    /**
+     * Created by Raykid on 2016/12/22.
+     * 数据更新订阅者，当依赖的数据有更新时会触发callback通知外面
+     */
+    var Watcher = (function () {
+        function Watcher(entity, target, exp, scope, callback) {
+            this._disposed = false;
+            // 记录entity
+            this._entity = entity;
+            // 生成一个全局唯一的ID
+            this._uid = Watcher._uid++;
+            // 记录作用目标、表达式和作用域
+            this._target = target;
+            this._exp = exp;
+            this._scope = scope;
+            // 将表达式和作用域解析为一个Function
+            this._expFunc = Utils_1.createEvalFunc(exp);
+            // 记录回调函数
+            this._callback = callback;
+            // 进行首次更新
+            this.update();
+        }
+        Object.defineProperty(Watcher.prototype, "uid", {
+            /** 获取Watcher的全局唯一ID */
+            get: function () {
+                return this._uid;
+            },
+            enumerable: true,
+            configurable: true
+        });
+        /**
+         * 获取到表达式当前最新值
+         * @returns {any} 最新值
+         */
+        Watcher.prototype.getValue = function () {
+            if (this._disposed)
+                return null;
+            var value = null;
+            // 记录自身
+            Watcher.updating = this;
+            // 设置通用属性
+            // 这里一定要用defineProperty将目标定义在当前节点上，否则会影响context.scope
+            Object.defineProperty(this._scope, "$root", {
+                configurable: true,
+                enumerable: false,
+                value: this._entity.compiler.root,
+                writable: false
+            });
+            // 这里一定要用defineProperty将目标定义在当前节点上，否则会影响context.scope
+            Object.defineProperty(this._scope, "$target", {
+                configurable: true,
+                enumerable: false,
+                value: this._target,
+                writable: false
+            });
+            // 表达式求值
+            try {
+                value = this._expFunc.call(this._scope, this._scope);
+            }
+            catch (err) {
+                // 输出错误日志
+                console.warn("表达式求值错误\nerr: " + err.toString() + "\nexp：" + this._exp + "，scope：" + JSON.stringify(this._scope));
+            }
+            // 移除通用属性
+            delete this._scope["$root"];
+            delete this._scope["$target"];
+            // 移除自身记录
+            Watcher.updating = null;
+            return value;
+        };
+        /**
+         * 当依赖的数据有更新时调用该方法
+         * @param extra 可能的额外数据
+         */
+        Watcher.prototype.update = function (extra) {
+            if (this._disposed)
+                return;
+            var value = this.getValue();
+            if (!Watcher.isEqual(value, this._value)) {
+                this._callback && this._callback(value, this._value, extra);
+                this._value = Watcher.deepCopy(value);
             }
         };
-        ares.bind(data, new ares.pixijs.PIXICompiler(testSkin));
-        ares.bind(data, new ares.html.HTMLCompiler("#div_root"));
-        ares.bind(data, new ares.template.TemplateCompiler("abc$a-{for: i in 10}'$a-{i}'$a-{end for}def", function (text) {
-            console.log(text);
-        }));
-        var testSkin2 = new PIXI.Container();
-        testSkin2["a-tpl"] = "testTpl";
-        testSkin2["a-y"] = 100;
-        stage.addChild(testSkin2);
-        ares.bind(data, new ares.pixijs.PIXICompiler(testSkin2));
-        setTimeout(function () {
-            data.testFor = [3, "jasdf"];
-        }, 2000);
-        setTimeout(function () {
-            data.testFor = ["kn", "j111", "14171a"];
-        }, 4000);
-    });
-};
+        /** 销毁订阅者 */
+        Watcher.prototype.dispose = function () {
+            if (this._disposed)
+                return;
+            this._value = null;
+            this._target = null;
+            this._exp = null;
+            this._scope = null;
+            this._expFunc = null;
+            this._callback = null;
+            this._disposed = true;
+        };
+        /**
+         * 是否相等，包括基础类型和对象/数组的对比
+         */
+        Watcher.isEqual = function (a, b) {
+            return (a == b || (Watcher.isObject(a) && Watcher.isObject(b)
+                ? JSON.stringify(a) == JSON.stringify(b)
+                : false));
+        };
+        /**
+         * 是否为对象(包括数组、正则等)
+         */
+        Watcher.isObject = function (obj) {
+            return (obj && typeof obj == "object");
+        };
+        /**
+         * 复制对象，若为对象则深度复制
+         */
+        Watcher.deepCopy = function (from) {
+            if (Watcher.isObject(from)) {
+                // 复杂类型对象，先字符串化，再对象化
+                return JSON.parse(JSON.stringify(from));
+            }
+            else {
+                // 基本类型对象，直接返回之
+                return from;
+            }
+        };
+        return Watcher;
+    }());
+    /** 记录当前正在执行update方法的Watcher引用 */
+    Watcher.updating = null;
+    Watcher._uid = 0;
+    exports.Watcher = Watcher;
+});
+/**
+ * Created by Raykid on 2016/12/22.
+ */
+define("src/ares/Dep", ["require", "exports"], function (require, exports) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    var Dep = (function () {
+        function Dep() {
+            this._map = {};
+        }
+        /**
+         * 添加数据变更订阅者
+         * @param watcher 数据变更订阅者
+         */
+        Dep.prototype.watch = function (watcher) {
+            if (!this._map[watcher.uid]) {
+                this._map[watcher.uid] = watcher;
+            }
+        };
+        /**
+         * 数据变更，通知所有订阅者
+         * @param extra 可能的额外数据
+         */
+        Dep.prototype.notify = function (extra) {
+            for (var uid in this._map) {
+                var watcher = this._map[uid];
+                watcher.update(extra);
+            }
+        };
+        return Dep;
+    }());
+    exports.Dep = Dep;
+});
+/**
+ * Created by Raykid on 2016/12/22.
+ */
+define("src/ares/Mutator", ["require", "exports", "src/ares/Watcher", "src/ares/Dep"], function (require, exports, Watcher_1, Dep_1) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    var Mutator = (function () {
+        function Mutator() {
+        }
+        /**
+         * 将用户传进来的数据“变异”成为具有截获数据变更能力的数据
+         * @param data 原始数据
+         * @returns {any} 变异后的数据
+         */
+        Mutator.mutate = function (data) {
+            // 如果是简单类型，则啥也不做
+            if (!data || typeof data != "object")
+                return;
+            // 是个复杂类型对象，但是以前变异过了就不再重做一遍了
+            if (!data.__ares_mutated__) {
+                // 针对每个内部变量都进行一次变异
+                for (var key in data) {
+                    Mutator.mutateObject(data, key, data[key]);
+                }
+                // 打一个标记表示已经变异过了
+                Object.defineProperty(data, "__ares_mutated__", {
+                    value: true,
+                    writable: false,
+                    enumerable: false,
+                    configurable: false
+                });
+            }
+            return data;
+        };
+        Mutator.mutateObject = function (data, key, value) {
+            // 对每个复杂类型对象都要有一个对应的依赖列表
+            var dep = new Dep_1.Dep();
+            // 变异过程
+            Object.defineProperty(data, key, {
+                enumerable: true,
+                configurable: false,
+                get: function () {
+                    // 如果Watcher.updating不是null，说明当前正在执行表达式，那么获取的变量自然是其需要依赖的
+                    var watcher = Watcher_1.Watcher.updating;
+                    if (watcher)
+                        dep.watch(watcher);
+                    // 利用闭包保存原始值
+                    return value;
+                },
+                set: function (v) {
+                    if (v == value)
+                        return;
+                    value = v;
+                    // 如果是数组就走专门的数组变异方法，否则递归变异对象
+                    if (Array.isArray(v))
+                        Mutator.mutateArray(v, dep);
+                    else
+                        Mutator.mutate(v);
+                    // 触发通知
+                    dep.notify();
+                }
+            });
+            // 递归变异
+            Mutator.mutate(value);
+        };
+        Mutator.mutateArray = function (arr, dep) {
+            // 变异当前数组
+            arr["__proto__"] = Mutator.defineReactiveArray(dep);
+            // 遍历当前数组，将内容对象全部变异
+            for (var i = 0, len = arr.length; i < len; i++) {
+                Mutator.mutate(arr[i]);
+            }
+        };
+        Mutator.defineReactiveArray = function (dep) {
+            var proto = Array.prototype;
+            var result = Object.create(proto);
+            // 遍历所有方法，一个一个地变异
+            Mutator._arrMethods.forEach(function (method) {
+                // 利用闭包记录一个原始方法
+                var oriMethod = proto[method];
+                // 开始变异
+                Object.defineProperty(result, method, {
+                    value: function () {
+                        var args = [];
+                        for (var _i = 0; _i < arguments.length; _i++) {
+                            args[_i] = arguments[_i];
+                        }
+                        // 首先调用原始方法，获取返回值
+                        var result = oriMethod.apply(this, args);
+                        // 数组插入项
+                        var inserted;
+                        switch (method) {
+                            case "push":
+                            case "unshift":
+                                inserted = args;
+                                break;
+                            case "splice":
+                                inserted = args.slice(2);
+                                break;
+                        }
+                        // 监视数组插入项，而不是重新监视整个数组
+                        if (inserted && inserted.length) {
+                            Mutator.mutateArray(inserted, dep);
+                        }
+                        // 触发更新
+                        dep.notify({ method: args });
+                        // 返回值
+                        return result;
+                    }
+                });
+            });
+            // 提供替换数组设置的方法，因为直接设置数组下标的方式无法变异
+            Object.defineProperty(result, "$set", {
+                value: function (index, value) {
+                    // 超出数组长度默认追加到最后
+                    if (index >= this.length)
+                        index = this.length;
+                    return this.splice(index, 1, value)[0];
+                }
+            });
+            // 提供替换数组移除的方法，因为直接移除的方式无法变异
+            Object.defineProperty(result, "$remove", {
+                value: function (item) {
+                    var index = this.indexOf(item);
+                    if (index > -1)
+                        return this.splice(index, 1);
+                    return null;
+                }
+            });
+            return result;
+        };
+        return Mutator;
+    }());
+    // 记录数组中会造成数据更新的所有方法名
+    Mutator._arrMethods = [
+        "push",
+        "pop",
+        "unshift",
+        "shift",
+        "splice",
+        "sort",
+        "reverse"
+    ];
+    exports.Mutator = Mutator;
+});
+/**
+ * Created by Raykid on 2016/12/16.
+ */
+define("src/ares/Ares", ["require", "exports", "src/ares/Mutator", "src/ares/Watcher"], function (require, exports, Mutator_1, Watcher_2) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    /**
+     * 将数据模型和视图进行绑定
+     * @param model 数据模型
+     * @param compiler 视图解析器，不同类型的视图需要使用不同的解析器解析后方可使用
+     * @param options 一些额外参数
+     * @returns {core.AresEntity} 绑定实体对象
+     */
+    function bind(data, compiler, options) {
+        return new Ares(data, compiler, options);
+    }
+    exports.bind = bind;
+    var Ares = (function () {
+        function Ares(data, compiler, options) {
+            // 记录变异对象
+            this._data = Mutator_1.Mutator.mutate(data);
+            this._compiler = compiler;
+            this._options = options;
+            // 初始化Compiler
+            this._compiler.init(this);
+            // 调用回调
+            if (this._options && this._options.inited) {
+                this._options.inited.call(this._data, this);
+            }
+        }
+        Object.defineProperty(Ares.prototype, "data", {
+            /** 获取ViewModel */
+            get: function () {
+                return this._data;
+            },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(Ares.prototype, "compiler", {
+            /** 获取编译器 */
+            get: function () {
+                return this._compiler;
+            },
+            enumerable: true,
+            configurable: true
+        });
+        Ares.prototype.createWatcher = function (target, exp, scope, callback) {
+            return new Watcher_2.Watcher(this, target, exp, scope, callback);
+        };
+        return Ares;
+    }());
+    exports.Ares = Ares;
+});
+/**
+ * Created by Raykid on 2016/12/22.
+ */
+define("src/ares/html/HTMLCommands", ["require", "exports", "src/ares/Utils"], function (require, exports, Utils_2) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    /**
+     * 提供给外部的可以注入自定义命令的接口
+     * @param name
+     * @param command
+     */
+    function addCommand(name, command) {
+        if (!exports.commands[name])
+            exports.commands[name] = command;
+    }
+    exports.addCommand = addCommand;
+    /** 文本域命令 */
+    function textContent(context) {
+        context.entity.createWatcher(context.target, context.exp, context.scope, function (value) {
+            context.target.nodeValue = value;
+        });
+    }
+    exports.textContent = textContent;
+    exports.commands = {
+        /** 文本命令 */
+        text: function (context) {
+            context.entity.createWatcher(context.target, context.exp, context.scope, function (value) {
+                context.target.textContent = value;
+            });
+        },
+        /** HTML文本命令 */
+        html: function (context) {
+            context.entity.createWatcher(context.target, context.exp, context.scope, function (value) {
+                var target = context.target;
+                target.innerHTML = value;
+                // 设置完成后需要重新编译一下当前节点的所有子节点
+                var children = target.childNodes;
+                for (var i = 0, len = children.length; i < len; i++) {
+                    context.compiler.compile(children[i], context.scope);
+                }
+            });
+        },
+        /** CSS类型命令 */
+        css: function (context) {
+            var target = context.target;
+            // 记录原始class值
+            var oriCls = target.getAttribute("class");
+            // 生成订阅器
+            context.entity.createWatcher(context.target, context.exp, context.scope, function (params) {
+                if (typeof params == "string") {
+                    // 直接赋值形式
+                    if (oriCls)
+                        params = oriCls + " " + params;
+                    // 更新target节点的class属性
+                    target.setAttribute("class", params);
+                }
+                else {
+                    // 集成形式
+                    var arr = [];
+                    if (oriCls)
+                        arr.push(oriCls);
+                    // 遍历所有params的key，如果其表达式值为true则添加其类型
+                    for (var cls in params) {
+                        if (params[cls] == true)
+                            arr.push(cls);
+                    }
+                    // 更新target节点的class属性
+                    if (arr.length > 0)
+                        target.setAttribute("class", arr.join(" "));
+                }
+            });
+        },
+        /** 修改任意属性命令 */
+        attr: function (context) {
+            var target = context.target;
+            context.entity.createWatcher(context.target, context.exp, context.scope, function (value) {
+                if (context.subCmd != "") {
+                    // 子命令形式
+                    target.setAttribute(context.subCmd, value);
+                }
+                else {
+                    // 集成形式，遍历所有value的key，如果其表达式值为true则添加其类型
+                    for (var name in value) {
+                        var value = value[name];
+                        target.setAttribute(name, value);
+                    }
+                }
+            });
+        },
+        /** 绑定事件 */
+        on: function (context) {
+            if (context.subCmd != "") {
+                var handler = context.scope[context.exp] || window[context.exp];
+                if (typeof handler == "function") {
+                    // 是函数名形式
+                    context.target.addEventListener(context.subCmd, handler.bind(context.scope));
+                }
+                else {
+                    // 是方法执行或者表达式方式
+                    context.target.addEventListener(context.subCmd, function (evt) {
+                        // 创建一个临时的子域，用于保存参数
+                        var scope = Object.create(context.scope);
+                        scope.$event = evt;
+                        scope.$target = context.target;
+                        Utils_2.runExp(context.exp, scope);
+                    });
+                }
+            }
+        },
+        /** if命令 */
+        if: function (context) {
+            // 记录一个是否编译过的flag
+            var compiled = false;
+            // 插入一个占位元素
+            var refNode = document.createTextNode("");
+            context.target.parentNode.insertBefore(refNode, context.target);
+            // 只有在条件为true时才启动编译
+            context.entity.createWatcher(context.target, context.exp, context.scope, function (value) {
+                if (value == true) {
+                    // 启动编译
+                    if (!compiled) {
+                        context.compiler.compile(context.target, context.scope);
+                        compiled = true;
+                    }
+                    // 插入节点
+                    if (!context.target.parentNode) {
+                        refNode.parentNode.insertBefore(context.target, refNode);
+                    }
+                }
+                else {
+                    // 移除元素
+                    if (context.target.parentNode) {
+                        context.target.parentNode.removeChild(context.target);
+                    }
+                }
+            });
+        },
+        /** for命令 */
+        for: function (context) {
+            // 解析表达式
+            var reg = /^\s*(\S+)\s+in\s+(\S+)\s*$/;
+            var res = reg.exec(context.exp);
+            if (!res) {
+                console.error("for命令表达式错误：" + context.exp);
+                return;
+            }
+            var itemName = res[1];
+            var arrName = res[2];
+            var pNode = context.target.parentNode;
+            var sNode = document.createTextNode("");
+            var eNode = document.createTextNode("");
+            var range = document.createRange();
+            // 替换原始模板
+            pNode.replaceChild(eNode, context.target);
+            pNode.insertBefore(sNode, eNode);
+            // 添加订阅
+            context.entity.createWatcher(context.target, arrName, context.scope, function (value) {
+                // 清理原始显示
+                range.setStart(sNode, 0);
+                range.setEnd(eNode, 0);
+                range.deleteContents();
+                // 如果是数字，构建一个数字列表
+                if (typeof value == "number") {
+                    var temp = [];
+                    for (var i = 0; i < value; i++) {
+                        temp.push(i);
+                    }
+                    value = temp;
+                }
+                // 开始遍历
+                for (var key in value) {
+                    // 拷贝一个target
+                    var newNode = context.target.cloneNode(true);
+                    // 添加到显示里
+                    pNode.insertBefore(newNode, eNode);
+                    // 生成子域
+                    var newScope = Object.create(context.scope);
+                    // 这里一定要用defineProperty将目标定义在当前节点上，否则会影响context.scope
+                    Object.defineProperty(newScope, "$index", {
+                        configurable: true,
+                        enumerable: false,
+                        value: (value instanceof Array ? parseInt(key) : key),
+                        writable: false
+                    });
+                    Object.defineProperty(newScope, itemName, {
+                        configurable: true,
+                        enumerable: true,
+                        value: value[key],
+                        writable: false
+                    });
+                    // 开始编译新节点
+                    context.compiler.compile(newNode, newScope);
+                }
+            });
+        }
+    };
+});
+/**
+ * Created by Raykid on 2016/12/22.
+ */
+define("src/ares/html/HTMLCompiler", ["require", "exports", "src/ares/html/HTMLCommands"], function (require, exports, HTMLCommands_1) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    var HTMLCompiler = (function () {
+        function HTMLCompiler(selectorsOrElement) {
+            this._selectorsOrElement = selectorsOrElement;
+        }
+        Object.defineProperty(HTMLCompiler.prototype, "root", {
+            get: function () {
+                return this._root;
+            },
+            enumerable: true,
+            configurable: true
+        });
+        HTMLCompiler.prototype.init = function (entity) {
+            if (typeof this._selectorsOrElement == "string")
+                this._root = document.querySelector(this._selectorsOrElement);
+            else
+                this._root = this._selectorsOrElement;
+            this._entity = entity;
+            // 开始编译root节点
+            this.compile(this._root, entity.data);
+        };
+        HTMLCompiler.prototype.compile = function (node, scope) {
+            if (node.nodeType == 3) {
+                // 是个文本节点
+                this.compileTextContent(node, scope);
+            }
+            else {
+                // 不是文本节点
+                var hasLazyCompile = false;
+                // 首先解析当前节点上面以data-a-或者a-开头的属性，将其认为是绑定属性
+                var attrs = node.attributes;
+                var cmdsToCompile = [];
+                for (var i = 0, len = attrs.length; i < len; i++) {
+                    var attr = attrs[i];
+                    var name = attr.name;
+                    // 所有属性必须以data-a-或者a-开头
+                    if (name.indexOf("a-") == 0 || name.indexOf("data-a-") == 0) {
+                        var bIndex = (name.charAt(0) == "d" ? 7 : 2);
+                        var eIndex = name.indexOf(":");
+                        if (eIndex < 0)
+                            eIndex = name.length;
+                        // 取到命令名
+                        var cmdName = name.substring(bIndex, eIndex);
+                        // 用命令名取到Command
+                        var cmd = HTMLCommands_1.commands[cmdName];
+                        if (cmd) {
+                            // 取到子命令名
+                            var subCmd = name.substr(eIndex + 1);
+                            // 取到命令字符串
+                            var exp = attr.value;
+                            // 推入数组
+                            cmdsToCompile.push({
+                                attr: attr,
+                                cmd: cmd,
+                                ctx: {
+                                    scope: scope,
+                                    target: node,
+                                    subCmd: subCmd,
+                                    exp: exp,
+                                    compiler: this,
+                                    entity: this._entity
+                                }
+                            });
+                            // 如果是for或者if则设置懒编译
+                            if (cmdName == "if" || cmdName == "for") {
+                                hasLazyCompile = true;
+                                // 清空数组，仅留下自身的编译
+                                cmdsToCompile.splice(0, cmdsToCompile.length - 1);
+                                break;
+                            }
+                        }
+                    }
+                }
+                // 开始编译当前节点外部结构
+                for (var i = 0, len = cmdsToCompile.length; i < len; i++) {
+                    var cmdToCompile = cmdsToCompile[i];
+                    // 移除属性
+                    cmdToCompile.attr.ownerElement.removeAttribute(cmdToCompile.attr.name);
+                    // 开始编译
+                    cmdToCompile.cmd(cmdToCompile.ctx);
+                }
+                // 如果没有懒编译则编译内部结构
+                if (!hasLazyCompile) {
+                    // 然后递归解析子节点
+                    var children = node.childNodes;
+                    for (var i = 0, len = children.length; i < len; i++) {
+                        var child = children[i];
+                        this.compile(child, scope);
+                    }
+                }
+            }
+        };
+        HTMLCompiler.prototype.compileTextContent = function (node, scope) {
+            if (HTMLCompiler._textExpReg.test(node.nodeValue)) {
+                var exp = this.parseTextExp(node.nodeValue);
+                HTMLCommands_1.textContent({
+                    scope: scope,
+                    target: node,
+                    subCmd: "",
+                    exp: exp,
+                    compiler: this,
+                    entity: this._entity
+                });
+            }
+        };
+        HTMLCompiler.prototype.parseTextExp = function (exp) {
+            var reg = HTMLCompiler._textExpReg;
+            for (var result = reg.exec(exp); result != null; result = reg.exec(exp)) {
+                exp = result[1] + "${" + result[2] + "}" + result[3];
+            }
+            return "`" + exp + "`";
+        };
+        return HTMLCompiler;
+    }());
+    HTMLCompiler._textExpReg = /(.*?)\{\{(.*?)\}\}(.*)/;
+    exports.HTMLCompiler = HTMLCompiler;
+});
+define("src/ares/pixijs/PIXICommands", ["require", "exports", "src/ares/pixijs/PIXICompiler", "src/ares/Utils"], function (require, exports, PIXICompiler_1, Utils_3) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    /**
+     * 提供给外部的可以注入自定义命令的接口
+     * @param name
+     * @param command
+     */
+    function addCommand(name, command) {
+        if (!exports.commands[name])
+            exports.commands[name] = command;
+    }
+    exports.addCommand = addCommand;
+    /** 文本域命令 */
+    function textContent(context) {
+        context.entity.createWatcher(context.target, context.exp, context.scope, function (value) {
+            var text = context.target;
+            text.text = value;
+        });
+    }
+    exports.textContent = textContent;
+    exports.commands = {
+        /** 模板替换命令 */
+        tpl: function (context) {
+            // 优先从本地模板库取到模板对象
+            var template = context.compiler.getTemplate(context.exp);
+            // 本地模板库没有找到，去全局模板库里取
+            if (!template)
+                template = PIXICompiler_1.getTemplate(context.exp);
+            // 仍然没有找到，放弃
+            if (!template)
+                return context.target;
+            // 拷贝模板
+            template = cloneObject(template, true);
+            // 使用模板添加到与目标相同的位置
+            var target = context.target;
+            var parent = target.parent;
+            parent.addChildAt(template, parent.getChildIndex(target));
+            // 移除并销毁目标，清理内存
+            parent.removeChild(target);
+            target.destroy();
+            // 启动编译
+            context.compiler.compile(template, context.scope);
+            // 返回替换节点
+            return template;
+        },
+        /** 修改任意属性命令 */
+        prop: function (context) {
+            var target = context.target;
+            context.entity.createWatcher(context.target, context.exp, context.scope, function (value) {
+                if (context.subCmd != "") {
+                    // 子命令形式
+                    target[context.subCmd] = value;
+                }
+                else {
+                    // 集成形式，遍历所有value的key，如果其表达式值为true则添加其类型
+                    for (var name in value) {
+                        target[name] = value[name];
+                    }
+                }
+            });
+            // 返回节点
+            return target;
+        },
+        /** 绑定事件 */
+        on: function (context) {
+            if (context.subCmd != "") {
+                var handler = context.scope[context.exp] || window[context.exp];
+                if (typeof handler == "function") {
+                    // 是函数名形式
+                    context.target.on(context.subCmd, handler, context.scope);
+                }
+                else {
+                    // 是方法执行或者表达式方式
+                    context.target.on(context.subCmd, function (evt) {
+                        // 创建一个临时的子域，用于保存参数
+                        var scope = Object.create(context.scope);
+                        scope.$event = evt;
+                        scope.$target = context.target;
+                        Utils_3.runExp(context.exp, scope);
+                    });
+                }
+            }
+            // 返回节点
+            return context.target;
+        },
+        /** if命令 */
+        if: function (context) {
+            // 记录一个是否编译过的flag
+            var compiled = false;
+            // 插入一个占位元素
+            var refNode = new PIXI.DisplayObject();
+            refNode.interactive = refNode.interactiveChildren = false;
+            var parent = context.target.parent;
+            var index = parent.getChildIndex(context.target);
+            parent.addChildAt(refNode, index);
+            // 只有在条件为true时才启动编译
+            var watcher = context.entity.createWatcher(context.target, context.exp, context.scope, function (value) {
+                // 如果refNode被从显示列表移除了，则表示该if指令要作废了
+                if (!refNode.parent) {
+                    watcher.dispose();
+                    return;
+                }
+                if (value == true) {
+                    // 启动编译
+                    if (!compiled) {
+                        context.compiler.compile(context.target, context.scope);
+                        compiled = true;
+                    }
+                    // 插入节点
+                    if (!context.target.parent) {
+                        var index = refNode.parent.getChildIndex(refNode);
+                        refNode.parent.addChildAt(context.target, index);
+                    }
+                }
+                else {
+                    // 移除元素
+                    if (context.target.parent) {
+                        context.target.parent.removeChild(context.target);
+                    }
+                }
+            });
+            // 返回节点
+            return context.target;
+        },
+        /** for命令 */
+        for: function (context) {
+            // 解析表达式
+            var reg = /^\s*(\S+)\s+in\s+(\S+)\s*$/;
+            var res = reg.exec(context.exp);
+            if (!res) {
+                console.error("for命令表达式错误：" + context.exp);
+                return;
+            }
+            var itemName = res[1];
+            var arrName = res[2];
+            var parent = context.target.parent;
+            var sNode = new PIXI.DisplayObject();
+            sNode.interactive = sNode.interactiveChildren = false;
+            var eNode = new PIXI.DisplayObject();
+            eNode.interactive = eNode.interactiveChildren = false;
+            // 替换原始模板
+            var index = parent.getChildIndex(context.target);
+            parent.addChildAt(sNode, index);
+            parent.addChildAt(eNode, index + 1);
+            parent.removeChild(context.target);
+            // 添加订阅
+            var watcher = context.entity.createWatcher(context.target, arrName, context.scope, function (value) {
+                // 如果refNode被从显示列表移除了，则表示该if指令要作废了
+                if (!sNode.parent) {
+                    watcher.dispose();
+                    return;
+                }
+                // 清理原始显示
+                var bIndex = parent.getChildIndex(sNode);
+                var eIndex = parent.getChildIndex(eNode);
+                for (var i = eIndex - 1; i > bIndex; i--) {
+                    parent.removeChildAt(i).destroy();
+                }
+                // 如果是数字，构建一个数字列表
+                if (typeof value == "number") {
+                    var temp = [];
+                    for (var i = 0; i < value; i++) {
+                        temp.push(i);
+                    }
+                    value = temp;
+                }
+                // 开始遍历
+                var curIndex = 0;
+                for (var key in value) {
+                    // 拷贝一个target
+                    var newNode = cloneObject(context.target, true);
+                    // 添加到显示里
+                    parent.addChildAt(newNode, (bIndex + 1) + curIndex);
+                    // 生成子域
+                    var newScope = Object.create(context.scope);
+                    // 这里一定要用defineProperty将目标定义在当前节点上，否则会影响context.scope
+                    Object.defineProperty(newScope, "$index", {
+                        configurable: true,
+                        enumerable: false,
+                        value: (value instanceof Array ? parseInt(key) : key),
+                        writable: false
+                    });
+                    Object.defineProperty(newScope, itemName, {
+                        configurable: true,
+                        enumerable: true,
+                        value: value[key],
+                        writable: false
+                    });
+                    // 开始编译新节点
+                    context.compiler.compile(newNode, newScope);
+                    // 索引自增1
+                    curIndex++;
+                }
+            });
+            // 返回节点
+            return context.target;
+        }
+    };
+    function cloneObject(target, deep) {
+        var result;
+        // 基础类型直接返回
+        if (!target || typeof target != "object")
+            return target;
+        // 如果对象有clone方法则直接调用clone方法
+        if (typeof target["clone"] == "function")
+            return target["clone"]();
+        // 浅表复制单独处理
+        if (!deep) {
+            result = Object.create(target["__proto__"] || null);
+            for (var k in target) {
+                result[k] = target[k];
+            }
+            return result;
+        }
+        // 下面是深表复制了
+        var cls = (target.constructor || Object);
+        try {
+            result = new cls();
+        }
+        catch (err) {
+            return null;
+        }
+        // 打个标签
+        target["__ares_cloning__"] = result;
+        var keys = Object.keys(target);
+        for (var i in keys) {
+            var key = keys[i];
+            // 标签不复制
+            if (key == "__ares_cloning__")
+                continue;
+            // Text的_texture属性不复制
+            if (key == "_texture" && target instanceof PIXI.Text)
+                continue;
+            // 显示对象的parent属性要特殊处理
+            if (key == "parent" && target instanceof PIXI.DisplayObject) {
+                if (target["parent"] && target["parent"]["__ares_cloning__"]) {
+                    // 如果target的parent正在被复制，则使用复制后的parent
+                    result["parent"] = target["parent"]["__ares_cloning__"];
+                }
+                else {
+                    // 如果target的parent没有被复制，则直接使用当前parent
+                    result["parent"] = target["parent"];
+                }
+                continue;
+            }
+            // EventEmitter的_events属性要进行浅表复制
+            if (key == "_events" && target instanceof PIXI.utils.EventEmitter) {
+                result["_events"] = cloneObject(target["_events"], false);
+                // 如果target的某个监听里的context就是target本身，则将result的context改为result本身
+                for (var k in target["_events"]) {
+                    var temp = target["_events"][k];
+                    if (temp.context == target) {
+                        result["_events"][k].context = result;
+                    }
+                }
+                continue;
+            }
+            // 显示对象的children属性要特殊处理
+            if (key == "children" && target instanceof PIXI.DisplayObject) {
+                var children = target["children"];
+                for (var j in children) {
+                    var child = cloneObject(children[j], true);
+                    result["addChild"](child);
+                }
+                continue;
+            }
+            // 通用处理
+            var oriValue = target[key];
+            if (oriValue && oriValue["__ares_cloning__"]) {
+                // 已经复制过的对象不再复制，直接使用之
+                result[key] = oriValue["__ares_cloning__"];
+            }
+            else {
+                // 还没复制过的对象，复制之
+                var value = cloneObject(oriValue, true);
+                if (value !== null)
+                    result[key] = value;
+            }
+        }
+        // 移除标签
+        delete target["__ares_cloning__"];
+        return result;
+    }
+});
+/// <reference path="pixi.js.d.ts"/>
+define("src/ares/pixijs/PIXICompiler", ["require", "exports", "src/ares/pixijs/PIXICommands"], function (require, exports, PIXICommands_1) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    var _tplDict = {};
+    /**
+     * 获取全局模板对象，该模板在任何地方都生效
+     * @param name 模板名称
+     * @returns {PIXI.DisplayObject|undefined} 如果模板名称存在则返回模板对象
+     */
+    function getTemplate(name) {
+        return _tplDict[name];
+    }
+    exports.getTemplate = getTemplate;
+    /**
+     * 设置全局模板对象，该模板在任何地方都生效
+     * @param name 模板名称
+     * @param tpl 模板对象
+     * @returns {PIXI.DisplayObject|null} 如果成功设置了模板则返回模板对象，否则返回null（如已存在同名模板）
+     */
+    function setTemplate(name, tpl) {
+        // 非空判断
+        if (!name || !tpl)
+            return null;
+        // 如果已经有了模板定义则返回null
+        if (_tplDict[name])
+            return null;
+        // 添加模板定义
+        _tplDict[name] = tpl;
+        // 返回模板对象
+        return tpl;
+    }
+    exports.setTemplate = setTemplate;
+    var PIXICompiler = (function () {
+        /**
+         * 创建PIXI绑定
+         * @param root 根显示对象，从这里传入的绑定数据属性名必须以“a_”开头
+         * @param config 绑定数据，从这里传入的绑定数据属性名可以不以“a_”开头
+         * @param tplDict 模板字典，可以在这里给出模板定义表
+         */
+        function PIXICompiler(root, config, tplDict) {
+            this._nameDict = {};
+            this._root = root;
+            this._config = config;
+            this._tplDict = tplDict || {};
+        }
+        Object.defineProperty(PIXICompiler.prototype, "root", {
+            /** 获取根显示对象 */
+            get: function () {
+                return this._root;
+            },
+            enumerable: true,
+            configurable: true
+        });
+        PIXICompiler.prototype.parseCmd = function (node) {
+            // 取到属性列表
+            var keys = [];
+            for (var t in node) {
+                if (t.indexOf("a-") == 0 || t.indexOf("a_") == 0) {
+                    keys.push(t);
+                }
+            }
+            // 把配置中的属性推入属性列表中
+            var conf = (this._config && this._config[node.name]);
+            for (var t in conf) {
+                if (t.indexOf("a-") != 0 && t.indexOf("a_") != 0)
+                    t = "a-" + t;
+                keys.push(t);
+            }
+            // 开始遍历属性列表
+            var cmdNameDict = {};
+            for (var i = 0, len = keys.length; i < len; i++) {
+                // 首先解析当前节点上面以a_开头的属性，将其认为是绑定属性
+                var key = keys[i];
+                var bIndex = 2;
+                var eIndex = key.indexOf(":");
+                if (eIndex < 0)
+                    eIndex = key.indexOf("$");
+                if (eIndex < 0)
+                    eIndex = key.length;
+                // 取到命令名
+                var cmdName = key.substring(bIndex, eIndex);
+                // 取到命令字符串
+                var exp;
+                if (conf)
+                    exp = conf[key] || conf[cmdName] || node[key];
+                else
+                    exp = node[key];
+                // 取到子命令名
+                var subCmd = key.substr(eIndex + 1);
+                // 填充字典
+                cmdNameDict[cmdName] = {
+                    cmdName: cmdName,
+                    subCmd: subCmd,
+                    propName: key,
+                    exp: exp
+                };
+            }
+            return cmdNameDict;
+        };
+        PIXICompiler.prototype.parseTpl = function (node) {
+            var tplName = node["a-tplName"] || node["a_tplName"];
+            if (tplName) {
+                var callback = function () {
+                    // 移除tpl相关属性
+                    delete node["a-tplName"];
+                    delete node["a_tplName"];
+                    delete node["a-tplGlobal"];
+                    delete node["a_tplGlobal"];
+                    // 将这个节点从显示列表中移除
+                    node.parent && node.parent.removeChild(node);
+                };
+                if (node["a-tplGlobal"] == "true" || node["a_tplGlobal"] == "true") {
+                    if (setTemplate(tplName, node)) {
+                        callback();
+                        return true;
+                    }
+                }
+                else {
+                    if (this.setTemplate(tplName, node)) {
+                        callback();
+                        return true;
+                    }
+                }
+            }
+            return false;
+        };
+        PIXICompiler.prototype.init = function (entity) {
+            this._entity = entity;
+            // 开始编译root节点
+            this.compile(this._root, entity.data);
+        };
+        PIXICompiler.prototype.compile = function (node, scope) {
+            // 首先判断是否是模板，是的话就设置模板，但是不编译
+            if (this.parseTpl(node))
+                return;
+            // 开始编译
+            var hasLazyCompile = false;
+            // 如果有名字就记下来
+            var name = node.name;
+            if (name)
+                this._nameDict[name] = node;
+            // 开始遍历属性列表
+            var cmdDict = this.parseCmd(node);
+            var cmdsToCompile = [];
+            for (var cmdName in cmdDict) {
+                var cmdData = cmdDict[cmdName];
+                // 取到子命令名
+                var subCmd = cmdData.subCmd;
+                // 取到命令字符串
+                var exp = cmdData.exp;
+                // 用命令名取到Command
+                var cmd = PIXICommands_1.commands[cmdName];
+                // 如果没有找到命令，则认为是自定义命令，套用prop命令
+                if (!cmd) {
+                    cmd = PIXICommands_1.commands["prop"];
+                    subCmd = cmdName || "";
+                }
+                // 推入数组
+                var cmdToCompile = {
+                    propName: cmdData.propName,
+                    cmd: cmd,
+                    ctx: {
+                        scope: scope,
+                        target: node,
+                        subCmd: subCmd,
+                        exp: exp,
+                        compiler: this,
+                        entity: this._entity
+                    }
+                };
+                // 如果是tpl命令则需要提前
+                if (cmdName == "tpl")
+                    cmdsToCompile.unshift(cmdToCompile);
+                else
+                    cmdsToCompile.push(cmdToCompile);
+                // 如果是for或者if则设置懒编译
+                if (cmdName == "if" || cmdName == "for") {
+                    hasLazyCompile = true;
+                    // 清空数组，仅留下自身的编译
+                    cmdsToCompile.splice(0, cmdsToCompile.length - 1);
+                    break;
+                }
+            }
+            // 开始编译当前节点外部结构
+            for (var i = 0, len = cmdsToCompile.length; i < len; i++) {
+                var cmdToCompile = cmdsToCompile[i];
+                // 更新target属性
+                cmdToCompile.ctx.target = node;
+                // 移除属性
+                delete cmdToCompile.ctx.target[cmdToCompile.propName];
+                // 开始编译
+                node = cmdToCompile.cmd(cmdToCompile.ctx);
+            }
+            // 如果没有懒编译则编译内部结构
+            if (!hasLazyCompile) {
+                // 如果是文本对象，则进行文本内容编译
+                if (node instanceof PIXI.Text) {
+                    this.compileTextContent(node, scope);
+                }
+                // 然后递归解析子节点
+                if (node instanceof PIXI.Container) {
+                    var children = node.children;
+                    var nextChild;
+                    for (var i = 0, len = children.length; i < len; i++) {
+                        var child = children[i];
+                        // 记录下一个子节点
+                        nextChild = children[i + 1];
+                        // 开始编译
+                        this.compile(child, scope);
+                        // 重置索引值和长度值
+                        var nextI = children.indexOf(nextChild);
+                        if (nextI >= 0 && nextI != i + 1) {
+                            i = nextI - 1;
+                            len = children.length;
+                        }
+                    }
+                }
+            }
+        };
+        /**
+         * 获取模板对象，该模板只在该PIXICompiler内部生效
+         * @param name 模板名称
+         * @returns {PIXI.DisplayObject|undefined} 如果模板名称存在则返回模板对象
+         */
+        PIXICompiler.prototype.getTemplate = function (name) {
+            return this._tplDict[name];
+        };
+        /**
+         * 设置模板，该模板只在该PIXICompiler内部生效
+         * @param name 模板名称
+         * @param tpl 模板对象
+         * @returns {PIXI.DisplayObject|null} 如果成功设置了模板则返回模板对象，否则返回null（如已存在同名模板）
+         */
+        PIXICompiler.prototype.setTemplate = function (name, tpl) {
+            // 非空判断
+            if (!name || !tpl)
+                return null;
+            // 如果已经有了模板定义则返回null
+            if (this._tplDict[name])
+                return null;
+            // 添加模板定义
+            this._tplDict[name] = tpl;
+            // 返回模板对象
+            return tpl;
+        };
+        PIXICompiler.prototype.compileTextContent = function (text, scope) {
+            var value = text.text;
+            if (PIXICompiler._textExpReg.test(value)) {
+                var exp = this.parseTextExp(value);
+                PIXICommands_1.textContent({
+                    scope: scope,
+                    target: text,
+                    subCmd: "",
+                    exp: exp,
+                    compiler: this,
+                    entity: this._entity
+                });
+            }
+        };
+        PIXICompiler.prototype.parseTextExp = function (exp) {
+            var reg = PIXICompiler._textExpReg;
+            for (var result = reg.exec(exp); result != null; result = reg.exec(exp)) {
+                exp = result[1] + "${" + result[2] + "}" + result[3];
+            }
+            return "`" + exp + "`";
+        };
+        return PIXICompiler;
+    }());
+    PIXICompiler._textExpReg = /(.*?)\{\{(.*?)\}\}(.*)/;
+    exports.PIXICompiler = PIXICompiler;
+});
+define("src/ares/template/TemplateCommands", ["require", "exports"], function (require, exports) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    function getChildrenString(node) {
+        var result = "";
+        var children = node.children;
+        if (children) {
+            for (var i = 0, len = children.length; i < len; i++) {
+                result += children[i].value;
+            }
+        }
+        return result;
+    }
+    exports.getChildrenString = getChildrenString;
+    function compileChildren(node, scope, compiler) {
+        node.children.forEach(function (child) {
+            compiler.compile(child, scope);
+        }, this);
+    }
+    exports.compileChildren = compileChildren;
+    /**
+     * 提供给外部的可以注入自定义命令的接口
+     * @param name
+     * @param command
+     */
+    function addCommand(name, command) {
+        if (!exports.commands[name])
+            exports.commands[name] = command;
+    }
+    exports.addCommand = addCommand;
+    exports.commands = {
+        /** text命令 */
+        text: function (context) {
+            // 直接储存结果
+            context.node.value = context.node.exp;
+        },
+        /** exp命令 */
+        exp: function (context) {
+            context.entity.createWatcher(context.node, context.node.exp, context.scope, function (value) {
+                // 更新显示
+                context.node.value = value + "";
+            });
+        },
+        /** if命令 */
+        if: function (context) {
+            context.entity.createWatcher(context.node, context.node.exp, context.scope, function (value) {
+                if (value) {
+                    // 判断为真，编译子节点并显示
+                    compileChildren(context.node, context.scope, context.compiler);
+                    // 更新值
+                    context.node.value = getChildrenString(context.node);
+                }
+                else {
+                    // 判断为假，啥也不显示
+                    context.node.value = "";
+                }
+            });
+        },
+        /** for命令 */
+        for: function (context) {
+            var reg = /^\s*(\S+)\s+in\s+(\S+)\s*$/;
+            var res = reg.exec(context.node.exp);
+            if (!res) {
+                console.error("for命令表达式错误：" + context.node.exp);
+                return;
+            }
+            context.entity.createWatcher(context.node, res[2], context.scope, function (value) {
+                // 如果是数字，构建一个数字列表
+                if (typeof value == "number") {
+                    var temp = [];
+                    for (var i = 0; i < value; i++) {
+                        temp.push(i);
+                    }
+                    value = temp;
+                }
+                var result = "";
+                if (value) {
+                    for (var key in value) {
+                        // 生成子域
+                        var newScope = Object.create(context.scope);
+                        // 这里一定要用defineProperty将目标定义在当前节点上，否则会影响context.scope
+                        Object.defineProperty(newScope, "$index", {
+                            configurable: true,
+                            enumerable: false,
+                            value: (value instanceof Array ? parseInt(key) : key),
+                            writable: false
+                        });
+                        Object.defineProperty(newScope, res[1], {
+                            configurable: true,
+                            enumerable: true,
+                            value: value[key],
+                            writable: false
+                        });
+                        // 编译子节点并显示
+                        compileChildren(context.node, newScope, context.compiler);
+                        // 更新值
+                        result += getChildrenString(context.node);
+                    }
+                }
+                context.node.value = result;
+            });
+        }
+    };
+});
+define("src/ares/template/TemplateCompiler", ["require", "exports", "src/ares/template/TemplateCommands"], function (require, exports, TemplateCommands_1) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    var TemplateCompiler = (function () {
+        /**
+         * 创建模板绑定
+         * @param template 模板字符串
+         * @param onUpdate 当文本有更新时调用，传入最新文本
+         * @param config 绑定数据
+         */
+        function TemplateCompiler(template, onUpdate, config) {
+            this._template = template;
+            this._onUpdate = onUpdate;
+            this._config = config;
+        }
+        Object.defineProperty(TemplateCompiler.prototype, "root", {
+            get: function () {
+                return this._root;
+            },
+            enumerable: true,
+            configurable: true
+        });
+        TemplateCompiler.prototype.init = function (entity) {
+            this._entity = entity;
+            // 将整个模板文本编译为节点
+            this._root = this.transformToNode(this._template);
+            // 开始编译根节点
+            this.compile(this._root, entity.data);
+            // 更新首次显示
+            this.update();
+            // 将所有node节点的value变为getter、setter
+            this.mutateValue(this._root);
+        };
+        TemplateCompiler.prototype.compile = function (node, scope) {
+            this._scope = scope;
+            // 如果节点的cmd不认识，则不编译该节点，仅编译其子节点
+            var cmd = TemplateCommands_1.commands[node.cmd];
+            if (cmd) {
+                var ctx = {
+                    node: node,
+                    scope: scope,
+                    compiler: this,
+                    entity: this._entity
+                };
+                cmd(ctx);
+            }
+            // 开始递归编译子节点，但if或者for不编译
+            if (node.children && node.cmd != "if" && node.cmd != "for") {
+                TemplateCommands_1.compileChildren(node, scope, this);
+            }
+        };
+        TemplateCompiler.prototype.update = function () {
+            var text = TemplateCommands_1.getChildrenString(this._root);
+            this._onUpdate(text);
+        };
+        TemplateCompiler.prototype.mutateValue = function (node) {
+            var value = node.value;
+            var self = this;
+            Object.defineProperty(node, "value", {
+                configurable: true,
+                enumerable: true,
+                get: function () {
+                    return value;
+                },
+                set: function (v) {
+                    value = v;
+                    // 更新显示
+                    self.update();
+                }
+            });
+            // 递归子对象
+            if (node.children) {
+                node.children.forEach(this.mutateValue, this);
+            }
+        };
+        TemplateCompiler.prototype.getEndIndex = function (str, startIndex) {
+            var startIcons = ["{", "\"", "'", "`", "(", "["];
+            var endIcons = ["}", "\"", "'", "`", ")", "]"];
+            var stack = [0];
+            for (var i = startIndex, len = str.length; i < len; i++) {
+                var tempChar = str.charAt(i);
+                var startIndex = startIcons.indexOf(tempChar);
+                var endIndex = endIcons.indexOf(tempChar);
+                // 如果是终结符号且当前栈顶是对应起始符号，则出栈
+                if (endIndex >= 0 && stack[stack.length - 1] == endIndex)
+                    stack.pop();
+                else if (startIndex >= 0)
+                    stack.push(startIndex);
+                // 如果stack已经空了，则立即返回当前字符的下一个索引
+                if (stack.length <= 0)
+                    return (i + 1);
+            }
+            return -1;
+        };
+        TemplateCompiler.prototype.transformToNode = function (str) {
+            var regAres = /\$a\-\{/g;
+            var regTrim = /^\s*([\s\S]*)\s*$/;
+            var regCmd = /^\s*([a-zA-Z0-9_]+?)\s*:\s*(.+?)\s*$/;
+            var regEnd = /^\s*end\s+([a-zA-Z0-9_]+?)\s*$/;
+            // 遍历整个str，使用ares命令将其分隔成数组
+            var nodes = [];
+            var index = 0;
+            var length = str.length;
+            var cmdStack = [];
+            var eatCount;
+            for (var resAres = regAres.exec(str); resAres != null; resAres = regAres.exec(str)) {
+                var endIndex = this.getEndIndex(str, resAres.index + resAres[0].length);
+                if (endIndex < 0) {
+                    console.error("\u6307\u4EE4\u6CA1\u6709\u7ED3\u675F" + str.substr(resAres.index));
+                    return null;
+                }
+                regAres.lastIndex = endIndex;
+                var whole = str.substring(resAres.index, endIndex);
+                var content = whole.substring(resAres[0].length, whole.length - 1);
+                eatCount = 0;
+                // 把ares命令前面的部分以简单文本形式推入数组（如果有的话）
+                if (resAres.index > index) {
+                    nodes.push({
+                        cmd: "text",
+                        exp: str.substring(index, resAres.index)
+                    });
+                }
+                // 把ares命令部分推入数组
+                var resEnd = regEnd.exec(content);
+                if (resEnd != null) {
+                    // 是命令的终结指令，需要清除节点两侧的空白符
+                    clearNode();
+                    // 弹出一个命令
+                    var start = cmdStack.pop();
+                    // 判断正确性
+                    if (start == null) {
+                        console.error("\u7EC8\u7ED3\u6307\u4EE4(" + resEnd[1] + ")\u6CA1\u6709\u5BF9\u5E94\u7684\u8D77\u59CB\u6307\u4EE4");
+                        return null;
+                    }
+                    if (start.cmd != resEnd[1]) {
+                        console.error("\u8D77\u59CB\u6307\u4EE4(" + start.cmd + ")\u4E0E\u7EC8\u7ED3\u6307\u4EE4(" + resEnd[1] + ")\u4E0D\u5339\u914D");
+                        return null;
+                    }
+                    // 将起始指令与终结指令之间所有节点放入该命令内部
+                    var startIndex = nodes.indexOf(start);
+                    start.children = nodes.splice(startIndex + 1);
+                }
+                else {
+                    // 不是终结指令
+                    var resCmd = regCmd.exec(content);
+                    if (resCmd != null) {
+                        // 是起始命令，需要清除节点两侧的空白符
+                        clearNode();
+                        // 生成命令节点
+                        var node = {
+                            cmd: resCmd[1],
+                            exp: resCmd[2]
+                        };
+                        nodes.push(node);
+                        // 推入命令栈
+                        cmdStack.push(node);
+                    }
+                    else if (content == "") {
+                        // 是占位符，需要清除节点两侧的空白符
+                        clearNode();
+                    }
+                    else {
+                        // 只是简单的表达式
+                        nodes.push({
+                            cmd: "exp",
+                            exp: content
+                        });
+                    }
+                }
+                // 修改index指向
+                index = resAres.index + whole.length + eatCount;
+            }
+            if (index < length) {
+                // 把最后一点字符推入数组
+                nodes.push({
+                    cmd: "text",
+                    exp: str.substr(index)
+                });
+            }
+            // 如果命令栈不为空，则表示起始指令没有终结指令
+            if (cmdStack.length > 0) {
+                console.error("\u8D77\u59CB\u6307\u4EE4" + cmdStack[0].cmd + "\u6CA1\u6709\u5BF9\u5E94\u7684\u7EC8\u7ED3\u6307\u4EE4");
+                return null;
+            }
+            // 返回结果
+            return {
+                cmd: null,
+                exp: null,
+                children: nodes
+            };
+            function clearNode() {
+                var regBlankBefore = /[ \f\t\v]*/;
+                var regBlankAfter = /([ \f\t\v]*((\r\n)|[\r\n]))|([ \f\t\v]*)/g;
+                var lastNode = nodes[nodes.length - 1];
+                if (lastNode && lastNode.cmd == "text") {
+                    // 将上一条换行符后面的空白符吃掉
+                    var index = Math.max(lastNode.exp.lastIndexOf("\r"), lastNode.exp.lastIndexOf("\n"));
+                    lastNode.exp = lastNode.exp.substring(0, index + 1) + lastNode.exp.substr(index + 1).replace(regBlankBefore, "");
+                }
+                // 再把本行直到换行符为止的空白符都吃掉
+                regBlankAfter.lastIndex = resAres.index + whole.length;
+                var resBlank = regBlankAfter.exec(str);
+                if (resBlank)
+                    eatCount = resBlank[0].length;
+            }
+        };
+        return TemplateCompiler;
+    }());
+    exports.TemplateCompiler = TemplateCompiler;
+});
+/// <reference path="../src/ares/pixijs/pixi.js.d.ts"/>
+// /// <reference path="../dist/ares.d.ts"/>
+// /// <reference path="../dist/ares_html.d.ts"/>
+// /// <reference path="../dist/ares_pixijs.d.ts"/>
+// /// <reference path="../dist/ares_template.d.ts"/>
+define("test/test", ["require", "exports", "src/ares/Ares", "src/ares/html/HTMLCompiler", "src/ares/pixijs/PIXICompiler", "src/ares/template/TemplateCompiler"], function (require, exports, ares, ares_html, ares_pixijs, ares_template) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    /**
+     * Created by Raykid on 2016/12/23.
+     */
+    if (document.body) {
+        go();
+    }
+    else {
+        window.onload = go;
+    }
+    function go() {
+        var renderer = PIXI.autoDetectRenderer(800, 600, { backgroundColor: 0xeeeeee });
+        document.getElementById("div_root").appendChild(renderer.view);
+        var stage = new PIXI.Container();
+        render();
+        function render() {
+            try {
+                // 渲染Stage
+                renderer.render(stage);
+            }
+            catch (err) {
+                console.error(err.toString());
+            }
+            // 计划下一次渲染
+            requestAnimationFrame(render);
+        }
+        PIXI.loader.add("http://pic.qiantucdn.com/58pic/14/45/39/57i58PICI2K_1024.png");
+        PIXI.loader.load(function () {
+            var testSkin = new PIXI.Container();
+            stage.addChild(testSkin);
+            var testSprite = new PIXI.Sprite();
+            testSprite.texture = PIXI.Texture.fromImage("http://pic.qiantucdn.com/58pic/14/45/39/57i58PICI2K_1024.png");
+            testSprite.width = testSprite.height = 200;
+            testSprite.interactive = true;
+            testSprite["a-on:click"] = "testFunc";
+            testSprite["a-for"] = "item in testFor";
+            testSprite["a-x"] = "$target.x + $index * 200";
+            testSprite.x = 200;
+            testSkin.addChild(testSprite);
+            var testText = new PIXI.Text("text: {{text}}");
+            testText["a-tplName"] = "testTpl";
+            testText["a-tplGlobal"] = "true";
+            testText.y = 300;
+            testSkin.addChild(testText);
+            var testTpl = new PIXI.Sprite();
+            testTpl["a-tpl"] = "testTpl";
+            testTpl["a-for"] = "item in testFor";
+            testTpl["a-x"] = "$index * 200";
+            testTpl["a_y"] = "$target.y + $index * 100";
+            testSkin.addChild(testTpl);
+            var data = {
+                text: "text",
+                testFor: [1, 2, 3],
+                testFunc: function (evt) {
+                    this.text = "Fuck!!!";
+                }
+            };
+            ares.bind(data, new ares_pixijs.PIXICompiler(testSkin));
+            ares.bind(data, new ares_html.HTMLCompiler("#div_root"));
+            ares.bind(data, new ares_template.TemplateCompiler("abc$a-{for: i in 10}'$a-{i}'$a-{end for}def", function (text) {
+                console.log(text);
+            }));
+            var testSkin2 = new PIXI.Container();
+            testSkin2["a-tpl"] = "testTpl";
+            testSkin2["a-y"] = 100;
+            stage.addChild(testSkin2);
+            ares.bind(data, new ares_pixijs.PIXICompiler(testSkin2));
+            setTimeout(function () {
+                data.testFor = [3, "jasdf"];
+            }, 2000);
+            setTimeout(function () {
+                data.testFor = ["kn", "j111", "14171a"];
+            }, 4000);
+        });
+    }
+});
 //# sourceMappingURL=test.js.map

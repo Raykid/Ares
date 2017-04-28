@@ -1,9 +1,9 @@
 {
   "compilerOptions": {
-    "module": "commonjs",
+    "module": "amd",
     "target": "es5",
-    "sourceMap": true,
-    "outFile": "test.js"
+    "outFile": "test.js",
+    "sourceMap": true
   },
   "files": [
     "test.ts"
