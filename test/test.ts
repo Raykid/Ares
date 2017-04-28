@@ -1,13 +1,13 @@
 /// <reference path="../src/ares/pixijs/pixi.js.d.ts"/>
-// /// <reference path="../dist/ares.d.ts"/>
-// /// <reference path="../dist/ares_html.d.ts"/>
-// /// <reference path="../dist/ares_pixijs.d.ts"/>
-// /// <reference path="../dist/ares_template.d.ts"/>
+/// <reference path="../dist/ares.d.ts"/>
+/// <reference path="../dist/ares_html.d.ts"/>
+/// <reference path="../dist/ares_pixijs.d.ts"/>
+/// <reference path="../dist/ares_template.d.ts"/>
 
-import * as ares from "../src/ares/Ares";
-import * as ares_html from "../src/ares/html/HTMLCompiler";
-import * as ares_pixijs from "../src/ares/pixijs/PIXICompiler";
-import * as ares_template from "../src/ares/template/TemplateCompiler";
+// import * as ares from "../src/ares/Ares";
+// import * as ares_html from "../src/ares/html/HTMLCompiler";
+// import * as ares_pixijs from "../src/ares/pixijs/PIXICompiler";
+// import * as ares_template from "../src/ares/template/TemplateCompiler";
 
 /**
  * Created by Raykid on 2016/12/23.
