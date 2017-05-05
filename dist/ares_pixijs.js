@@ -701,9 +701,6 @@ function cloneObject(target, deep) {
             result[key] = target[key]["slice"]();
             continue;
         }
-        // trackedPointers属性不复制，因为它是只读的
-        if (key == "trackedPointers")
-            continue;
         // 通用处理
         var oriValue = target[key];
         if (oriValue && oriValue["__ares_cloning__"]) {
@@ -713,8 +710,13 @@ function cloneObject(target, deep) {
         else {
             // 还没复制过的对象，复制之
             var value = cloneObject(oriValue, true);
-            if (value !== null)
-                result[key] = value;
+            if (value !== null) {
+                try {
+                    // 这里加try catch是为了防止给只读属性赋值时报错
+                    result[key] = value;
+                }
+                catch (err) { }
+            }
         }
     }
     // 移除标签
