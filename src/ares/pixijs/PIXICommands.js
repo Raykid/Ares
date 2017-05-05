@@ -203,6 +203,10 @@ function cloneObject(target, deep) {
     // 基础类型直接返回
     if (!target || typeof target != "object")
         return target;
+    // ObservablePoint类型对象需要特殊处理
+    if (target instanceof PIXI.ObservablePoint) {
+        return new PIXI.ObservablePoint(target["cb"], target["scope"]["__ares_cloning__"], target["x"], target["y"]);
+    }
     // 如果对象有clone方法则直接调用clone方法
     if (typeof target["clone"] == "function")
         return target["clone"]();
@@ -272,9 +276,6 @@ function cloneObject(target, deep) {
             result[key] = target[key]["slice"]();
             continue;
         }
-        // trackedPointers属性不复制，因为它是只读的
-        if (key == "trackedPointers")
-            continue;
         // 通用处理
         var oriValue = target[key];
         if (oriValue && oriValue["__ares_cloning__"]) {
@@ -284,8 +285,13 @@ function cloneObject(target, deep) {
         else {
             // 还没复制过的对象，复制之
             var value = cloneObject(oriValue, true);
-            if (value !== null)
-                result[key] = value;
+            if (value !== null) {
+                try {
+                    // 这里加try catch是为了防止给只读属性赋值时报错
+                    result[key] = value;
+                }
+                catch (err) { }
+            }
         }
     }
     // 移除标签

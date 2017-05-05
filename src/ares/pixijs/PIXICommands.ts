@@ -254,6 +254,16 @@ function cloneObject<T>(target:T, deep:boolean):T
     var result:T;
     // 基础类型直接返回
     if(!target || typeof target != "object") return target;
+    // ObservablePoint类型对象需要特殊处理
+    if(target instanceof PIXI.ObservablePoint)
+    {
+        return new PIXI.ObservablePoint(
+            target["cb"],
+            target["scope"]["__ares_cloning__"],
+            target["x"],
+            target["y"]
+        ) as any;
+    }
     // 如果对象有clone方法则直接调用clone方法
     if(typeof target["clone"] == "function") return target["clone"]();
     // 浅表复制单独处理
