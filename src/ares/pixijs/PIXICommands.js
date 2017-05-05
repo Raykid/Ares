@@ -90,7 +90,7 @@ exports.commands = {
         // 记录一个是否编译过的flag
         var compiled = false;
         // 插入一个占位元素
-        var refNode = new PIXI.DisplayObject();
+        var refNode = new PIXI.Container();
         refNode.interactive = refNode.interactiveChildren = false;
         var parent = context.target.parent;
         var index = parent.getChildIndex(context.target);
@@ -136,9 +136,9 @@ exports.commands = {
         var itemName = res[1];
         var arrName = res[2];
         var parent = context.target.parent;
-        var sNode = new PIXI.DisplayObject();
+        var sNode = new PIXI.Container();
         sNode.interactive = sNode.interactiveChildren = false;
-        var eNode = new PIXI.DisplayObject();
+        var eNode = new PIXI.Container();
         eNode.interactive = eNode.interactiveChildren = false;
         // 替换原始模板
         var index = parent.getChildIndex(context.target);

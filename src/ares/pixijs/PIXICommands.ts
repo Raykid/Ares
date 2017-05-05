@@ -126,7 +126,7 @@ export const commands:{[name:string]:Command} = {
         // 记录一个是否编译过的flag
         var compiled:boolean = false;
         // 插入一个占位元素
-        var refNode:PIXI.DisplayObject = new PIXI.DisplayObject();
+        var refNode:PIXI.Container = new PIXI.Container();
         refNode.interactive = refNode.interactiveChildren = false;
         var parent:PIXI.Container = context.target.parent;
         var index:number = parent.getChildIndex(context.target);
@@ -181,9 +181,9 @@ export const commands:{[name:string]:Command} = {
         var itemName:string = res[1];
         var arrName:string = res[2];
         var parent:PIXI.Container = context.target.parent;
-        var sNode:PIXI.DisplayObject = new PIXI.DisplayObject();
+        var sNode:PIXI.Container = new PIXI.Container();
         sNode.interactive = sNode.interactiveChildren = false;
-        var eNode:PIXI.DisplayObject = new PIXI.DisplayObject();
+        var eNode:PIXI.Container = new PIXI.Container();
         eNode.interactive = eNode.interactiveChildren = false;
         // 替换原始模板
         var index:number = parent.getChildIndex(context.target);
