@@ -147,8 +147,8 @@ exports.runExp = runExp;
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
-/// <reference path="pixi.js.d.ts"/>
 
+/// <reference path="pixi.js.d.ts"/>
 Object.defineProperty(exports, "__esModule", { value: true });
 var PIXICommands_1 = __webpack_require__(5);
 var _tplDict = {};
@@ -653,11 +653,12 @@ function cloneObject(target, deep) {
     }
     // 打个标签
     target["__ares_cloning__"] = result;
-    var keys = Object.keys(target);
-    for (var i in keys) {
-        var key = keys[i];
+    for (var key in target) {
         // 标签不复制
         if (key == "__ares_cloning__")
+            continue;
+        // 非属性方法不复制
+        if (typeof target[key] == "function" && !target.hasOwnProperty(key))
             continue;
         // Text的_texture属性不复制
         if (key == "_texture" && target instanceof PIXI.Text)
@@ -686,8 +687,8 @@ function cloneObject(target, deep) {
             }
             continue;
         }
-        // 显示对象的children属性要特殊处理
-        if (key == "children" && target instanceof PIXI.DisplayObject) {
+        // 容器对象的children属性要特殊处理
+        if (key == "children" && target instanceof PIXI.Container) {
             var children = target["children"];
             for (var j in children) {
                 var child = cloneObject(children[j], true);
@@ -695,6 +696,14 @@ function cloneObject(target, deep) {
             }
             continue;
         }
+        // Sprite的vertexData属性需要特殊处理
+        if (key == "vertexData" && target instanceof PIXI.Sprite) {
+            result[key] = target[key]["slice"]();
+            continue;
+        }
+        // trackedPointers属性不复制，因为它是只读的
+        if (key == "trackedPointers")
+            continue;
         // 通用处理
         var oriValue = target[key];
         if (oriValue && oriValue["__ares_cloning__"]) {

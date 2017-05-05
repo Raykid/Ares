@@ -285,10 +285,10 @@ exports.Watcher = Watcher;
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
+
 /**
  * Created by Raykid on 2016/12/22.
  */
-
 Object.defineProperty(exports, "__esModule", { value: true });
 var Watcher_1 = __webpack_require__(1);
 var Dep_1 = __webpack_require__(8);
@@ -440,10 +440,10 @@ exports.Mutator = Mutator;
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
+
 /**
  * Created by Raykid on 2016/12/16.
  */
-
 Object.defineProperty(exports, "__esModule", { value: true });
 var Mutator_1 = __webpack_require__(3);
 var Watcher_1 = __webpack_require__(1);
@@ -500,10 +500,10 @@ exports.Ares = Ares;
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
+
 /**
  * Created by Raykid on 2016/12/22.
  */
-
 Object.defineProperty(exports, "__esModule", { value: true });
 var Dep = (function () {
     function Dep() {

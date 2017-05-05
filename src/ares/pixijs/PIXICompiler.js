@@ -1,5 +1,5 @@
-/// <reference path="pixi.js.d.ts"/>
 "use strict";
+/// <reference path="pixi.js.d.ts"/>
 Object.defineProperty(exports, "__esModule", { value: true });
 var PIXICommands_1 = require("./PIXICommands");
 var _tplDict = {};

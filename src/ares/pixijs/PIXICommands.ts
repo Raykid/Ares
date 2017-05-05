@@ -278,12 +278,12 @@ function cloneObject<T>(target:T, deep:boolean):T
     }
     // 打个标签
     target["__ares_cloning__"] = result;
-    var keys:string[] = Object.keys(target);
-    for(var i in keys)
+    for(var key in target)
     {
-        var key:string = keys[i];
         // 标签不复制
         if(key == "__ares_cloning__") continue;
+        // 非属性方法不复制
+        if(typeof target[key] == "function" && !target.hasOwnProperty(key)) continue;
         // Text的_texture属性不复制
         if(key == "_texture" && target instanceof PIXI.Text) continue;
         // 显示对象的parent属性要特殊处理
@@ -316,8 +316,8 @@ function cloneObject<T>(target:T, deep:boolean):T
             }
             continue;
         }
-        // 显示对象的children属性要特殊处理
-        if(key == "children" && target instanceof PIXI.DisplayObject)
+        // 容器对象的children属性要特殊处理
+        if(key == "children" && target instanceof PIXI.Container)
         {
             var children:PIXI.DisplayObject[] = target["children"];
             for(var j in children)
@@ -327,6 +327,14 @@ function cloneObject<T>(target:T, deep:boolean):T
             }
             continue;
         }
+        // Sprite的vertexData属性需要特殊处理
+        if(key == "vertexData" && target instanceof PIXI.Sprite)
+        {
+            result[key] = target[key]["slice"]();
+            continue;
+        }
+        // trackedPointers属性不复制，因为它是只读的
+        if(key == "trackedPointers") continue;
         // 通用处理
         var oriValue:any = target[key];
         if(oriValue && oriValue["__ares_cloning__"])

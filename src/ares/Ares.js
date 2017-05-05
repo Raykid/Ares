@@ -1,7 +1,7 @@
+"use strict";
 /**
  * Created by Raykid on 2016/12/16.
  */
-"use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var Mutator_1 = require("./Mutator");
 var Watcher_1 = require("./Watcher");

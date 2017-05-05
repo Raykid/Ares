@@ -1,7 +1,7 @@
+"use strict";
 /**
  * Created by Raykid on 2016/12/22.
  */
-"use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var HTMLCommands_1 = require("./HTMLCommands");
 var HTMLCompiler = (function () {
