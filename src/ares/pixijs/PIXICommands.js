@@ -285,7 +285,7 @@ function cloneObject(target, deep) {
         else {
             // 还没复制过的对象，复制之
             var value = cloneObject(oriValue, true);
-            if (value !== null) {
+            if (value != null) {
                 try {
                     // 这里加try catch是为了防止给只读属性赋值时报错
                     result[key] = value;

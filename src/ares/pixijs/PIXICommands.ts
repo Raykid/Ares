@@ -354,7 +354,7 @@ function cloneObject<T>(target:T, deep:boolean):T
         {
             // 还没复制过的对象，复制之
             var value:any = cloneObject(oriValue, true);
-            if(value !== null)
+            if(value != null)
             {
                 try
                 {
