@@ -457,8 +457,11 @@ exports.commands = {
         var exp = "[" + context.exp + "]";
         // 生成处理器
         var handler = new ViewPortHandler_1.ViewPortHandler(target);
+        // 生成新的scope
+        var newScope = Object.create(context.scope);
+        newScope.$bounds = target.getLocalBounds();
         // 设置监视
-        context.entity.createWatcher(target, exp, context.scope, function (value) {
+        context.entity.createWatcher(target, exp, newScope, function (value) {
             var x = value[0] || 0;
             var y = value[1] || 0;
             var width = value[2] || 0;
@@ -599,8 +602,6 @@ exports.commands = {
         if (viewportCmd != null) {
             parent[viewportKey] = viewportCmd;
             delete context.target[viewportKey];
-            // 编译一次parent
-            context.compiler.compile(parent, context.scope);
         }
         // 添加订阅
         var watcher = context.entity.createWatcher(context.target, arrName, context.scope, function (value) {
@@ -646,6 +647,8 @@ exports.commands = {
                 context.compiler.compile(newNode, newScope);
             }
         });
+        // 编译一次parent
+        context.compiler.compile(parent, context.scope);
         // 返回节点
         return context.target;
     }

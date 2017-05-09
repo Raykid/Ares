@@ -55,8 +55,11 @@ export const commands:{[name:string]:Command} = {
         var exp:string = "[" + context.exp + "]";
         // 生成处理器
         var handler:ViewPortHandler = new ViewPortHandler(target);
+        // 生成新的scope
+        var newScope:any = Object.create(context.scope);
+        newScope.$bounds = target.getLocalBounds();
         // 设置监视
-        context.entity.createWatcher(target, exp, context.scope, (value:number[])=>
+        context.entity.createWatcher(target, exp, newScope, (value:number[])=>
         {
             var x:number = value[0] || 0;
             var y:number = value[1] || 0;
@@ -219,8 +222,6 @@ export const commands:{[name:string]:Command} = {
         {
             parent[viewportKey] = viewportCmd;
             delete context.target[viewportKey];
-            // 编译一次parent
-            context.compiler.compile(parent, context.scope);
         }
         // 添加订阅
         var watcher:IWatcher = context.entity.createWatcher(context.target, arrName, context.scope, (value:any)=>{
@@ -271,6 +272,8 @@ export const commands:{[name:string]:Command} = {
                 context.compiler.compile(newNode, newScope);
             }
         });
+        // 编译一次parent
+        context.compiler.compile(parent, context.scope);
         // 返回节点
         return context.target;
     }
