@@ -747,7 +747,7 @@ define("src/ares/html/HTMLCompiler", ["require", "exports", "src/ares/html/HTMLC
 define("src/ares/pixijs/ViewPortHandler", ["require", "exports"], function (require, exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
-    var THRESHOLD_MOVED = 10;
+    var THRESHOLD_MOVED = 5;
     var ELASTICITY_COEFFICIENT = 1;
     var FRICTION_COEFFICIENT = 0.01;
     function shifting(to, from) {
@@ -1119,27 +1119,33 @@ define("src/ares/pixijs/PIXICommands", ["require", "exports", "src/ares/pixijs/P
             }
             var itemName = res[1];
             var arrName = res[2];
-            var parent = context.target.parent;
-            var sNode = new PIXI.Container();
-            sNode.interactive = sNode.interactiveChildren = false;
-            var eNode = new PIXI.Container();
-            eNode.interactive = eNode.interactiveChildren = false;
-            // 替换原始模板
-            var index = parent.getChildIndex(context.target);
-            parent.addChildAt(sNode, index);
-            parent.addChildAt(eNode, index + 1);
-            parent.removeChild(context.target);
+            // 生成一个容器替换原始模板
+            var index = context.target.parent.getChildIndex(context.target);
+            var parent = new PIXI.Container();
+            context.target.parent.addChildAt(parent, index);
+            context.target.parent.removeChild(context.target);
+            // 如果有viewport命令，则将其转移至容器上
+            var viewportKey = "a-viewport";
+            var viewportCmd = context.target[viewportKey];
+            if (viewportCmd == null) {
+                viewportKey = "a_viewport";
+                viewportCmd = context.target[viewportKey];
+            }
+            if (viewportCmd != null) {
+                parent[viewportKey] = viewportCmd;
+                delete context.target[viewportKey];
+                // 编译一次parent
+                context.compiler.compile(parent, context.scope);
+            }
             // 添加订阅
             var watcher = context.entity.createWatcher(context.target, arrName, context.scope, function (value) {
                 // 如果refNode被从显示列表移除了，则表示该if指令要作废了
-                if (!sNode.parent) {
+                if (!parent.parent) {
                     watcher.dispose();
                     return;
                 }
                 // 清理原始显示
-                var bIndex = parent.getChildIndex(sNode);
-                var eIndex = parent.getChildIndex(eNode);
-                for (var i = eIndex - 1; i > bIndex; i--) {
+                for (var i = parent.children.length - 1; i > 0; i--) {
                     parent.removeChildAt(i).destroy();
                 }
                 // 如果是数字，构建一个数字列表
@@ -1151,12 +1157,11 @@ define("src/ares/pixijs/PIXICommands", ["require", "exports", "src/ares/pixijs/P
                     value = temp;
                 }
                 // 开始遍历
-                var curIndex = 0;
                 for (var key in value) {
                     // 拷贝一个target
                     var newNode = cloneObject(context.target, true);
                     // 添加到显示里
-                    parent.addChildAt(newNode, (bIndex + 1) + curIndex);
+                    parent.addChild(newNode);
                     // 生成子域
                     var newScope = Object.create(context.scope);
                     // 这里一定要用defineProperty将目标定义在当前节点上，否则会影响context.scope
@@ -1174,8 +1179,6 @@ define("src/ares/pixijs/PIXICommands", ["require", "exports", "src/ares/pixijs/P
                     });
                     // 开始编译新节点
                     context.compiler.compile(newNode, newScope);
-                    // 索引自增1
-                    curIndex++;
                 }
             });
             // 返回节点
@@ -1906,9 +1909,6 @@ define("test/test", ["require", "exports", "src/ares/Ares", "src/ares/html/HTMLC
         PIXI.loader.load(function () {
             var testSkin = new PIXI.Container();
             stage.addChild(testSkin);
-            var testContainer = new PIXI.Container();
-            testContainer["a-viewport"] = "200, 0, 200, 600";
-            testSkin.addChild(testContainer);
             var testSprite = new PIXI.Sprite();
             testSprite.texture = PIXI.Texture.fromImage("http://pic.qiantucdn.com/58pic/14/45/39/57i58PICI2K_1024.png");
             testSprite.width = testSprite.height = 200;
@@ -1916,8 +1916,9 @@ define("test/test", ["require", "exports", "src/ares/Ares", "src/ares/html/HTMLC
             testSprite["a-on:click"] = "testFunc";
             testSprite["a-for"] = "item in 10";
             testSprite["a-y"] = "$target.y + $index * 200";
+            testSprite["a-viewport"] = "200, 0, 200, 600";
             testSprite.x = 200;
-            testContainer.addChild(testSprite);
+            testSkin.addChild(testSprite);
             var testText = new PIXI.Text("text: {{text}}");
             testText["a-tplName"] = "testTpl";
             testText["a-tplGlobal"] = "true";

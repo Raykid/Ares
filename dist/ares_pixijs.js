@@ -584,27 +584,33 @@ exports.commands = {
         }
         var itemName = res[1];
         var arrName = res[2];
-        var parent = context.target.parent;
-        var sNode = new PIXI.Container();
-        sNode.interactive = sNode.interactiveChildren = false;
-        var eNode = new PIXI.Container();
-        eNode.interactive = eNode.interactiveChildren = false;
-        // 替换原始模板
-        var index = parent.getChildIndex(context.target);
-        parent.addChildAt(sNode, index);
-        parent.addChildAt(eNode, index + 1);
-        parent.removeChild(context.target);
+        // 生成一个容器替换原始模板
+        var index = context.target.parent.getChildIndex(context.target);
+        var parent = new PIXI.Container();
+        context.target.parent.addChildAt(parent, index);
+        context.target.parent.removeChild(context.target);
+        // 如果有viewport命令，则将其转移至容器上
+        var viewportKey = "a-viewport";
+        var viewportCmd = context.target[viewportKey];
+        if (viewportCmd == null) {
+            viewportKey = "a_viewport";
+            viewportCmd = context.target[viewportKey];
+        }
+        if (viewportCmd != null) {
+            parent[viewportKey] = viewportCmd;
+            delete context.target[viewportKey];
+            // 编译一次parent
+            context.compiler.compile(parent, context.scope);
+        }
         // 添加订阅
         var watcher = context.entity.createWatcher(context.target, arrName, context.scope, function (value) {
             // 如果refNode被从显示列表移除了，则表示该if指令要作废了
-            if (!sNode.parent) {
+            if (!parent.parent) {
                 watcher.dispose();
                 return;
             }
             // 清理原始显示
-            var bIndex = parent.getChildIndex(sNode);
-            var eIndex = parent.getChildIndex(eNode);
-            for (var i = eIndex - 1; i > bIndex; i--) {
+            for (var i = parent.children.length - 1; i > 0; i--) {
                 parent.removeChildAt(i).destroy();
             }
             // 如果是数字，构建一个数字列表
@@ -616,12 +622,11 @@ exports.commands = {
                 value = temp;
             }
             // 开始遍历
-            var curIndex = 0;
             for (var key in value) {
                 // 拷贝一个target
                 var newNode = cloneObject(context.target, true);
                 // 添加到显示里
-                parent.addChildAt(newNode, (bIndex + 1) + curIndex);
+                parent.addChild(newNode);
                 // 生成子域
                 var newScope = Object.create(context.scope);
                 // 这里一定要用defineProperty将目标定义在当前节点上，否则会影响context.scope
@@ -639,8 +644,6 @@ exports.commands = {
                 });
                 // 开始编译新节点
                 context.compiler.compile(newNode, newScope);
-                // 索引自增1
-                curIndex++;
             }
         });
         // 返回节点
@@ -760,7 +763,7 @@ function cloneObject(target, deep) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", { value: true });
-var THRESHOLD_MOVED = 10;
+var THRESHOLD_MOVED = 5;
 var ELASTICITY_COEFFICIENT = 1;
 var FRICTION_COEFFICIENT = 0.01;
 function shifting(to, from) {

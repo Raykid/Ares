@@ -1,4 +1,4 @@
-const THRESHOLD_MOVED:number = 10;
+const THRESHOLD_MOVED:number = 5;
 const ELASTICITY_COEFFICIENT:number = 1;
 const FRICTION_COEFFICIENT:number = 0.01;
 

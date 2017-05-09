@@ -202,28 +202,36 @@ export const commands:{[name:string]:Command} = {
         }
         var itemName:string = res[1];
         var arrName:string = res[2];
-        var parent:PIXI.Container = context.target.parent;
-        var sNode:PIXI.Container = new PIXI.Container();
-        sNode.interactive = sNode.interactiveChildren = false;
-        var eNode:PIXI.Container = new PIXI.Container();
-        eNode.interactive = eNode.interactiveChildren = false;
-        // 替换原始模板
-        var index:number = parent.getChildIndex(context.target);
-        parent.addChildAt(sNode, index);
-        parent.addChildAt(eNode, index + 1);
-        parent.removeChild(context.target);
+        // 生成一个容器替换原始模板
+        var index:number = context.target.parent.getChildIndex(context.target);
+        var parent:PIXI.Container = new PIXI.Container();
+        context.target.parent.addChildAt(parent, index);
+        context.target.parent.removeChild(context.target);
+        // 如果有viewport命令，则将其转移至容器上
+        var viewportKey:string = "a-viewport";
+        var viewportCmd:string = context.target[viewportKey];
+        if(viewportCmd == null)
+        {
+            viewportKey = "a_viewport";
+            viewportCmd = context.target[viewportKey];
+        }
+        if(viewportCmd != null)
+        {
+            parent[viewportKey] = viewportCmd;
+            delete context.target[viewportKey];
+            // 编译一次parent
+            context.compiler.compile(parent, context.scope);
+        }
         // 添加订阅
         var watcher:IWatcher = context.entity.createWatcher(context.target, arrName, context.scope, (value:any)=>{
             // 如果refNode被从显示列表移除了，则表示该if指令要作废了
-            if(!sNode.parent)
+            if(!parent.parent)
             {
                 watcher.dispose();
                 return;
             }
             // 清理原始显示
-            var bIndex:number = parent.getChildIndex(sNode);
-            var eIndex:number = parent.getChildIndex(eNode);
-            for(var i:number = eIndex - 1; i > bIndex; i--)
+            for(var i:number = parent.children.length - 1; i > 0; i--)
             {
                 parent.removeChildAt(i).destroy();
             }
@@ -238,13 +246,12 @@ export const commands:{[name:string]:Command} = {
                 value = temp;
             }
             // 开始遍历
-            var curIndex:number = 0;
             for(var key in value)
             {
                 // 拷贝一个target
                 var newNode:PIXI.DisplayObject = cloneObject(context.target, true);
                 // 添加到显示里
-                parent.addChildAt(newNode, (bIndex + 1) + curIndex);
+                parent.addChild(newNode);
                 // 生成子域
                 var newScope:any = Object.create(context.scope);
                 // 这里一定要用defineProperty将目标定义在当前节点上，否则会影响context.scope
@@ -262,8 +269,6 @@ export const commands:{[name:string]:Command} = {
                 });
                 // 开始编译新节点
                 context.compiler.compile(newNode, newScope);
-                // 索引自增1
-                curIndex ++;
             }
         });
         // 返回节点
