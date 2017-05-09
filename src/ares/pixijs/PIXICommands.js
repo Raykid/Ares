@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 var PIXICompiler_1 = require("./PIXICompiler");
 var Utils_1 = require("../Utils");
+var ViewPortHandler_1 = require("./ViewPortHandler");
 /**
  * 提供给外部的可以注入自定义命令的接口
  * @param name
@@ -21,6 +22,23 @@ function textContent(context) {
 }
 exports.textContent = textContent;
 exports.commands = {
+    /** 视点命令 */
+    viewport: function (context) {
+        var target = context.target;
+        var exp = "[" + context.exp + "]";
+        // 生成处理器
+        var handler = new ViewPortHandler_1.ViewPortHandler(target);
+        // 设置监视
+        context.entity.createWatcher(target, exp, context.scope, function (value) {
+            var x = value[0] || 0;
+            var y = value[1] || 0;
+            var width = value[2] || 0;
+            var height = value[3] || 0;
+            // 设置视点范围
+            handler.setViewPort(x, y, width, height);
+        });
+        return target;
+    },
     /** 模板替换命令 */
     tpl: function (context) {
         // 优先从本地模板库取到模板对象
@@ -48,7 +66,7 @@ exports.commands = {
     /** 修改任意属性命令 */
     prop: function (context) {
         var target = context.target;
-        context.entity.createWatcher(context.target, context.exp, context.scope, function (value) {
+        context.entity.createWatcher(target, context.exp, context.scope, function (value) {
             if (context.subCmd != "") {
                 // 子命令形式
                 target[context.subCmd] = value;
@@ -69,7 +87,9 @@ exports.commands = {
             var handler = context.scope[context.exp] || window[context.exp];
             if (typeof handler == "function") {
                 // 是函数名形式
-                context.target.on(context.subCmd, handler, context.scope);
+                context.target.on(context.subCmd, function () {
+                    handler.apply(this, arguments);
+                }, context.scope);
             }
             else {
                 // 是方法执行或者表达式方式

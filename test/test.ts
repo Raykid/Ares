@@ -1,13 +1,13 @@
 /// <reference path="../src/ares/pixijs/pixi.js.d.ts"/>
-/// <reference path="../dist/ares.d.ts"/>
-/// <reference path="../dist/ares_html.d.ts"/>
-/// <reference path="../dist/ares_pixijs.d.ts"/>
-/// <reference path="../dist/ares_template.d.ts"/>
+// / <reference path="../dist/ares.d.ts"/>
+// / <reference path="../dist/ares_html.d.ts"/>
+// / <reference path="../dist/ares_pixijs.d.ts"/>
+// / <reference path="../dist/ares_template.d.ts"/>
 
-// import * as ares from "../src/ares/Ares";
-// import * as ares_html from "../src/ares/html/HTMLCompiler";
-// import * as ares_pixijs from "../src/ares/pixijs/PIXICompiler";
-// import * as ares_template from "../src/ares/template/TemplateCompiler";
+import * as ares from "../src/ares/Ares";
+import * as ares_html from "../src/ares/html/HTMLCompiler";
+import * as ares_pixijs from "../src/ares/pixijs/PIXICompiler";
+import * as ares_template from "../src/ares/template/TemplateCompiler";
 
 /**
  * Created by Raykid on 2016/12/23.
@@ -49,15 +49,19 @@ function go():void
         var testSkin:PIXI.Container = new PIXI.Container();
         stage.addChild(testSkin);
 
+        var testContainer:PIXI.Container = new PIXI.Container();
+        testContainer["a-viewport"] = "200, 0, 200, 600";
+        testSkin.addChild(testContainer);
+
         var testSprite:PIXI.Sprite = new PIXI.Sprite();
         testSprite.texture = PIXI.Texture.fromImage("http://pic.qiantucdn.com/58pic/14/45/39/57i58PICI2K_1024.png");
         testSprite.width = testSprite.height = 200;
         testSprite.interactive = true;
         testSprite["a-on:click"] = "testFunc";
-        testSprite["a-for"] = "item in testFor";
-        testSprite["a-x"] = "$target.x + $index * 200";
+        testSprite["a-for"] = "item in 10";
+        testSprite["a-y"] = "$target.y + $index * 200";
         testSprite.x = 200;
-        testSkin.addChild(testSprite);
+        testContainer.addChild(testSprite);
 
         var testText:PIXI.Text = new PIXI.Text("text: {{text}}");
         testText["a-tplName"] = "testTpl";
@@ -74,6 +78,7 @@ function go():void
 
         var data:any = {
             text: "text",
+            testNum: 1,
             testFor: [1, 2, 3],
             testFunc: function(evt:Event):void
             {
@@ -95,12 +100,12 @@ function go():void
         stage.addChild(testSkin2);
         ares.bind(data, new ares_pixijs.PIXICompiler(testSkin2));
 
-        setTimeout(()=>{
-            data.testFor = [3, "jasdf"];
-        }, 2000);
+        // setTimeout(()=>{
+        //     data.testFor = [3, "jasdf"];
+        // }, 2000);
 
-        setTimeout(()=>{
-            data.testFor = ["kn", "j111", "14171a"];
-        }, 4000);
+        // setTimeout(()=>{
+        //     data.testFor = ["kn", "j111", "14171a"];
+        // }, 4000);
     });
 }

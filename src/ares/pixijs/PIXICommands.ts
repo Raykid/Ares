@@ -1,6 +1,7 @@
 import {IAres, IWatcher} from "../Interfaces";
 import {PIXICompiler, getTemplate} from "./PIXICompiler";
 import {runExp} from "../Utils";
+import {ViewPortHandler} from "./ViewPortHandler";
 
 /**
  * Created by Raykid on 2016/12/27.
@@ -47,6 +48,25 @@ export function textContent(context:CommandContext):void
 }
 
 export const commands:{[name:string]:Command} = {
+    /** 视点命令 */
+    viewport: (context:CommandContext)=>
+    {
+        var target:PIXI.DisplayObject = context.target;
+        var exp:string = "[" + context.exp + "]";
+        // 生成处理器
+        var handler:ViewPortHandler = new ViewPortHandler(target);
+        // 设置监视
+        context.entity.createWatcher(target, exp, context.scope, (value:number[])=>
+        {
+            var x:number = value[0] || 0;
+            var y:number = value[1] || 0;
+            var width:number = value[2] || 0;
+            var height:number = value[3] || 0;
+            // 设置视点范围
+            handler.setViewPort(x, y, width, height);
+        });
+        return target;
+    },
     /** 模板替换命令 */
     tpl: (context:CommandContext)=>
     {
@@ -74,7 +94,7 @@ export const commands:{[name:string]:Command} = {
     prop: (context:CommandContext)=>
     {
         var target:PIXI.DisplayObject = context.target;
-        context.entity.createWatcher(context.target, context.exp, context.scope, (value:any)=>
+        context.entity.createWatcher(target, context.exp, context.scope, (value:any)=>
         {
             if(context.subCmd != "")
             {
@@ -102,7 +122,9 @@ export const commands:{[name:string]:Command} = {
             if(typeof handler == "function")
             {
                 // 是函数名形式
-                context.target.on(context.subCmd, handler, context.scope);
+                context.target.on(context.subCmd, function(){
+                    handler.apply(this, arguments);
+                }, context.scope);
             }
             else
             {
