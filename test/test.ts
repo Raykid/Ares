@@ -54,10 +54,9 @@ function go():void
         testSprite.width = testSprite.height = 200;
         testSprite.interactive = true;
         testSprite["a-on:click"] = "testFunc";
-        testSprite["a-for"] = "item in 20";
-        testSprite["a-x"] = "$target.x + ($index % 2) * 200"
-        testSprite["a-y"] = "$target.y + Math.floor($index / 2) * 200";
-        testSprite["a-viewport"] = "$bounds.x, $bounds.y, 250, 500";
+        testSprite["a-for"] = "item in testFor";
+        testSprite["a-y"] = "$target.y + $index * 200";
+        testSprite["a-viewport"] = "$target.x, $target.y, $target.width, $target.height * 2";
         testSprite.x = 200;
         testSkin.addChild(testSprite);
 
@@ -98,12 +97,12 @@ function go():void
         stage.addChild(testSkin2);
         ares.bind(data, new ares_pixijs.PIXICompiler(testSkin2));
 
-        // setTimeout(()=>{
-        //     data.testFor = [3, "jasdf"];
-        // }, 2000);
+        setTimeout(()=>{
+            data.testFor = [3, "jasdf"];
+        }, 2000);
 
-        // setTimeout(()=>{
-        //     data.testFor = ["kn", "j111", "14171a"];
-        // }, 4000);
+        setTimeout(()=>{
+            data.testFor = ["kn", "j111", "14171a"];
+        }, 4000);
     });
 }

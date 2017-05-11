@@ -1,4 +1,4 @@
-const THRESHOLD_MOVED:number = 5;
+const THRESHOLD_DRAGGING:number = 3;
 const ELASTICITY_COEFFICIENT:number = 1;
 const FRICTION_COEFFICIENT:number = 0.01;
 
@@ -84,8 +84,8 @@ export class ViewPortHandler
             // 计算位移
             var nowPoint:PIXI.Point = evt.data.global.clone();
             var s:Shifting = shifting(nowPoint, this._lastPoint);
-            // 如果移动距离超过THRESHOLD_MOVED像素则认为是移动了
-            if(!this._dragging && shifting(nowPoint, this._downPoint).distance > THRESHOLD_MOVED)
+            // 如果移动距离超过THRESHOLD_DRAGGING像素则认为是移动了
+            if(!this._dragging && shifting(nowPoint, this._downPoint).distance > THRESHOLD_DRAGGING)
             {
                 this._dragging = true;
             }

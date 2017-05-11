@@ -55,11 +55,8 @@ export const commands:{[name:string]:Command} = {
         var exp:string = "[" + context.exp + "]";
         // 生成处理器
         var handler:ViewPortHandler = new ViewPortHandler(target);
-        // 生成新的scope
-        var newScope:any = Object.create(context.scope);
-        newScope.$bounds = target.getLocalBounds();
-        // 设置监视
-        context.entity.createWatcher(target, exp, newScope, (value:number[])=>
+        // 设置监视，这里的target要优先使用$forTarget，因为在for里面的$target属性应该指向原始显示对象
+        context.entity.createWatcher(context.scope.$forTarget || target, exp, context.scope, (value:number[])=>
         {
             var x:number = value[0] || 0;
             var y:number = value[1] || 0;
@@ -210,6 +207,14 @@ export const commands:{[name:string]:Command} = {
         var parent:PIXI.Container = new PIXI.Container();
         context.target.parent.addChildAt(parent, index);
         context.target.parent.removeChild(context.target);
+        // 生成一个新的scope，要向其中添加属性
+        var forScope:any = Object.create(context.scope);
+        Object.defineProperty(forScope, "$forTarget", {
+            configurable: true,
+            enumerable: false,
+            value: context.target,
+            writable: false
+        });
         // 如果有viewport命令，则将其转移至容器上
         var viewportKey:string = "a-viewport";
         var viewportCmd:string = context.target[viewportKey];
@@ -224,7 +229,7 @@ export const commands:{[name:string]:Command} = {
             delete context.target[viewportKey];
         }
         // 添加订阅
-        var watcher:IWatcher = context.entity.createWatcher(context.target, arrName, context.scope, (value:any)=>{
+        var watcher:IWatcher = context.entity.createWatcher(context.target, arrName, forScope, (value:any)=>{
             // 如果refNode被从显示列表移除了，则表示该if指令要作废了
             if(!parent.parent)
             {
@@ -254,8 +259,8 @@ export const commands:{[name:string]:Command} = {
                 // 添加到显示里
                 parent.addChild(newNode);
                 // 生成子域
-                var newScope:any = Object.create(context.scope);
-                // 这里一定要用defineProperty将目标定义在当前节点上，否则会影响context.scope
+                var newScope:any = Object.create(forScope);
+                // 这里一定要用defineProperty将目标定义在当前节点上，否则会影响forScope
                 Object.defineProperty(newScope, "$index", {
                     configurable: true,
                     enumerable: false,
@@ -272,8 +277,8 @@ export const commands:{[name:string]:Command} = {
                 context.compiler.compile(newNode, newScope);
             }
         });
-        // 编译一次parent
-        context.compiler.compile(parent, context.scope);
+        // 使用原始显示对象编译一次parent
+        context.compiler.compile(parent, forScope);
         // 返回节点
         return context.target;
     }

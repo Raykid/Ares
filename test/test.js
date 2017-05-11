@@ -747,7 +747,7 @@ define("src/ares/html/HTMLCompiler", ["require", "exports", "src/ares/html/HTMLC
 define("src/ares/pixijs/ViewPortHandler", ["require", "exports"], function (require, exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
-    var THRESHOLD_MOVED = 5;
+    var THRESHOLD_MOVED = 3;
     var ELASTICITY_COEFFICIENT = 1;
     var FRICTION_COEFFICIENT = 0.01;
     function shifting(to, from) {
@@ -992,11 +992,8 @@ define("src/ares/pixijs/PIXICommands", ["require", "exports", "src/ares/pixijs/P
             var exp = "[" + context.exp + "]";
             // 生成处理器
             var handler = new ViewPortHandler_1.ViewPortHandler(target);
-            // 生成新的scope
-            var newScope = Object.create(context.scope);
-            newScope.$bounds = target.getLocalBounds();
-            // 设置监视
-            context.entity.createWatcher(target, exp, newScope, function (value) {
+            // 设置监视，这里的target要优先使用$forTarget，因为在for里面的$target属性应该指向原始显示对象
+            context.entity.createWatcher(context.scope.$forTarget || target, exp, context.scope, function (value) {
                 var x = value[0] || 0;
                 var y = value[1] || 0;
                 var width = value[2] || 0;
@@ -1127,6 +1124,14 @@ define("src/ares/pixijs/PIXICommands", ["require", "exports", "src/ares/pixijs/P
             var parent = new PIXI.Container();
             context.target.parent.addChildAt(parent, index);
             context.target.parent.removeChild(context.target);
+            // 生成一个新的scope，要向其中添加属性
+            var forScope = Object.create(context.scope);
+            Object.defineProperty(forScope, "$forTarget", {
+                configurable: true,
+                enumerable: false,
+                value: context.target,
+                writable: false
+            });
             // 如果有viewport命令，则将其转移至容器上
             var viewportKey = "a-viewport";
             var viewportCmd = context.target[viewportKey];
@@ -1139,7 +1144,7 @@ define("src/ares/pixijs/PIXICommands", ["require", "exports", "src/ares/pixijs/P
                 delete context.target[viewportKey];
             }
             // 添加订阅
-            var watcher = context.entity.createWatcher(context.target, arrName, context.scope, function (value) {
+            var watcher = context.entity.createWatcher(context.target, arrName, forScope, function (value) {
                 // 如果refNode被从显示列表移除了，则表示该if指令要作废了
                 if (!parent.parent) {
                     watcher.dispose();
@@ -1164,8 +1169,8 @@ define("src/ares/pixijs/PIXICommands", ["require", "exports", "src/ares/pixijs/P
                     // 添加到显示里
                     parent.addChild(newNode);
                     // 生成子域
-                    var newScope = Object.create(context.scope);
-                    // 这里一定要用defineProperty将目标定义在当前节点上，否则会影响context.scope
+                    var newScope = Object.create(forScope);
+                    // 这里一定要用defineProperty将目标定义在当前节点上，否则会影响forScope
                     Object.defineProperty(newScope, "$index", {
                         configurable: true,
                         enumerable: false,
@@ -1182,8 +1187,8 @@ define("src/ares/pixijs/PIXICommands", ["require", "exports", "src/ares/pixijs/P
                     context.compiler.compile(newNode, newScope);
                 }
             });
-            // 编译一次parent
-            context.compiler.compile(parent, context.scope);
+            // 使用原始显示对象编译一次parent
+            context.compiler.compile(parent, forScope);
             // 返回节点
             return context.target;
         }
@@ -1917,10 +1922,9 @@ define("test/test", ["require", "exports", "src/ares/Ares", "src/ares/html/HTMLC
             testSprite.width = testSprite.height = 200;
             testSprite.interactive = true;
             testSprite["a-on:click"] = "testFunc";
-            testSprite["a-for"] = "item in 20";
-            testSprite["a-x"] = "$target.x + ($index % 2) * 200";
-            testSprite["a-y"] = "$target.y + Math.floor($index / 2) * 200";
-            testSprite["a-viewport"] = "$bounds.x, $bounds.y, 250, 500";
+            testSprite["a-for"] = "item in testFor";
+            testSprite["a-y"] = "$target.y + $index * 200";
+            testSprite["a-viewport"] = "$target.x, $target.y, $target.width, $target.height * 2";
             testSprite.x = 200;
             testSkin.addChild(testSprite);
             var testText = new PIXI.Text("text: {{text}}");
@@ -1952,12 +1956,12 @@ define("test/test", ["require", "exports", "src/ares/Ares", "src/ares/html/HTMLC
             testSkin2["a-y"] = 100;
             stage.addChild(testSkin2);
             ares.bind(data, new ares_pixijs.PIXICompiler(testSkin2));
-            // setTimeout(()=>{
-            //     data.testFor = [3, "jasdf"];
-            // }, 2000);
-            // setTimeout(()=>{
-            //     data.testFor = ["kn", "j111", "14171a"];
-            // }, 4000);
+            setTimeout(function () {
+                data.testFor = [3, "jasdf"];
+            }, 2000);
+            setTimeout(function () {
+                data.testFor = ["kn", "j111", "14171a"];
+            }, 4000);
         });
     }
 });

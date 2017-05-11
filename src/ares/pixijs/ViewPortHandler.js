@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-var THRESHOLD_MOVED = 5;
+var THRESHOLD_MOVED = 3;
 var ELASTICITY_COEFFICIENT = 1;
 var FRICTION_COEFFICIENT = 0.01;
 function shifting(to, from) {
