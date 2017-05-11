@@ -56,7 +56,7 @@ function go():void
         testSprite["a-on:click"] = "testFunc";
         testSprite["a-for"] = "item in testFor";
         testSprite["a-y"] = "$target.y + $index * 200";
-        testSprite["a-viewport"] = "$target.x, $target.y, $target.width, $target.height * 2";
+        testSprite["a-viewport${oneway:true}"] = "$target.x, $target.y, $target.width - 100, $target.height * 2";
         testSprite.x = 200;
         testSkin.addChild(testSprite);
 

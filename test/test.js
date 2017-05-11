@@ -747,7 +747,7 @@ define("src/ares/html/HTMLCompiler", ["require", "exports", "src/ares/html/HTMLC
 define("src/ares/pixijs/ViewPortHandler", ["require", "exports"], function (require, exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
-    var THRESHOLD_MOVED = 3;
+    var THRESHOLD_DRAGGING = 3;
     var ELASTICITY_COEFFICIENT = 1;
     var FRICTION_COEFFICIENT = 0.01;
     function shifting(to, from) {
@@ -760,11 +760,13 @@ define("src/ares/pixijs/ViewPortHandler", ["require", "exports"], function (requ
         };
     }
     var ViewPortHandler = (function () {
-        function ViewPortHandler(target) {
+        function ViewPortHandler(target, options) {
             this._movableH = false;
             this._movableV = false;
             this._dragging = false;
+            this._direction = 0;
             this._target = target;
+            this._options = options;
             this._viewPort = new PIXI.Rectangle();
             this._ticker = new PIXI.ticker.Ticker();
             this._ticker.add(this.onTick, this);
@@ -804,12 +806,29 @@ define("src/ares/pixijs/ViewPortHandler", ["require", "exports"], function (requ
                 // 计算位移
                 var nowPoint = evt.data.global.clone();
                 var s = shifting(nowPoint, this._lastPoint);
-                // 如果移动距离超过THRESHOLD_MOVED像素则认为是移动了
-                if (!this._dragging && shifting(nowPoint, this._downPoint).distance > THRESHOLD_MOVED) {
+                // 如果移动距离超过THRESHOLD_DRAGGING像素则认为是移动了
+                if (!this._dragging && shifting(nowPoint, this._downPoint).distance > THRESHOLD_DRAGGING) {
                     this._dragging = true;
                 }
+                // 判断移动方向
+                if (this._direction == 0) {
+                    if (this._options && this._options.oneway) {
+                        if (Math.abs(s.x) > Math.abs(s.y))
+                            this._direction = ViewPortHandler.DIRECTION_H;
+                        else
+                            this._direction = ViewPortHandler.DIRECTION_V;
+                    }
+                    else {
+                        this._direction = ViewPortHandler.DIRECTION_H | ViewPortHandler.DIRECTION_V;
+                    }
+                }
                 // 移动物体
-                this.moveTarget(s.x, s.y);
+                var sx = 0, sy = 0;
+                if (this._direction & ViewPortHandler.DIRECTION_H)
+                    sx = s.x;
+                if (this._direction & ViewPortHandler.DIRECTION_V)
+                    sy = s.y;
+                this.moveTarget(sx, sy);
                 // 记录本次坐标
                 this._lastPoint = nowPoint;
                 // 计算运动速度
@@ -833,6 +852,7 @@ define("src/ares/pixijs/ViewPortHandler", ["require", "exports"], function (requ
                 // 重置状态
                 this._downTarget = null;
                 this._dragging = false;
+                this._direction = 0;
                 // 开始缓动
                 this._ticker.start();
             }
@@ -962,6 +982,8 @@ define("src/ares/pixijs/ViewPortHandler", ["require", "exports"], function (requ
         };
         return ViewPortHandler;
     }());
+    ViewPortHandler.DIRECTION_H = 1;
+    ViewPortHandler.DIRECTION_V = 2;
     exports.ViewPortHandler = ViewPortHandler;
 });
 define("src/ares/pixijs/PIXICommands", ["require", "exports", "src/ares/pixijs/PIXICompiler", "src/ares/Utils", "src/ares/pixijs/ViewPortHandler"], function (require, exports, PIXICompiler_1, Utils_3, ViewPortHandler_1) {
@@ -991,7 +1013,8 @@ define("src/ares/pixijs/PIXICommands", ["require", "exports", "src/ares/pixijs/P
             var target = context.target;
             var exp = "[" + context.exp + "]";
             // 生成处理器
-            var handler = new ViewPortHandler_1.ViewPortHandler(target);
+            var options = Utils_3.evalExp(context.subCmd, context.scope);
+            var handler = new ViewPortHandler_1.ViewPortHandler(target, options);
             // 设置监视，这里的target要优先使用$forTarget，因为在for里面的$target属性应该指向原始显示对象
             context.entity.createWatcher(context.scope.$forTarget || target, exp, context.scope, function (value) {
                 var x = value[0] || 0;
@@ -1133,15 +1156,10 @@ define("src/ares/pixijs/PIXICommands", ["require", "exports", "src/ares/pixijs/P
                 writable: false
             });
             // 如果有viewport命令，则将其转移至容器上
-            var viewportKey = "a-viewport";
-            var viewportCmd = context.target[viewportKey];
-            if (viewportCmd == null) {
-                viewportKey = "a_viewport";
-                viewportCmd = context.target[viewportKey];
-            }
-            if (viewportCmd != null) {
-                parent[viewportKey] = viewportCmd;
-                delete context.target[viewportKey];
+            var viewportCmd = context.cmdDict["viewport"];
+            if (viewportCmd) {
+                parent[viewportCmd.propName] = viewportCmd.exp;
+                delete context.target[viewportCmd.propName];
             }
             // 添加订阅
             var watcher = context.entity.createWatcher(context.target, arrName, forScope, function (value) {
@@ -1349,33 +1367,33 @@ define("src/ares/pixijs/PIXICompiler", ["require", "exports", "src/ares/pixijs/P
             configurable: true
         });
         PIXICompiler.prototype.parseCmd = function (node) {
+            var reg = /^a[\-_](\w+)([:\$](.+))?$/;
             // 取到属性列表
-            var keys = [];
+            var results = [];
+            var result;
             for (var t in node) {
-                if (t.indexOf("a-") == 0 || t.indexOf("a_") == 0) {
-                    keys.push(t);
-                }
+                result = reg.exec(t);
+                if (result)
+                    results.push(result);
             }
             // 把配置中的属性推入属性列表中
             var conf = (this._config && this._config[node.name]);
             for (var t in conf) {
                 if (t.indexOf("a-") != 0 && t.indexOf("a_") != 0)
                     t = "a-" + t;
-                keys.push(t);
+                result = reg.exec(t);
+                if (result)
+                    results.push(result);
             }
             // 开始遍历属性列表
             var cmdNameDict = {};
-            for (var i = 0, len = keys.length; i < len; i++) {
+            for (var i = 0, len = results.length; i < len; i++) {
                 // 首先解析当前节点上面以a_开头的属性，将其认为是绑定属性
-                var key = keys[i];
-                var bIndex = 2;
-                var eIndex = key.indexOf(":");
-                if (eIndex < 0)
-                    eIndex = key.indexOf("$");
-                if (eIndex < 0)
-                    eIndex = key.length;
+                result = results[i];
+                // 取到key
+                var key = result[0];
                 // 取到命令名
-                var cmdName = key.substring(bIndex, eIndex);
+                var cmdName = result[1];
                 // 取到命令字符串
                 var exp;
                 if (conf)
@@ -1383,7 +1401,7 @@ define("src/ares/pixijs/PIXICompiler", ["require", "exports", "src/ares/pixijs/P
                 else
                     exp = node[key];
                 // 取到子命令名
-                var subCmd = key.substr(eIndex + 1);
+                var subCmd = result[3] || "";
                 // 填充字典
                 cmdNameDict[cmdName] = {
                     cmdName: cmdName,
@@ -1462,7 +1480,8 @@ define("src/ares/pixijs/PIXICompiler", ["require", "exports", "src/ares/pixijs/P
                         subCmd: subCmd,
                         exp: exp,
                         compiler: this,
-                        entity: this._entity
+                        entity: this._entity,
+                        cmdDict: cmdDict
                     }
                 };
                 // 如果是tpl命令则需要提前
@@ -1492,7 +1511,7 @@ define("src/ares/pixijs/PIXICompiler", ["require", "exports", "src/ares/pixijs/P
             if (!hasLazyCompile) {
                 // 如果是文本对象，则进行文本内容编译
                 if (node instanceof PIXI.Text) {
-                    this.compileTextContent(node, scope);
+                    this.compileTextContent(node, scope, cmdDict);
                 }
                 // 然后递归解析子节点
                 if (node instanceof PIXI.Container) {
@@ -1540,7 +1559,7 @@ define("src/ares/pixijs/PIXICompiler", ["require", "exports", "src/ares/pixijs/P
             // 返回模板对象
             return tpl;
         };
-        PIXICompiler.prototype.compileTextContent = function (text, scope) {
+        PIXICompiler.prototype.compileTextContent = function (text, scope, cmdDict) {
             var value = text.text;
             if (PIXICompiler._textExpReg.test(value)) {
                 var exp = this.parseTextExp(value);
@@ -1550,7 +1569,8 @@ define("src/ares/pixijs/PIXICompiler", ["require", "exports", "src/ares/pixijs/P
                     subCmd: "",
                     exp: exp,
                     compiler: this,
-                    entity: this._entity
+                    entity: this._entity,
+                    cmdDict: cmdDict
                 });
             }
         };
@@ -1924,7 +1944,7 @@ define("test/test", ["require", "exports", "src/ares/Ares", "src/ares/html/HTMLC
             testSprite["a-on:click"] = "testFunc";
             testSprite["a-for"] = "item in testFor";
             testSprite["a-y"] = "$target.y + $index * 200";
-            testSprite["a-viewport"] = "$target.x, $target.y, $target.width, $target.height * 2";
+            testSprite["a-viewport${oneway:true}"] = "$target.x, $target.y, $target.width - 100, $target.height * 2";
             testSprite.x = 200;
             testSkin.addChild(testSprite);
             var testText = new PIXI.Text("text: {{text}}");

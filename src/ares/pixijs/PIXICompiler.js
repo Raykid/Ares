@@ -53,33 +53,33 @@ var PIXICompiler = (function () {
         configurable: true
     });
     PIXICompiler.prototype.parseCmd = function (node) {
+        var reg = /^a[\-_](\w+)([:\$](.+))?$/;
         // 取到属性列表
-        var keys = [];
+        var results = [];
+        var result;
         for (var t in node) {
-            if (t.indexOf("a-") == 0 || t.indexOf("a_") == 0) {
-                keys.push(t);
-            }
+            result = reg.exec(t);
+            if (result)
+                results.push(result);
         }
         // 把配置中的属性推入属性列表中
         var conf = (this._config && this._config[node.name]);
         for (var t in conf) {
             if (t.indexOf("a-") != 0 && t.indexOf("a_") != 0)
                 t = "a-" + t;
-            keys.push(t);
+            result = reg.exec(t);
+            if (result)
+                results.push(result);
         }
         // 开始遍历属性列表
         var cmdNameDict = {};
-        for (var i = 0, len = keys.length; i < len; i++) {
+        for (var i = 0, len = results.length; i < len; i++) {
             // 首先解析当前节点上面以a_开头的属性，将其认为是绑定属性
-            var key = keys[i];
-            var bIndex = 2;
-            var eIndex = key.indexOf(":");
-            if (eIndex < 0)
-                eIndex = key.indexOf("$");
-            if (eIndex < 0)
-                eIndex = key.length;
+            result = results[i];
+            // 取到key
+            var key = result[0];
             // 取到命令名
-            var cmdName = key.substring(bIndex, eIndex);
+            var cmdName = result[1];
             // 取到命令字符串
             var exp;
             if (conf)
@@ -87,7 +87,7 @@ var PIXICompiler = (function () {
             else
                 exp = node[key];
             // 取到子命令名
-            var subCmd = key.substr(eIndex + 1);
+            var subCmd = result[3] || "";
             // 填充字典
             cmdNameDict[cmdName] = {
                 cmdName: cmdName,
@@ -166,7 +166,8 @@ var PIXICompiler = (function () {
                     subCmd: subCmd,
                     exp: exp,
                     compiler: this,
-                    entity: this._entity
+                    entity: this._entity,
+                    cmdDict: cmdDict
                 }
             };
             // 如果是tpl命令则需要提前
@@ -196,7 +197,7 @@ var PIXICompiler = (function () {
         if (!hasLazyCompile) {
             // 如果是文本对象，则进行文本内容编译
             if (node instanceof PIXI.Text) {
-                this.compileTextContent(node, scope);
+                this.compileTextContent(node, scope, cmdDict);
             }
             // 然后递归解析子节点
             if (node instanceof PIXI.Container) {
@@ -244,7 +245,7 @@ var PIXICompiler = (function () {
         // 返回模板对象
         return tpl;
     };
-    PIXICompiler.prototype.compileTextContent = function (text, scope) {
+    PIXICompiler.prototype.compileTextContent = function (text, scope, cmdDict) {
         var value = text.text;
         if (PIXICompiler._textExpReg.test(value)) {
             var exp = this.parseTextExp(value);
@@ -254,7 +255,8 @@ var PIXICompiler = (function () {
                 subCmd: "",
                 exp: exp,
                 compiler: this,
-                entity: this._entity
+                entity: this._entity,
+                cmdDict: cmdDict
             });
         }
     };

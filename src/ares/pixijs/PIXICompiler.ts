@@ -45,7 +45,7 @@ export function setTemplate(name:string, tpl:PIXI.DisplayObject):PIXI.DisplayObj
     return tpl;
 }
 
-interface CmdData
+export interface CmdData
 {
     cmdName:string;
     subCmd:string;
@@ -53,7 +53,7 @@ interface CmdData
     exp:string;
 }
 
-interface CmdDict
+export interface CmdDict
 {
     [cmdName:string]:CmdData;
 }
@@ -90,40 +90,39 @@ export class PIXICompiler implements Compiler
 
     private parseCmd(node:PIXI.DisplayObject):CmdDict
     {
+        var reg:RegExp = /^a[\-_](\w+)([:\$](.+))?$/;
         // 取到属性列表
-        var keys:string[] = [];
+        var results:RegExpExecArray[] = [];
+        var result:RegExpExecArray;
         for(var t in node)
         {
-            if(t.indexOf("a-") == 0 || t.indexOf("a_") == 0)
-            {
-                keys.push(t);
-            }
+            result = reg.exec(t);
+            if(result) results.push(result);
         }
         // 把配置中的属性推入属性列表中
         var conf:PIXIBindConfigCommands = (this._config && this._config[node.name]);
         for(var t in conf)
         {
             if(t.indexOf("a-") != 0 && t.indexOf("a_") != 0) t = "a-" + t;
-            keys.push(t);
+            result = reg.exec(t);
+            if(result) results.push(result);
         }
         // 开始遍历属性列表
         var cmdNameDict:CmdDict = {};
-        for(var i:number = 0, len:number = keys.length; i < len; i++)
+        for(var i:number = 0, len:number = results.length; i < len; i++)
         {
             // 首先解析当前节点上面以a_开头的属性，将其认为是绑定属性
-            var key:string = keys[i];
-            var bIndex:number = 2;
-            var eIndex:number = key.indexOf(":");
-            if(eIndex < 0) eIndex = key.indexOf("$");
-            if(eIndex < 0) eIndex = key.length;
+            result = results[i];
+            // 取到key
+            var key:string = result[0];
             // 取到命令名
-            var cmdName:string = key.substring(bIndex, eIndex);
+            var cmdName:string = result[1];
             // 取到命令字符串
             var exp:string;
             if(conf) exp = conf[key] || conf[cmdName] || node[key];
             else exp = node[key];
             // 取到子命令名
-            var subCmd:string = key.substr(eIndex + 1);
+            var subCmd:string = result[3] || "";
             // 填充字典
             cmdNameDict[cmdName] = {
                 cmdName: cmdName,
@@ -213,7 +212,8 @@ export class PIXICompiler implements Compiler
                     subCmd: subCmd,
                     exp: exp,
                     compiler: this,
-                    entity: this._entity
+                    entity: this._entity,
+                    cmdDict: cmdDict
                 }
             };
             // 如果是tpl命令则需要提前
@@ -245,7 +245,7 @@ export class PIXICompiler implements Compiler
             // 如果是文本对象，则进行文本内容编译
             if(node instanceof PIXI.Text)
             {
-                this.compileTextContent(node as PIXI.Text, scope);
+                this.compileTextContent(node as PIXI.Text, scope, cmdDict);
             }
             // 然后递归解析子节点
             if(node instanceof PIXI.Container)
@@ -299,7 +299,7 @@ export class PIXICompiler implements Compiler
         return tpl;
     }
 
-    private compileTextContent(text:PIXI.Text, scope:any):void
+    private compileTextContent(text:PIXI.Text, scope:any, cmdDict:CmdDict):void
     {
         var value:string = text.text;
         if(PIXICompiler._textExpReg.test(value))
@@ -311,7 +311,8 @@ export class PIXICompiler implements Compiler
                 subCmd: "",
                 exp: exp,
                 compiler: this,
-                entity: this._entity
+                entity: this._entity,
+                cmdDict: cmdDict
             });
         }
     }

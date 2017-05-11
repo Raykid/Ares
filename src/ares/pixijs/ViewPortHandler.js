@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-var THRESHOLD_MOVED = 3;
+var THRESHOLD_DRAGGING = 3;
 var ELASTICITY_COEFFICIENT = 1;
 var FRICTION_COEFFICIENT = 0.01;
 function shifting(to, from) {
@@ -13,11 +13,13 @@ function shifting(to, from) {
     };
 }
 var ViewPortHandler = (function () {
-    function ViewPortHandler(target) {
+    function ViewPortHandler(target, options) {
         this._movableH = false;
         this._movableV = false;
         this._dragging = false;
+        this._direction = 0;
         this._target = target;
+        this._options = options;
         this._viewPort = new PIXI.Rectangle();
         this._ticker = new PIXI.ticker.Ticker();
         this._ticker.add(this.onTick, this);
@@ -57,12 +59,29 @@ var ViewPortHandler = (function () {
             // 计算位移
             var nowPoint = evt.data.global.clone();
             var s = shifting(nowPoint, this._lastPoint);
-            // 如果移动距离超过THRESHOLD_MOVED像素则认为是移动了
-            if (!this._dragging && shifting(nowPoint, this._downPoint).distance > THRESHOLD_MOVED) {
+            // 如果移动距离超过THRESHOLD_DRAGGING像素则认为是移动了
+            if (!this._dragging && shifting(nowPoint, this._downPoint).distance > THRESHOLD_DRAGGING) {
                 this._dragging = true;
             }
+            // 判断移动方向
+            if (this._direction == 0) {
+                if (this._options && this._options.oneway) {
+                    if (Math.abs(s.x) > Math.abs(s.y))
+                        this._direction = ViewPortHandler.DIRECTION_H;
+                    else
+                        this._direction = ViewPortHandler.DIRECTION_V;
+                }
+                else {
+                    this._direction = ViewPortHandler.DIRECTION_H | ViewPortHandler.DIRECTION_V;
+                }
+            }
             // 移动物体
-            this.moveTarget(s.x, s.y);
+            var sx = 0, sy = 0;
+            if (this._direction & ViewPortHandler.DIRECTION_H)
+                sx = s.x;
+            if (this._direction & ViewPortHandler.DIRECTION_V)
+                sy = s.y;
+            this.moveTarget(sx, sy);
             // 记录本次坐标
             this._lastPoint = nowPoint;
             // 计算运动速度
@@ -86,6 +105,7 @@ var ViewPortHandler = (function () {
             // 重置状态
             this._downTarget = null;
             this._dragging = false;
+            this._direction = 0;
             // 开始缓动
             this._ticker.start();
         }
@@ -215,5 +235,7 @@ var ViewPortHandler = (function () {
     };
     return ViewPortHandler;
 }());
+ViewPortHandler.DIRECTION_H = 1;
+ViewPortHandler.DIRECTION_V = 2;
 exports.ViewPortHandler = ViewPortHandler;
 //# sourceMappingURL=ViewPortHandler.js.map

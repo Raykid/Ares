@@ -20,12 +20,21 @@ function shifting(to:PIXI.Point, from:PIXI.Point):Shifting
     };
 }
 
+export interface ViewPortHandlerOptions
+{
+    oneway?:boolean;
+}
+
 export class ViewPortHandler
 {
+    private static DIRECTION_H:number = 1;
+    private static DIRECTION_V:number = 2;
+
     private _target:PIXI.DisplayObject;
     private _viewPort:PIXI.Rectangle;
     private _ticker:PIXI.ticker.Ticker;
     private _masker:PIXI.Graphics;
+    private _options:ViewPortHandlerOptions;
 
     private _movableH:boolean = false;
     private _movableV:boolean = false;
@@ -35,10 +44,12 @@ export class ViewPortHandler
     private _lastTime:number;
     private _speed:PIXI.Point;
     private _dragging:boolean = false;
+    private _direction:number = 0;
 
-    public constructor(target:PIXI.DisplayObject)
+    public constructor(target:PIXI.DisplayObject, options:ViewPortHandlerOptions)
     {
         this._target = target;
+        this._options = options;
         this._viewPort = new PIXI.Rectangle();
         this._ticker = new PIXI.ticker.Ticker();
         this._ticker.add(this.onTick, this);
@@ -89,8 +100,24 @@ export class ViewPortHandler
             {
                 this._dragging = true;
             }
+            // 判断移动方向
+            if(this._direction == 0)
+            {
+                if(this._options && this._options.oneway)
+                {
+                    if(Math.abs(s.x) > Math.abs(s.y)) this._direction = ViewPortHandler.DIRECTION_H;
+                    else this._direction = ViewPortHandler.DIRECTION_V;
+                }
+                else
+                {
+                    this._direction = ViewPortHandler.DIRECTION_H | ViewPortHandler.DIRECTION_V;
+                }
+            }
             // 移动物体
-            this.moveTarget(s.x, s.y);
+            var sx:number = 0, sy:number = 0;
+            if(this._direction & ViewPortHandler.DIRECTION_H) sx = s.x;
+            if(this._direction & ViewPortHandler.DIRECTION_V) sy = s.y;
+            this.moveTarget(sx, sy);
             // 记录本次坐标
             this._lastPoint = nowPoint;
             // 计算运动速度
@@ -119,6 +146,7 @@ export class ViewPortHandler
             // 重置状态
             this._downTarget = null;
             this._dragging = false;
+            this._direction = 0;
             // 开始缓动
             this._ticker.start();
         }

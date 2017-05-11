@@ -1,7 +1,7 @@
 import {IAres, IWatcher} from "../Interfaces";
-import {PIXICompiler, getTemplate} from "./PIXICompiler";
-import {runExp} from "../Utils";
-import {ViewPortHandler} from "./ViewPortHandler";
+import {PIXICompiler, CmdDict, CmdData, getTemplate} from "./PIXICompiler";
+import {runExp, evalExp} from "../Utils";
+import {ViewPortHandler, ViewPortHandlerOptions} from "./ViewPortHandler";
 
 /**
  * Created by Raykid on 2016/12/27.
@@ -24,6 +24,7 @@ export interface CommandContext
     exp:string;
     compiler:PIXICompiler;
     entity:IAres;
+    cmdDict:CmdDict;
     [name:string]:any;
 }
 
@@ -54,7 +55,8 @@ export const commands:{[name:string]:Command} = {
         var target:PIXI.DisplayObject = context.target;
         var exp:string = "[" + context.exp + "]";
         // 生成处理器
-        var handler:ViewPortHandler = new ViewPortHandler(target);
+        var options:ViewPortHandlerOptions = evalExp(context.subCmd, context.scope);
+        var handler:ViewPortHandler = new ViewPortHandler(target, options);
         // 设置监视，这里的target要优先使用$forTarget，因为在for里面的$target属性应该指向原始显示对象
         context.entity.createWatcher(context.scope.$forTarget || target, exp, context.scope, (value:number[])=>
         {
@@ -216,17 +218,11 @@ export const commands:{[name:string]:Command} = {
             writable: false
         });
         // 如果有viewport命令，则将其转移至容器上
-        var viewportKey:string = "a-viewport";
-        var viewportCmd:string = context.target[viewportKey];
-        if(viewportCmd == null)
+        var viewportCmd:CmdData = context.cmdDict["viewport"];
+        if(viewportCmd)
         {
-            viewportKey = "a_viewport";
-            viewportCmd = context.target[viewportKey];
-        }
-        if(viewportCmd != null)
-        {
-            parent[viewportKey] = viewportCmd;
-            delete context.target[viewportKey];
+            parent[viewportCmd.propName] = viewportCmd.exp;
+            delete context.target[viewportCmd.propName];
         }
         // 添加订阅
         var watcher:IWatcher = context.entity.createWatcher(context.target, arrName, forScope, (value:any)=>{

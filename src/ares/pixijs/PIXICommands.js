@@ -27,7 +27,8 @@ exports.commands = {
         var target = context.target;
         var exp = "[" + context.exp + "]";
         // 生成处理器
-        var handler = new ViewPortHandler_1.ViewPortHandler(target);
+        var options = Utils_1.evalExp(context.subCmd, context.scope);
+        var handler = new ViewPortHandler_1.ViewPortHandler(target, options);
         // 设置监视，这里的target要优先使用$forTarget，因为在for里面的$target属性应该指向原始显示对象
         context.entity.createWatcher(context.scope.$forTarget || target, exp, context.scope, function (value) {
             var x = value[0] || 0;
@@ -169,15 +170,10 @@ exports.commands = {
             writable: false
         });
         // 如果有viewport命令，则将其转移至容器上
-        var viewportKey = "a-viewport";
-        var viewportCmd = context.target[viewportKey];
-        if (viewportCmd == null) {
-            viewportKey = "a_viewport";
-            viewportCmd = context.target[viewportKey];
-        }
-        if (viewportCmd != null) {
-            parent[viewportKey] = viewportCmd;
-            delete context.target[viewportKey];
+        var viewportCmd = context.cmdDict["viewport"];
+        if (viewportCmd) {
+            parent[viewportCmd.propName] = viewportCmd.exp;
+            delete context.target[viewportCmd.propName];
         }
         // 添加订阅
         var watcher = context.entity.createWatcher(context.target, arrName, forScope, function (value) {
