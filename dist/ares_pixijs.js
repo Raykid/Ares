@@ -840,22 +840,15 @@ var ViewPortHandler = (function () {
                 this._dragging = true;
             }
             // 判断移动方向
-            if (this._direction == 0) {
+            if (this._direction == 0 && s.distance > 0) {
                 if (this._options && this._options.oneway) {
-                    if (Math.abs(s.x) > Math.abs(s.y)) {
+                    if (Math.abs(s.x) > Math.abs(s.y))
                         this._direction = ViewPortHandler.DIRECTION_H;
-                        dirH = true;
-                        dirV = false;
-                    }
-                    else {
+                    else
                         this._direction = ViewPortHandler.DIRECTION_V;
-                        dirH = false;
-                        dirV = true;
-                    }
                 }
                 else {
                     this._direction = ViewPortHandler.DIRECTION_H | ViewPortHandler.DIRECTION_V;
-                    dirH = dirV = true;
                 }
             }
             var dirH = (this._direction & ViewPortHandler.DIRECTION_H) > 0;
