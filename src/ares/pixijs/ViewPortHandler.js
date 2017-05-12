@@ -39,6 +39,7 @@ var ViewPortHandler = (function () {
             // 初始化状态
             this._downTarget = evt.target;
             this._dragging = false;
+            this._direction = 0;
             this._speed.set(0, 0);
             // 设置移动性
             this._movableH = (this._target["width"] || 0) > this._viewPort.width;
@@ -66,20 +67,29 @@ var ViewPortHandler = (function () {
             // 判断移动方向
             if (this._direction == 0) {
                 if (this._options && this._options.oneway) {
-                    if (Math.abs(s.x) > Math.abs(s.y))
+                    if (Math.abs(s.x) > Math.abs(s.y)) {
                         this._direction = ViewPortHandler.DIRECTION_H;
-                    else
+                        dirH = true;
+                        dirV = false;
+                    }
+                    else {
                         this._direction = ViewPortHandler.DIRECTION_V;
+                        dirH = false;
+                        dirV = true;
+                    }
                 }
                 else {
                     this._direction = ViewPortHandler.DIRECTION_H | ViewPortHandler.DIRECTION_V;
+                    dirH = dirV = true;
                 }
             }
+            var dirH = (this._direction & ViewPortHandler.DIRECTION_H) > 0;
+            var dirV = (this._direction & ViewPortHandler.DIRECTION_V) > 0;
             // 移动物体
             var sx = 0, sy = 0;
-            if (this._direction & ViewPortHandler.DIRECTION_H)
+            if (dirH)
                 sx = s.x;
-            if (this._direction & ViewPortHandler.DIRECTION_V)
+            if (dirV)
                 sy = s.y;
             this.moveTarget(sx, sy);
             // 记录本次坐标
@@ -87,7 +97,7 @@ var ViewPortHandler = (function () {
             // 计算运动速度
             var nowTime = Date.now();
             var deltaTime = nowTime - this._lastTime;
-            this._speed.set(this._movableH ? s.x / deltaTime * 5 : 0, this._movableV ? s.y / deltaTime * 5 : 0);
+            this._speed.set(dirH && this._movableH ? s.x / deltaTime * 5 : 0, dirV && this._movableV ? s.y / deltaTime * 5 : 0);
             // 记录最后时刻
             this._lastTime = nowTime;
         }
@@ -105,7 +115,6 @@ var ViewPortHandler = (function () {
             // 重置状态
             this._downTarget = null;
             this._dragging = false;
-            this._direction = 0;
             // 开始缓动
             this._ticker.start();
         }
@@ -210,8 +219,11 @@ var ViewPortHandler = (function () {
             }
         }
         // 停止tick
-        if (doneX && doneY)
+        if (doneX && doneY) {
             this._ticker.stop();
+            // 重置方向
+            this._direction = 0;
+        }
     };
     /**
      * 设置视点范围

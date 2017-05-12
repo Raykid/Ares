@@ -20,10 +20,9 @@ export interface CommandContext
 {
     scope:any;
     target:PIXI.DisplayObject;
-    subCmd:string;
-    exp:string;
     compiler:PIXICompiler;
     entity:IAres;
+    cmdData:CmdData;
     cmdDict:CmdDict;
     [name:string]:any;
 }
@@ -41,7 +40,7 @@ export function addCommand(name:string, command:Command):void
 /** 文本域命令 */
 export function textContent(context:CommandContext):void
 {
-    context.entity.createWatcher(context.target, context.exp, context.scope, (value:string)=>
+    context.entity.createWatcher(context.target, context.cmdData.exp, context.scope, (value:string)=>
     {
         var text:PIXI.Text = context.target as PIXI.Text;
         text.text = value;
@@ -52,10 +51,11 @@ export const commands:{[name:string]:Command} = {
     /** 视点命令 */
     viewport: (context:CommandContext)=>
     {
+        var cmdData:CmdData = context.cmdData;
         var target:PIXI.DisplayObject = context.target;
-        var exp:string = "[" + context.exp + "]";
+        var exp:string = "[" + cmdData.exp + "]";
         // 生成处理器
-        var options:ViewPortHandlerOptions = evalExp(context.subCmd, context.scope);
+        var options:ViewPortHandlerOptions = evalExp(cmdData.subCmd, context.scope);
         var handler:ViewPortHandler = new ViewPortHandler(target, options);
         // 设置监视，这里的target要优先使用$forTarget，因为在for里面的$target属性应该指向原始显示对象
         context.entity.createWatcher(context.scope.$forTarget || target, exp, context.scope, (value:number[])=>
@@ -72,10 +72,11 @@ export const commands:{[name:string]:Command} = {
     /** 模板替换命令 */
     tpl: (context:CommandContext)=>
     {
+        var cmdData:CmdData = context.cmdData;
         // 优先从本地模板库取到模板对象
-        var template:PIXI.DisplayObject = context.compiler.getTemplate(context.exp);
+        var template:PIXI.DisplayObject = context.compiler.getTemplate(cmdData.exp);
         // 本地模板库没有找到，去全局模板库里取
-        if(!template) template = getTemplate(context.exp);
+        if(!template) template = getTemplate(cmdData.exp);
         // 仍然没有找到，放弃
         if(!template) return context.target;
         // 拷贝模板
@@ -95,13 +96,14 @@ export const commands:{[name:string]:Command} = {
     /** 修改任意属性命令 */
     prop: (context:CommandContext)=>
     {
+        var cmdData:CmdData = context.cmdData;
         var target:PIXI.DisplayObject = context.target;
-        context.entity.createWatcher(target, context.exp, context.scope, (value:any)=>
+        context.entity.createWatcher(target, cmdData.exp, context.scope, (value:any)=>
         {
-            if(context.subCmd != "")
+            if(cmdData.subCmd != "")
             {
                 // 子命令形式
-                target[context.subCmd] = value;
+                target[cmdData.subCmd] = value;
             }
             else
             {
@@ -118,26 +120,27 @@ export const commands:{[name:string]:Command} = {
     /** 绑定事件 */
     on: (context:CommandContext)=>
     {
-        if(context.subCmd != "")
+        var cmdData:CmdData = context.cmdData;
+        if(cmdData.subCmd != "")
         {
-            var handler:Function = context.scope[context.exp] || window[context.exp];
+            var handler:Function = context.scope[cmdData.exp] || window[context.cmdData.exp];
             if(typeof handler == "function")
             {
                 // 是函数名形式
-                context.target.on(context.subCmd, function(){
+                context.target.on(cmdData.subCmd, function(){
                     handler.apply(this, arguments);
                 }, context.scope);
             }
             else
             {
                 // 是方法执行或者表达式方式
-                context.target.on(context.subCmd, (evt:Event)=>
+                context.target.on(cmdData.subCmd, (evt:Event)=>
                 {
                     // 创建一个临时的子域，用于保存参数
                     var scope:any = Object.create(context.scope);
                     scope.$event = evt;
                     scope.$target = context.target;
-                    runExp(context.exp, scope);
+                    runExp(cmdData.exp, scope);
                 });
             }
         }
@@ -147,6 +150,7 @@ export const commands:{[name:string]:Command} = {
     /** if命令 */
     if: (context:CommandContext)=>
     {
+        var cmdData:CmdData = context.cmdData;
         // 记录一个是否编译过的flag
         var compiled:boolean = false;
         // 插入一个占位元素
@@ -156,7 +160,7 @@ export const commands:{[name:string]:Command} = {
         var index:number = parent.getChildIndex(context.target);
         parent.addChildAt(refNode, index);
         // 只有在条件为true时才启动编译
-        var watcher:IWatcher = context.entity.createWatcher(context.target, context.exp, context.scope, (value:boolean)=>
+        var watcher:IWatcher = context.entity.createWatcher(context.target, cmdData.exp, context.scope, (value:boolean)=>
         {
             // 如果refNode被从显示列表移除了，则表示该if指令要作废了
             if(!refNode.parent)
@@ -194,12 +198,13 @@ export const commands:{[name:string]:Command} = {
     /** for命令 */
     for: (context:CommandContext)=>
     {
+        var cmdData:CmdData = context.cmdData;
         // 解析表达式
         var reg:RegExp = /^\s*(\S+)\s+in\s+(\S+)\s*$/;
-        var res:RegExpExecArray = reg.exec(context.exp);
+        var res:RegExpExecArray = reg.exec(cmdData.exp);
         if(!res)
         {
-            console.error("for命令表达式错误：" + context.exp);
+            console.error("for命令表达式错误：" + cmdData.exp);
             return;
         }
         var itemName:string = res[1];

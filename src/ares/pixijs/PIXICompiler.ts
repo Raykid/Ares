@@ -60,7 +60,8 @@ export interface CmdDict
 
 export class PIXICompiler implements Compiler
 {
-    private static _textExpReg:RegExp = /(.*?)\{\{(.*?)\}\}(.*)/;
+    private static _cmdRegExp:RegExp = /^a[\-_](\w+)([:\$](.+))?$/;
+    private static _textRegExp:RegExp = /(.*?)\{\{(.*?)\}\}(.*)/;
 
     private _root:PIXI.DisplayObject;
     private _config:PIXIBindConfig;
@@ -90,13 +91,12 @@ export class PIXICompiler implements Compiler
 
     private parseCmd(node:PIXI.DisplayObject):CmdDict
     {
-        var reg:RegExp = /^a[\-_](\w+)([:\$](.+))?$/;
         // 取到属性列表
         var results:RegExpExecArray[] = [];
         var result:RegExpExecArray;
         for(var t in node)
         {
-            result = reg.exec(t);
+            result = PIXICompiler._cmdRegExp.exec(t);
             if(result) results.push(result);
         }
         // 把配置中的属性推入属性列表中
@@ -104,7 +104,7 @@ export class PIXICompiler implements Compiler
         for(var t in conf)
         {
             if(t.indexOf("a-") != 0 && t.indexOf("a_") != 0) t = "a-" + t;
-            result = reg.exec(t);
+            result = PIXICompiler._cmdRegExp.exec(t);
             if(result) results.push(result);
         }
         // 开始遍历属性列表
@@ -190,17 +190,14 @@ export class PIXICompiler implements Compiler
         for(var cmdName in cmdDict)
         {
             var cmdData:CmdData = cmdDict[cmdName];
-            // 取到子命令名
-            var subCmd:string = cmdData.subCmd;
-            // 取到命令字符串
-            var exp:string = cmdData.exp;
             // 用命令名取到Command
             var cmd:Command = commands[cmdName];
             // 如果没有找到命令，则认为是自定义命令，套用prop命令
             if(!cmd)
             {
-                cmd = commands["prop"];
-                subCmd = cmdName || "";
+                cmdData.cmdName = "prop";
+                cmdData.subCmd = cmdName || "";
+                cmd = commands[cmdData.cmdName];
             }
             // 推入数组
             var cmdToCompile:{propName:string, cmd:Command, ctx:CommandContext} = {
@@ -209,18 +206,17 @@ export class PIXICompiler implements Compiler
                 ctx: {
                     scope: scope,
                     target: node,
-                    subCmd: subCmd,
-                    exp: exp,
                     compiler: this,
                     entity: this._entity,
+                    cmdData: cmdData,
                     cmdDict: cmdDict
                 }
             };
             // 如果是tpl命令则需要提前
-            if(cmdName == "tpl") cmdsToCompile.unshift(cmdToCompile);
+            if(cmdData.cmdName == "tpl") cmdsToCompile.unshift(cmdToCompile);
             else cmdsToCompile.push(cmdToCompile);
             // 如果是for或者if则设置懒编译
-            if(cmdName == "if" || cmdName == "for")
+            if(cmdData.cmdName == "if" || cmdData.cmdName == "for")
             {
                 hasLazyCompile = true;
                 // 清空数组，仅留下自身的编译
@@ -302,16 +298,20 @@ export class PIXICompiler implements Compiler
     private compileTextContent(text:PIXI.Text, scope:any, cmdDict:CmdDict):void
     {
         var value:string = text.text;
-        if(PIXICompiler._textExpReg.test(value))
+        if(PIXICompiler._textRegExp.test(value))
         {
             var exp:string = this.parseTextExp(value);
             textContent({
                 scope: scope,
                 target: text,
-                subCmd: "",
-                exp: exp,
                 compiler: this,
                 entity: this._entity,
+                cmdData: {
+                    cmdName: "textContent",
+                    subCmd: "",
+                    propName: "",
+                    exp: exp
+                },
                 cmdDict: cmdDict
             });
         }
@@ -319,7 +319,7 @@ export class PIXICompiler implements Compiler
 
     private parseTextExp(exp:string):string
     {
-        var reg:RegExp = PIXICompiler._textExpReg;
+        var reg:RegExp = PIXICompiler._textRegExp;
         for(var result:RegExpExecArray = reg.exec(exp); result != null; result = reg.exec(exp))
         {
             exp = result[1] + "${" + result[2] + "}" + result[3];

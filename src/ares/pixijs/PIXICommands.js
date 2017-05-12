@@ -15,7 +15,7 @@ function addCommand(name, command) {
 exports.addCommand = addCommand;
 /** 文本域命令 */
 function textContent(context) {
-    context.entity.createWatcher(context.target, context.exp, context.scope, function (value) {
+    context.entity.createWatcher(context.target, context.cmdData.exp, context.scope, function (value) {
         var text = context.target;
         text.text = value;
     });
@@ -24,10 +24,11 @@ exports.textContent = textContent;
 exports.commands = {
     /** 视点命令 */
     viewport: function (context) {
+        var cmdData = context.cmdData;
         var target = context.target;
-        var exp = "[" + context.exp + "]";
+        var exp = "[" + cmdData.exp + "]";
         // 生成处理器
-        var options = Utils_1.evalExp(context.subCmd, context.scope);
+        var options = Utils_1.evalExp(cmdData.subCmd, context.scope);
         var handler = new ViewPortHandler_1.ViewPortHandler(target, options);
         // 设置监视，这里的target要优先使用$forTarget，因为在for里面的$target属性应该指向原始显示对象
         context.entity.createWatcher(context.scope.$forTarget || target, exp, context.scope, function (value) {
@@ -42,11 +43,12 @@ exports.commands = {
     },
     /** 模板替换命令 */
     tpl: function (context) {
+        var cmdData = context.cmdData;
         // 优先从本地模板库取到模板对象
-        var template = context.compiler.getTemplate(context.exp);
+        var template = context.compiler.getTemplate(cmdData.exp);
         // 本地模板库没有找到，去全局模板库里取
         if (!template)
-            template = PIXICompiler_1.getTemplate(context.exp);
+            template = PIXICompiler_1.getTemplate(cmdData.exp);
         // 仍然没有找到，放弃
         if (!template)
             return context.target;
@@ -66,11 +68,12 @@ exports.commands = {
     },
     /** 修改任意属性命令 */
     prop: function (context) {
+        var cmdData = context.cmdData;
         var target = context.target;
-        context.entity.createWatcher(target, context.exp, context.scope, function (value) {
-            if (context.subCmd != "") {
+        context.entity.createWatcher(target, cmdData.exp, context.scope, function (value) {
+            if (cmdData.subCmd != "") {
                 // 子命令形式
-                target[context.subCmd] = value;
+                target[cmdData.subCmd] = value;
             }
             else {
                 // 集成形式，遍历所有value的key，如果其表达式值为true则添加其类型
@@ -84,22 +87,23 @@ exports.commands = {
     },
     /** 绑定事件 */
     on: function (context) {
-        if (context.subCmd != "") {
-            var handler = context.scope[context.exp] || window[context.exp];
+        var cmdData = context.cmdData;
+        if (cmdData.subCmd != "") {
+            var handler = context.scope[cmdData.exp] || window[context.cmdData.exp];
             if (typeof handler == "function") {
                 // 是函数名形式
-                context.target.on(context.subCmd, function () {
+                context.target.on(cmdData.subCmd, function () {
                     handler.apply(this, arguments);
                 }, context.scope);
             }
             else {
                 // 是方法执行或者表达式方式
-                context.target.on(context.subCmd, function (evt) {
+                context.target.on(cmdData.subCmd, function (evt) {
                     // 创建一个临时的子域，用于保存参数
                     var scope = Object.create(context.scope);
                     scope.$event = evt;
                     scope.$target = context.target;
-                    Utils_1.runExp(context.exp, scope);
+                    Utils_1.runExp(cmdData.exp, scope);
                 });
             }
         }
@@ -108,6 +112,7 @@ exports.commands = {
     },
     /** if命令 */
     if: function (context) {
+        var cmdData = context.cmdData;
         // 记录一个是否编译过的flag
         var compiled = false;
         // 插入一个占位元素
@@ -117,7 +122,7 @@ exports.commands = {
         var index = parent.getChildIndex(context.target);
         parent.addChildAt(refNode, index);
         // 只有在条件为true时才启动编译
-        var watcher = context.entity.createWatcher(context.target, context.exp, context.scope, function (value) {
+        var watcher = context.entity.createWatcher(context.target, cmdData.exp, context.scope, function (value) {
             // 如果refNode被从显示列表移除了，则表示该if指令要作废了
             if (!refNode.parent) {
                 watcher.dispose();
@@ -147,11 +152,12 @@ exports.commands = {
     },
     /** for命令 */
     for: function (context) {
+        var cmdData = context.cmdData;
         // 解析表达式
         var reg = /^\s*(\S+)\s+in\s+(\S+)\s*$/;
-        var res = reg.exec(context.exp);
+        var res = reg.exec(cmdData.exp);
         if (!res) {
-            console.error("for命令表达式错误：" + context.exp);
+            console.error("for命令表达式错误：" + cmdData.exp);
             return;
         }
         var itemName = res[1];

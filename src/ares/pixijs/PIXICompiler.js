@@ -53,12 +53,11 @@ var PIXICompiler = (function () {
         configurable: true
     });
     PIXICompiler.prototype.parseCmd = function (node) {
-        var reg = /^a[\-_](\w+)([:\$](.+))?$/;
         // 取到属性列表
         var results = [];
         var result;
         for (var t in node) {
-            result = reg.exec(t);
+            result = PIXICompiler._cmdRegExp.exec(t);
             if (result)
                 results.push(result);
         }
@@ -67,7 +66,7 @@ var PIXICompiler = (function () {
         for (var t in conf) {
             if (t.indexOf("a-") != 0 && t.indexOf("a_") != 0)
                 t = "a-" + t;
-            result = reg.exec(t);
+            result = PIXICompiler._cmdRegExp.exec(t);
             if (result)
                 results.push(result);
         }
@@ -145,16 +144,13 @@ var PIXICompiler = (function () {
         var cmdsToCompile = [];
         for (var cmdName in cmdDict) {
             var cmdData = cmdDict[cmdName];
-            // 取到子命令名
-            var subCmd = cmdData.subCmd;
-            // 取到命令字符串
-            var exp = cmdData.exp;
             // 用命令名取到Command
             var cmd = PIXICommands_1.commands[cmdName];
             // 如果没有找到命令，则认为是自定义命令，套用prop命令
             if (!cmd) {
-                cmd = PIXICommands_1.commands["prop"];
-                subCmd = cmdName || "";
+                cmdData.cmdName = "prop";
+                cmdData.subCmd = cmdName || "";
+                cmd = PIXICommands_1.commands[cmdData.cmdName];
             }
             // 推入数组
             var cmdToCompile = {
@@ -163,20 +159,19 @@ var PIXICompiler = (function () {
                 ctx: {
                     scope: scope,
                     target: node,
-                    subCmd: subCmd,
-                    exp: exp,
                     compiler: this,
                     entity: this._entity,
+                    cmdData: cmdData,
                     cmdDict: cmdDict
                 }
             };
             // 如果是tpl命令则需要提前
-            if (cmdName == "tpl")
+            if (cmdData.cmdName == "tpl")
                 cmdsToCompile.unshift(cmdToCompile);
             else
                 cmdsToCompile.push(cmdToCompile);
             // 如果是for或者if则设置懒编译
-            if (cmdName == "if" || cmdName == "for") {
+            if (cmdData.cmdName == "if" || cmdData.cmdName == "for") {
                 hasLazyCompile = true;
                 // 清空数组，仅留下自身的编译
                 cmdsToCompile.splice(0, cmdsToCompile.length - 1);
@@ -247,21 +242,25 @@ var PIXICompiler = (function () {
     };
     PIXICompiler.prototype.compileTextContent = function (text, scope, cmdDict) {
         var value = text.text;
-        if (PIXICompiler._textExpReg.test(value)) {
+        if (PIXICompiler._textRegExp.test(value)) {
             var exp = this.parseTextExp(value);
             PIXICommands_1.textContent({
                 scope: scope,
                 target: text,
-                subCmd: "",
-                exp: exp,
                 compiler: this,
                 entity: this._entity,
+                cmdData: {
+                    cmdName: "textContent",
+                    subCmd: "",
+                    propName: "",
+                    exp: exp
+                },
                 cmdDict: cmdDict
             });
         }
     };
     PIXICompiler.prototype.parseTextExp = function (exp) {
-        var reg = PIXICompiler._textExpReg;
+        var reg = PIXICompiler._textRegExp;
         for (var result = reg.exec(exp); result != null; result = reg.exec(exp)) {
             exp = result[1] + "${" + result[2] + "}" + result[3];
         }
@@ -269,6 +268,7 @@ var PIXICompiler = (function () {
     };
     return PIXICompiler;
 }());
-PIXICompiler._textExpReg = /(.*?)\{\{(.*?)\}\}(.*)/;
+PIXICompiler._cmdRegExp = /^a[\-_](\w+)([:\$](.+))?$/;
+PIXICompiler._textRegExp = /(.*?)\{\{(.*?)\}\}(.*)/;
 exports.PIXICompiler = PIXICompiler;
 //# sourceMappingURL=PIXICompiler.js.map

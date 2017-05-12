@@ -72,6 +72,7 @@ export class ViewPortHandler
             // 初始化状态
             this._downTarget = evt.target;
             this._dragging = false;
+            this._direction = 0;
             this._speed.set(0, 0);
             // 设置移动性
             this._movableH = (this._target["width"] || 0) > this._viewPort.width;
@@ -105,18 +106,31 @@ export class ViewPortHandler
             {
                 if(this._options && this._options.oneway)
                 {
-                    if(Math.abs(s.x) > Math.abs(s.y)) this._direction = ViewPortHandler.DIRECTION_H;
-                    else this._direction = ViewPortHandler.DIRECTION_V;
+                    if(Math.abs(s.x) > Math.abs(s.y))
+                    {
+                        this._direction = ViewPortHandler.DIRECTION_H;
+                        dirH = true;
+                        dirV = false;
+                    }
+                    else
+                    {
+                        this._direction = ViewPortHandler.DIRECTION_V;
+                        dirH = false;
+                        dirV = true;
+                    }
                 }
                 else
                 {
                     this._direction = ViewPortHandler.DIRECTION_H | ViewPortHandler.DIRECTION_V;
+                    dirH = dirV = true;
                 }
             }
+            var dirH:boolean = (this._direction & ViewPortHandler.DIRECTION_H) > 0;
+            var dirV:boolean = (this._direction & ViewPortHandler.DIRECTION_V) > 0;
             // 移动物体
             var sx:number = 0, sy:number = 0;
-            if(this._direction & ViewPortHandler.DIRECTION_H) sx = s.x;
-            if(this._direction & ViewPortHandler.DIRECTION_V) sy = s.y;
+            if(dirH) sx = s.x;
+            if(dirV) sy = s.y;
             this.moveTarget(sx, sy);
             // 记录本次坐标
             this._lastPoint = nowPoint;
@@ -124,8 +138,8 @@ export class ViewPortHandler
             var nowTime:number = Date.now();
             var deltaTime:number = nowTime - this._lastTime;
             this._speed.set(
-                this._movableH ? s.x / deltaTime * 5 : 0,
-                this._movableV ? s.y / deltaTime * 5 : 0
+                dirH && this._movableH ? s.x / deltaTime * 5 : 0,
+                dirV && this._movableV ? s.y / deltaTime * 5 : 0
             );
             // 记录最后时刻
             this._lastTime = nowTime;
@@ -146,7 +160,6 @@ export class ViewPortHandler
             // 重置状态
             this._downTarget = null;
             this._dragging = false;
-            this._direction = 0;
             // 开始缓动
             this._ticker.start();
         }
@@ -262,7 +275,12 @@ export class ViewPortHandler
             }
         }
         // 停止tick
-        if(doneX && doneY) this._ticker.stop();
+        if(doneX && doneY)
+        {
+            this._ticker.stop();
+            // 重置方向
+            this._direction = 0;
+        }
     }
 
     /**

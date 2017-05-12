@@ -5,9 +5,23 @@
 import {Compiler, IAres} from "../Interfaces";
 import {Command, CommandContext, commands, textContent} from "./HTMLCommands";
 
+export interface CmdData
+{
+    cmdName:string;
+    subCmd:string;
+    propName:string;
+    exp:string;
+}
+
+export interface CmdDict
+{
+    [cmdName:string]:CmdData;
+}
+
 export class HTMLCompiler implements Compiler
 {
-    private static _textExpReg:RegExp = /(.*?)\{\{(.*?)\}\}(.*)/;
+    private static _cmdRegExp:RegExp = /^(data\-)?a\-(\w+)(:(.+))?$/;
+    private static _textRegExp:RegExp = /(.*?)\{\{(.*?)\}\}(.*)/;
 
     private _selectorsOrElement:string|HTMLElement;
     private _root:HTMLElement;
@@ -36,10 +50,11 @@ export class HTMLCompiler implements Compiler
 
     public compile(node:Node, scope:any):void
     {
+        var cmdDict:CmdDict = {};
         if(node.nodeType == 3)
         {
             // 是个文本节点
-            this.compileTextContent(node, scope);
+            this.compileTextContent(node, scope, cmdDict);
         }
         else
         {
@@ -52,22 +67,22 @@ export class HTMLCompiler implements Compiler
             {
                 var attr:Attr = attrs[i];
                 var name:string = attr.name;
-                // 所有属性必须以data-a-或者a-开头
-                if(name.indexOf("a-") == 0 || name.indexOf("data-a-") == 0)
+                // 检测命令
+                var result:RegExpExecArray = HTMLCompiler._cmdRegExp.exec(name);
+                if(result)
                 {
-                    var bIndex:number = (name.charAt(0) == "d" ? 7 : 2);
-                    var eIndex:number = name.indexOf(":");
-                    if(eIndex < 0) eIndex = name.length;
                     // 取到命令名
-                    var cmdName:string = name.substring(bIndex, eIndex);
+                    var cmdName:string = result[2];
                     // 用命令名取到Command
                     var cmd:Command = commands[cmdName];
                     if(cmd)
                     {
-                        // 取到子命令名
-                        var subCmd:string = name.substr(eIndex + 1);
-                        // 取到命令字符串
-                        var exp:string = attr.value;
+                        var cmdData:CmdData = {
+                            cmdName: cmdName,
+                            subCmd: result[4],
+                            propName: result[0],
+                            exp: attr.value
+                        };
                         // 推入数组
                         cmdsToCompile.push({
                             attr: attr,
@@ -75,10 +90,10 @@ export class HTMLCompiler implements Compiler
                             ctx: {
                                 scope: scope,
                                 target: node as HTMLElement,
-                                subCmd: subCmd,
-                                exp: exp,
                                 compiler: this,
-                                entity: this._entity
+                                entity: this._entity,
+                                cmdData: cmdData,
+                                cmdDict: cmdDict
                             }
                         });
                         // 如果是for或者if则设置懒编译
@@ -115,25 +130,30 @@ export class HTMLCompiler implements Compiler
         }
     }
 
-    private compileTextContent(node:Node, scope:any):void
+    private compileTextContent(node:Node, scope:any, cmdDict:CmdDict):void
     {
-        if(HTMLCompiler._textExpReg.test(node.nodeValue))
+        if(HTMLCompiler._textRegExp.test(node.nodeValue))
         {
             var exp:string = this.parseTextExp(node.nodeValue);
             textContent({
                 scope: scope,
                 target: node,
-                subCmd: "",
-                exp: exp,
                 compiler: this,
-                entity: this._entity
+                entity: this._entity,
+                cmdData: {
+                    cmdName: "",
+                    subCmd: "",
+                    propName: "",
+                    exp: exp
+                },
+                cmdDict: cmdDict
             });
         }
     }
 
     private parseTextExp(exp:string):string
     {
-        var reg:RegExp = HTMLCompiler._textExpReg;
+        var reg:RegExp = HTMLCompiler._textRegExp;
         for(var result:RegExpExecArray = reg.exec(exp); result != null; result = reg.exec(exp))
         {
             exp = result[1] + "${" + result[2] + "}" + result[3];

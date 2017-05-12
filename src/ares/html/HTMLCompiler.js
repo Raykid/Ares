@@ -25,9 +25,10 @@ var HTMLCompiler = (function () {
         this.compile(this._root, entity.data);
     };
     HTMLCompiler.prototype.compile = function (node, scope) {
+        var cmdDict = {};
         if (node.nodeType == 3) {
             // 是个文本节点
-            this.compileTextContent(node, scope);
+            this.compileTextContent(node, scope, cmdDict);
         }
         else {
             // 不是文本节点
@@ -38,21 +39,20 @@ var HTMLCompiler = (function () {
             for (var i = 0, len = attrs.length; i < len; i++) {
                 var attr = attrs[i];
                 var name = attr.name;
-                // 所有属性必须以data-a-或者a-开头
-                if (name.indexOf("a-") == 0 || name.indexOf("data-a-") == 0) {
-                    var bIndex = (name.charAt(0) == "d" ? 7 : 2);
-                    var eIndex = name.indexOf(":");
-                    if (eIndex < 0)
-                        eIndex = name.length;
+                // 检测命令
+                var result = HTMLCompiler._cmdRegExp.exec(name);
+                if (result) {
                     // 取到命令名
-                    var cmdName = name.substring(bIndex, eIndex);
+                    var cmdName = result[2];
                     // 用命令名取到Command
                     var cmd = HTMLCommands_1.commands[cmdName];
                     if (cmd) {
-                        // 取到子命令名
-                        var subCmd = name.substr(eIndex + 1);
-                        // 取到命令字符串
-                        var exp = attr.value;
+                        var cmdData = {
+                            cmdName: cmdName,
+                            subCmd: result[4],
+                            propName: result[0],
+                            exp: attr.value
+                        };
                         // 推入数组
                         cmdsToCompile.push({
                             attr: attr,
@@ -60,10 +60,10 @@ var HTMLCompiler = (function () {
                             ctx: {
                                 scope: scope,
                                 target: node,
-                                subCmd: subCmd,
-                                exp: exp,
                                 compiler: this,
-                                entity: this._entity
+                                entity: this._entity,
+                                cmdData: cmdData,
+                                cmdDict: cmdDict
                             }
                         });
                         // 如果是for或者if则设置懒编译
@@ -95,21 +95,26 @@ var HTMLCompiler = (function () {
             }
         }
     };
-    HTMLCompiler.prototype.compileTextContent = function (node, scope) {
-        if (HTMLCompiler._textExpReg.test(node.nodeValue)) {
+    HTMLCompiler.prototype.compileTextContent = function (node, scope, cmdDict) {
+        if (HTMLCompiler._textRegExp.test(node.nodeValue)) {
             var exp = this.parseTextExp(node.nodeValue);
             HTMLCommands_1.textContent({
                 scope: scope,
                 target: node,
-                subCmd: "",
-                exp: exp,
                 compiler: this,
-                entity: this._entity
+                entity: this._entity,
+                cmdData: {
+                    cmdName: "",
+                    subCmd: "",
+                    propName: "",
+                    exp: exp
+                },
+                cmdDict: cmdDict
             });
         }
     };
     HTMLCompiler.prototype.parseTextExp = function (exp) {
-        var reg = HTMLCompiler._textExpReg;
+        var reg = HTMLCompiler._textRegExp;
         for (var result = reg.exec(exp); result != null; result = reg.exec(exp)) {
             exp = result[1] + "${" + result[2] + "}" + result[3];
         }
@@ -117,6 +122,7 @@ var HTMLCompiler = (function () {
     };
     return HTMLCompiler;
 }());
-HTMLCompiler._textExpReg = /(.*?)\{\{(.*?)\}\}(.*)/;
+HTMLCompiler._cmdRegExp = /^(data\-)?a\-(\w+)(:(.+))?$/;
+HTMLCompiler._textRegExp = /(.*?)\{\{(.*?)\}\}(.*)/;
 exports.HTMLCompiler = HTMLCompiler;
 //# sourceMappingURL=HTMLCompiler.js.map

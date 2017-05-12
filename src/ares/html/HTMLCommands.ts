@@ -2,6 +2,7 @@
  * Created by Raykid on 2016/12/22.
  */
 
+import {CmdDict, CmdData} from "./HTMLCompiler";
 import {Compiler, IAres} from "../Interfaces";
 import {runExp} from "../Utils";
 
@@ -14,10 +15,10 @@ export interface CommandContext
 {
     scope:any;
     target:Node;
-    subCmd:string;
-    exp:string;
     compiler:Compiler;
     entity:IAres;
+    cmdData:CmdData;
+    cmdDict:CmdDict;
     [name:string]:any;
 }
 
@@ -34,7 +35,7 @@ export function addCommand(name:string, command:Command):void
 /** 文本域命令 */
 export function textContent(context:CommandContext):void
 {
-    context.entity.createWatcher(context.target, context.exp, context.scope, (value:string)=>
+    context.entity.createWatcher(context.target, context.cmdData.exp, context.scope, (value:string)=>
     {
         context.target.nodeValue = value;
     });
@@ -44,7 +45,7 @@ export const commands:{[name:string]:Command} = {
     /** 文本命令 */
     text: (context:CommandContext)=>
     {
-        context.entity.createWatcher(context.target, context.exp, context.scope, (value:string)=>
+        context.entity.createWatcher(context.target, context.cmdData.exp, context.scope, (value:string)=>
         {
             context.target.textContent = value;
         });
@@ -52,7 +53,7 @@ export const commands:{[name:string]:Command} = {
     /** HTML文本命令 */
     html: (context:CommandContext)=>
     {
-        context.entity.createWatcher(context.target, context.exp, context.scope, (value:string)=>
+        context.entity.createWatcher(context.target, context.cmdData.exp, context.scope, (value:string)=>
         {
             var target:HTMLElement = context.target as HTMLElement;
             target.innerHTML = value;
@@ -71,7 +72,7 @@ export const commands:{[name:string]:Command} = {
         // 记录原始class值
         var oriCls:string = target.getAttribute("class");
         // 生成订阅器
-        context.entity.createWatcher(context.target, context.exp, context.scope, (params:any)=>
+        context.entity.createWatcher(context.target, context.cmdData.exp, context.scope, (params:any)=>
         {
             if(typeof params == "string")
             {
@@ -98,13 +99,14 @@ export const commands:{[name:string]:Command} = {
     /** 修改任意属性命令 */
     attr: (context:CommandContext)=>
     {
+        var cmdData:CmdData = context.cmdData;
         var target:HTMLElement = context.target as HTMLElement;
-        context.entity.createWatcher(context.target, context.exp, context.scope, (value:any)=>
+        context.entity.createWatcher(context.target, cmdData.exp, context.scope, (value:any)=>
         {
-            if(context.subCmd != "")
+            if(cmdData.subCmd != "")
             {
                 // 子命令形式
-                target.setAttribute(context.subCmd, value);
+                target.setAttribute(cmdData.subCmd, value);
             }
             else
             {
@@ -120,24 +122,25 @@ export const commands:{[name:string]:Command} = {
     /** 绑定事件 */
     on: (context:CommandContext)=>
     {
-        if(context.subCmd != "")
+        var cmdData:CmdData = context.cmdData;
+        if(cmdData.subCmd != "")
         {
-            var handler:Function = context.scope[context.exp] || window[context.exp];
+            var handler:Function = context.scope[cmdData.exp] || window[context.cmdData.exp];
             if(typeof handler == "function")
             {
                 // 是函数名形式
-                context.target.addEventListener(context.subCmd, handler.bind(context.scope));
+                context.target.addEventListener(cmdData.subCmd, handler.bind(context.scope));
             }
             else
             {
                 // 是方法执行或者表达式方式
-                context.target.addEventListener(context.subCmd, (evt:Event)=>
+                context.target.addEventListener(cmdData.subCmd, (evt:Event)=>
                 {
                     // 创建一个临时的子域，用于保存参数
                     var scope:any = Object.create(context.scope);
                     scope.$event = evt;
                     scope.$target = context.target;
-                    runExp(context.exp, scope);
+                    runExp(cmdData.exp, scope);
                 });
             }
         }
@@ -151,7 +154,7 @@ export const commands:{[name:string]:Command} = {
         var refNode:Node = document.createTextNode("");
         context.target.parentNode.insertBefore(refNode, context.target);
         // 只有在条件为true时才启动编译
-        context.entity.createWatcher(context.target, context.exp, context.scope, (value:boolean)=>
+        context.entity.createWatcher(context.target, context.cmdData.exp, context.scope, (value:boolean)=>
         {
             if(value == true)
             {
@@ -180,12 +183,13 @@ export const commands:{[name:string]:Command} = {
     /** for命令 */
     for: (context:CommandContext)=>
     {
+        var cmdData:CmdData = context.cmdData;
         // 解析表达式
         var reg:RegExp = /^\s*(\S+)\s+in\s+(\S+)\s*$/;
-        var res:RegExpExecArray = reg.exec(context.exp);
+        var res:RegExpExecArray = reg.exec(cmdData.exp);
         if(!res)
         {
-            console.error("for命令表达式错误：" + context.exp);
+            console.error("for命令表达式错误：" + cmdData.exp);
             return;
         }
         var itemName:string = res[1];

@@ -443,7 +443,7 @@ define("src/ares/html/HTMLCommands", ["require", "exports", "src/ares/Utils"], f
     exports.addCommand = addCommand;
     /** 文本域命令 */
     function textContent(context) {
-        context.entity.createWatcher(context.target, context.exp, context.scope, function (value) {
+        context.entity.createWatcher(context.target, context.cmdData.exp, context.scope, function (value) {
             context.target.nodeValue = value;
         });
     }
@@ -451,13 +451,13 @@ define("src/ares/html/HTMLCommands", ["require", "exports", "src/ares/Utils"], f
     exports.commands = {
         /** 文本命令 */
         text: function (context) {
-            context.entity.createWatcher(context.target, context.exp, context.scope, function (value) {
+            context.entity.createWatcher(context.target, context.cmdData.exp, context.scope, function (value) {
                 context.target.textContent = value;
             });
         },
         /** HTML文本命令 */
         html: function (context) {
-            context.entity.createWatcher(context.target, context.exp, context.scope, function (value) {
+            context.entity.createWatcher(context.target, context.cmdData.exp, context.scope, function (value) {
                 var target = context.target;
                 target.innerHTML = value;
                 // 设置完成后需要重新编译一下当前节点的所有子节点
@@ -473,7 +473,7 @@ define("src/ares/html/HTMLCommands", ["require", "exports", "src/ares/Utils"], f
             // 记录原始class值
             var oriCls = target.getAttribute("class");
             // 生成订阅器
-            context.entity.createWatcher(context.target, context.exp, context.scope, function (params) {
+            context.entity.createWatcher(context.target, context.cmdData.exp, context.scope, function (params) {
                 if (typeof params == "string") {
                     // 直接赋值形式
                     if (oriCls)
@@ -499,11 +499,12 @@ define("src/ares/html/HTMLCommands", ["require", "exports", "src/ares/Utils"], f
         },
         /** 修改任意属性命令 */
         attr: function (context) {
+            var cmdData = context.cmdData;
             var target = context.target;
-            context.entity.createWatcher(context.target, context.exp, context.scope, function (value) {
-                if (context.subCmd != "") {
+            context.entity.createWatcher(context.target, cmdData.exp, context.scope, function (value) {
+                if (cmdData.subCmd != "") {
                     // 子命令形式
-                    target.setAttribute(context.subCmd, value);
+                    target.setAttribute(cmdData.subCmd, value);
                 }
                 else {
                     // 集成形式，遍历所有value的key，如果其表达式值为true则添加其类型
@@ -516,20 +517,21 @@ define("src/ares/html/HTMLCommands", ["require", "exports", "src/ares/Utils"], f
         },
         /** 绑定事件 */
         on: function (context) {
-            if (context.subCmd != "") {
-                var handler = context.scope[context.exp] || window[context.exp];
+            var cmdData = context.cmdData;
+            if (cmdData.subCmd != "") {
+                var handler = context.scope[cmdData.exp] || window[context.cmdData.exp];
                 if (typeof handler == "function") {
                     // 是函数名形式
-                    context.target.addEventListener(context.subCmd, handler.bind(context.scope));
+                    context.target.addEventListener(cmdData.subCmd, handler.bind(context.scope));
                 }
                 else {
                     // 是方法执行或者表达式方式
-                    context.target.addEventListener(context.subCmd, function (evt) {
+                    context.target.addEventListener(cmdData.subCmd, function (evt) {
                         // 创建一个临时的子域，用于保存参数
                         var scope = Object.create(context.scope);
                         scope.$event = evt;
                         scope.$target = context.target;
-                        Utils_2.runExp(context.exp, scope);
+                        Utils_2.runExp(cmdData.exp, scope);
                     });
                 }
             }
@@ -542,7 +544,7 @@ define("src/ares/html/HTMLCommands", ["require", "exports", "src/ares/Utils"], f
             var refNode = document.createTextNode("");
             context.target.parentNode.insertBefore(refNode, context.target);
             // 只有在条件为true时才启动编译
-            context.entity.createWatcher(context.target, context.exp, context.scope, function (value) {
+            context.entity.createWatcher(context.target, context.cmdData.exp, context.scope, function (value) {
                 if (value == true) {
                     // 启动编译
                     if (!compiled) {
@@ -564,11 +566,12 @@ define("src/ares/html/HTMLCommands", ["require", "exports", "src/ares/Utils"], f
         },
         /** for命令 */
         for: function (context) {
+            var cmdData = context.cmdData;
             // 解析表达式
             var reg = /^\s*(\S+)\s+in\s+(\S+)\s*$/;
-            var res = reg.exec(context.exp);
+            var res = reg.exec(cmdData.exp);
             if (!res) {
-                console.error("for命令表达式错误：" + context.exp);
+                console.error("for命令表达式错误：" + cmdData.exp);
                 return;
             }
             var itemName = res[1];
@@ -649,9 +652,10 @@ define("src/ares/html/HTMLCompiler", ["require", "exports", "src/ares/html/HTMLC
             this.compile(this._root, entity.data);
         };
         HTMLCompiler.prototype.compile = function (node, scope) {
+            var cmdDict = {};
             if (node.nodeType == 3) {
                 // 是个文本节点
-                this.compileTextContent(node, scope);
+                this.compileTextContent(node, scope, cmdDict);
             }
             else {
                 // 不是文本节点
@@ -662,21 +666,20 @@ define("src/ares/html/HTMLCompiler", ["require", "exports", "src/ares/html/HTMLC
                 for (var i = 0, len = attrs.length; i < len; i++) {
                     var attr = attrs[i];
                     var name = attr.name;
-                    // 所有属性必须以data-a-或者a-开头
-                    if (name.indexOf("a-") == 0 || name.indexOf("data-a-") == 0) {
-                        var bIndex = (name.charAt(0) == "d" ? 7 : 2);
-                        var eIndex = name.indexOf(":");
-                        if (eIndex < 0)
-                            eIndex = name.length;
+                    // 检测命令
+                    var result = HTMLCompiler._cmdRegExp.exec(name);
+                    if (result) {
                         // 取到命令名
-                        var cmdName = name.substring(bIndex, eIndex);
+                        var cmdName = result[2];
                         // 用命令名取到Command
                         var cmd = HTMLCommands_1.commands[cmdName];
                         if (cmd) {
-                            // 取到子命令名
-                            var subCmd = name.substr(eIndex + 1);
-                            // 取到命令字符串
-                            var exp = attr.value;
+                            var cmdData = {
+                                cmdName: cmdName,
+                                subCmd: result[4],
+                                propName: result[0],
+                                exp: attr.value
+                            };
                             // 推入数组
                             cmdsToCompile.push({
                                 attr: attr,
@@ -684,10 +687,10 @@ define("src/ares/html/HTMLCompiler", ["require", "exports", "src/ares/html/HTMLC
                                 ctx: {
                                     scope: scope,
                                     target: node,
-                                    subCmd: subCmd,
-                                    exp: exp,
                                     compiler: this,
-                                    entity: this._entity
+                                    entity: this._entity,
+                                    cmdData: cmdData,
+                                    cmdDict: cmdDict
                                 }
                             });
                             // 如果是for或者if则设置懒编译
@@ -719,21 +722,26 @@ define("src/ares/html/HTMLCompiler", ["require", "exports", "src/ares/html/HTMLC
                 }
             }
         };
-        HTMLCompiler.prototype.compileTextContent = function (node, scope) {
-            if (HTMLCompiler._textExpReg.test(node.nodeValue)) {
+        HTMLCompiler.prototype.compileTextContent = function (node, scope, cmdDict) {
+            if (HTMLCompiler._textRegExp.test(node.nodeValue)) {
                 var exp = this.parseTextExp(node.nodeValue);
                 HTMLCommands_1.textContent({
                     scope: scope,
                     target: node,
-                    subCmd: "",
-                    exp: exp,
                     compiler: this,
-                    entity: this._entity
+                    entity: this._entity,
+                    cmdData: {
+                        cmdName: "",
+                        subCmd: "",
+                        propName: "",
+                        exp: exp
+                    },
+                    cmdDict: cmdDict
                 });
             }
         };
         HTMLCompiler.prototype.parseTextExp = function (exp) {
-            var reg = HTMLCompiler._textExpReg;
+            var reg = HTMLCompiler._textRegExp;
             for (var result = reg.exec(exp); result != null; result = reg.exec(exp)) {
                 exp = result[1] + "${" + result[2] + "}" + result[3];
             }
@@ -741,7 +749,8 @@ define("src/ares/html/HTMLCompiler", ["require", "exports", "src/ares/html/HTMLC
         };
         return HTMLCompiler;
     }());
-    HTMLCompiler._textExpReg = /(.*?)\{\{(.*?)\}\}(.*)/;
+    HTMLCompiler._cmdRegExp = /^(data\-)?a\-(\w+)(:(.+))?$/;
+    HTMLCompiler._textRegExp = /(.*?)\{\{(.*?)\}\}(.*)/;
     exports.HTMLCompiler = HTMLCompiler;
 });
 define("src/ares/pixijs/ViewPortHandler", ["require", "exports"], function (require, exports) {
@@ -786,6 +795,7 @@ define("src/ares/pixijs/ViewPortHandler", ["require", "exports"], function (requ
                 // 初始化状态
                 this._downTarget = evt.target;
                 this._dragging = false;
+                this._direction = 0;
                 this._speed.set(0, 0);
                 // 设置移动性
                 this._movableH = (this._target["width"] || 0) > this._viewPort.width;
@@ -813,20 +823,29 @@ define("src/ares/pixijs/ViewPortHandler", ["require", "exports"], function (requ
                 // 判断移动方向
                 if (this._direction == 0) {
                     if (this._options && this._options.oneway) {
-                        if (Math.abs(s.x) > Math.abs(s.y))
+                        if (Math.abs(s.x) > Math.abs(s.y)) {
                             this._direction = ViewPortHandler.DIRECTION_H;
-                        else
+                            dirH = true;
+                            dirV = false;
+                        }
+                        else {
                             this._direction = ViewPortHandler.DIRECTION_V;
+                            dirH = false;
+                            dirV = true;
+                        }
                     }
                     else {
                         this._direction = ViewPortHandler.DIRECTION_H | ViewPortHandler.DIRECTION_V;
+                        dirH = dirV = true;
                     }
                 }
+                var dirH = (this._direction & ViewPortHandler.DIRECTION_H) > 0;
+                var dirV = (this._direction & ViewPortHandler.DIRECTION_V) > 0;
                 // 移动物体
                 var sx = 0, sy = 0;
-                if (this._direction & ViewPortHandler.DIRECTION_H)
+                if (dirH)
                     sx = s.x;
-                if (this._direction & ViewPortHandler.DIRECTION_V)
+                if (dirV)
                     sy = s.y;
                 this.moveTarget(sx, sy);
                 // 记录本次坐标
@@ -834,7 +853,7 @@ define("src/ares/pixijs/ViewPortHandler", ["require", "exports"], function (requ
                 // 计算运动速度
                 var nowTime = Date.now();
                 var deltaTime = nowTime - this._lastTime;
-                this._speed.set(this._movableH ? s.x / deltaTime * 5 : 0, this._movableV ? s.y / deltaTime * 5 : 0);
+                this._speed.set(dirH && this._movableH ? s.x / deltaTime * 5 : 0, dirV && this._movableV ? s.y / deltaTime * 5 : 0);
                 // 记录最后时刻
                 this._lastTime = nowTime;
             }
@@ -852,7 +871,6 @@ define("src/ares/pixijs/ViewPortHandler", ["require", "exports"], function (requ
                 // 重置状态
                 this._downTarget = null;
                 this._dragging = false;
-                this._direction = 0;
                 // 开始缓动
                 this._ticker.start();
             }
@@ -957,8 +975,11 @@ define("src/ares/pixijs/ViewPortHandler", ["require", "exports"], function (requ
                 }
             }
             // 停止tick
-            if (doneX && doneY)
+            if (doneX && doneY) {
                 this._ticker.stop();
+                // 重置方向
+                this._direction = 0;
+            }
         };
         /**
          * 设置视点范围
@@ -1001,7 +1022,7 @@ define("src/ares/pixijs/PIXICommands", ["require", "exports", "src/ares/pixijs/P
     exports.addCommand = addCommand;
     /** 文本域命令 */
     function textContent(context) {
-        context.entity.createWatcher(context.target, context.exp, context.scope, function (value) {
+        context.entity.createWatcher(context.target, context.cmdData.exp, context.scope, function (value) {
             var text = context.target;
             text.text = value;
         });
@@ -1010,10 +1031,11 @@ define("src/ares/pixijs/PIXICommands", ["require", "exports", "src/ares/pixijs/P
     exports.commands = {
         /** 视点命令 */
         viewport: function (context) {
+            var cmdData = context.cmdData;
             var target = context.target;
-            var exp = "[" + context.exp + "]";
+            var exp = "[" + cmdData.exp + "]";
             // 生成处理器
-            var options = Utils_3.evalExp(context.subCmd, context.scope);
+            var options = Utils_3.evalExp(cmdData.subCmd, context.scope);
             var handler = new ViewPortHandler_1.ViewPortHandler(target, options);
             // 设置监视，这里的target要优先使用$forTarget，因为在for里面的$target属性应该指向原始显示对象
             context.entity.createWatcher(context.scope.$forTarget || target, exp, context.scope, function (value) {
@@ -1028,11 +1050,12 @@ define("src/ares/pixijs/PIXICommands", ["require", "exports", "src/ares/pixijs/P
         },
         /** 模板替换命令 */
         tpl: function (context) {
+            var cmdData = context.cmdData;
             // 优先从本地模板库取到模板对象
-            var template = context.compiler.getTemplate(context.exp);
+            var template = context.compiler.getTemplate(cmdData.exp);
             // 本地模板库没有找到，去全局模板库里取
             if (!template)
-                template = PIXICompiler_1.getTemplate(context.exp);
+                template = PIXICompiler_1.getTemplate(cmdData.exp);
             // 仍然没有找到，放弃
             if (!template)
                 return context.target;
@@ -1052,11 +1075,12 @@ define("src/ares/pixijs/PIXICommands", ["require", "exports", "src/ares/pixijs/P
         },
         /** 修改任意属性命令 */
         prop: function (context) {
+            var cmdData = context.cmdData;
             var target = context.target;
-            context.entity.createWatcher(target, context.exp, context.scope, function (value) {
-                if (context.subCmd != "") {
+            context.entity.createWatcher(target, cmdData.exp, context.scope, function (value) {
+                if (cmdData.subCmd != "") {
                     // 子命令形式
-                    target[context.subCmd] = value;
+                    target[cmdData.subCmd] = value;
                 }
                 else {
                     // 集成形式，遍历所有value的key，如果其表达式值为true则添加其类型
@@ -1070,22 +1094,23 @@ define("src/ares/pixijs/PIXICommands", ["require", "exports", "src/ares/pixijs/P
         },
         /** 绑定事件 */
         on: function (context) {
-            if (context.subCmd != "") {
-                var handler = context.scope[context.exp] || window[context.exp];
+            var cmdData = context.cmdData;
+            if (cmdData.subCmd != "") {
+                var handler = context.scope[cmdData.exp] || window[context.cmdData.exp];
                 if (typeof handler == "function") {
                     // 是函数名形式
-                    context.target.on(context.subCmd, function () {
+                    context.target.on(cmdData.subCmd, function () {
                         handler.apply(this, arguments);
                     }, context.scope);
                 }
                 else {
                     // 是方法执行或者表达式方式
-                    context.target.on(context.subCmd, function (evt) {
+                    context.target.on(cmdData.subCmd, function (evt) {
                         // 创建一个临时的子域，用于保存参数
                         var scope = Object.create(context.scope);
                         scope.$event = evt;
                         scope.$target = context.target;
-                        Utils_3.runExp(context.exp, scope);
+                        Utils_3.runExp(cmdData.exp, scope);
                     });
                 }
             }
@@ -1094,6 +1119,7 @@ define("src/ares/pixijs/PIXICommands", ["require", "exports", "src/ares/pixijs/P
         },
         /** if命令 */
         if: function (context) {
+            var cmdData = context.cmdData;
             // 记录一个是否编译过的flag
             var compiled = false;
             // 插入一个占位元素
@@ -1103,7 +1129,7 @@ define("src/ares/pixijs/PIXICommands", ["require", "exports", "src/ares/pixijs/P
             var index = parent.getChildIndex(context.target);
             parent.addChildAt(refNode, index);
             // 只有在条件为true时才启动编译
-            var watcher = context.entity.createWatcher(context.target, context.exp, context.scope, function (value) {
+            var watcher = context.entity.createWatcher(context.target, cmdData.exp, context.scope, function (value) {
                 // 如果refNode被从显示列表移除了，则表示该if指令要作废了
                 if (!refNode.parent) {
                     watcher.dispose();
@@ -1133,11 +1159,12 @@ define("src/ares/pixijs/PIXICommands", ["require", "exports", "src/ares/pixijs/P
         },
         /** for命令 */
         for: function (context) {
+            var cmdData = context.cmdData;
             // 解析表达式
             var reg = /^\s*(\S+)\s+in\s+(\S+)\s*$/;
-            var res = reg.exec(context.exp);
+            var res = reg.exec(cmdData.exp);
             if (!res) {
-                console.error("for命令表达式错误：" + context.exp);
+                console.error("for命令表达式错误：" + cmdData.exp);
                 return;
             }
             var itemName = res[1];
@@ -1367,12 +1394,11 @@ define("src/ares/pixijs/PIXICompiler", ["require", "exports", "src/ares/pixijs/P
             configurable: true
         });
         PIXICompiler.prototype.parseCmd = function (node) {
-            var reg = /^a[\-_](\w+)([:\$](.+))?$/;
             // 取到属性列表
             var results = [];
             var result;
             for (var t in node) {
-                result = reg.exec(t);
+                result = PIXICompiler._cmdRegExp.exec(t);
                 if (result)
                     results.push(result);
             }
@@ -1381,7 +1407,7 @@ define("src/ares/pixijs/PIXICompiler", ["require", "exports", "src/ares/pixijs/P
             for (var t in conf) {
                 if (t.indexOf("a-") != 0 && t.indexOf("a_") != 0)
                     t = "a-" + t;
-                result = reg.exec(t);
+                result = PIXICompiler._cmdRegExp.exec(t);
                 if (result)
                     results.push(result);
             }
@@ -1459,16 +1485,13 @@ define("src/ares/pixijs/PIXICompiler", ["require", "exports", "src/ares/pixijs/P
             var cmdsToCompile = [];
             for (var cmdName in cmdDict) {
                 var cmdData = cmdDict[cmdName];
-                // 取到子命令名
-                var subCmd = cmdData.subCmd;
-                // 取到命令字符串
-                var exp = cmdData.exp;
                 // 用命令名取到Command
                 var cmd = PIXICommands_1.commands[cmdName];
                 // 如果没有找到命令，则认为是自定义命令，套用prop命令
                 if (!cmd) {
-                    cmd = PIXICommands_1.commands["prop"];
-                    subCmd = cmdName || "";
+                    cmdData.cmdName = "prop";
+                    cmdData.subCmd = cmdName || "";
+                    cmd = PIXICommands_1.commands[cmdData.cmdName];
                 }
                 // 推入数组
                 var cmdToCompile = {
@@ -1477,20 +1500,19 @@ define("src/ares/pixijs/PIXICompiler", ["require", "exports", "src/ares/pixijs/P
                     ctx: {
                         scope: scope,
                         target: node,
-                        subCmd: subCmd,
-                        exp: exp,
                         compiler: this,
                         entity: this._entity,
+                        cmdData: cmdData,
                         cmdDict: cmdDict
                     }
                 };
                 // 如果是tpl命令则需要提前
-                if (cmdName == "tpl")
+                if (cmdData.cmdName == "tpl")
                     cmdsToCompile.unshift(cmdToCompile);
                 else
                     cmdsToCompile.push(cmdToCompile);
                 // 如果是for或者if则设置懒编译
-                if (cmdName == "if" || cmdName == "for") {
+                if (cmdData.cmdName == "if" || cmdData.cmdName == "for") {
                     hasLazyCompile = true;
                     // 清空数组，仅留下自身的编译
                     cmdsToCompile.splice(0, cmdsToCompile.length - 1);
@@ -1561,21 +1583,25 @@ define("src/ares/pixijs/PIXICompiler", ["require", "exports", "src/ares/pixijs/P
         };
         PIXICompiler.prototype.compileTextContent = function (text, scope, cmdDict) {
             var value = text.text;
-            if (PIXICompiler._textExpReg.test(value)) {
+            if (PIXICompiler._textRegExp.test(value)) {
                 var exp = this.parseTextExp(value);
                 PIXICommands_1.textContent({
                     scope: scope,
                     target: text,
-                    subCmd: "",
-                    exp: exp,
                     compiler: this,
                     entity: this._entity,
+                    cmdData: {
+                        cmdName: "textContent",
+                        subCmd: "",
+                        propName: "",
+                        exp: exp
+                    },
                     cmdDict: cmdDict
                 });
             }
         };
         PIXICompiler.prototype.parseTextExp = function (exp) {
-            var reg = PIXICompiler._textExpReg;
+            var reg = PIXICompiler._textRegExp;
             for (var result = reg.exec(exp); result != null; result = reg.exec(exp)) {
                 exp = result[1] + "${" + result[2] + "}" + result[3];
             }
@@ -1583,7 +1609,8 @@ define("src/ares/pixijs/PIXICompiler", ["require", "exports", "src/ares/pixijs/P
         };
         return PIXICompiler;
     }());
-    PIXICompiler._textExpReg = /(.*?)\{\{(.*?)\}\}(.*)/;
+    PIXICompiler._cmdRegExp = /^a[\-_](\w+)([:\$](.+))?$/;
+    PIXICompiler._textRegExp = /(.*?)\{\{(.*?)\}\}(.*)/;
     exports.PIXICompiler = PIXICompiler;
 });
 define("src/ares/template/TemplateCommands", ["require", "exports"], function (require, exports) {

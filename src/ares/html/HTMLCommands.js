@@ -16,7 +16,7 @@ function addCommand(name, command) {
 exports.addCommand = addCommand;
 /** 文本域命令 */
 function textContent(context) {
-    context.entity.createWatcher(context.target, context.exp, context.scope, function (value) {
+    context.entity.createWatcher(context.target, context.cmdData.exp, context.scope, function (value) {
         context.target.nodeValue = value;
     });
 }
@@ -24,13 +24,13 @@ exports.textContent = textContent;
 exports.commands = {
     /** 文本命令 */
     text: function (context) {
-        context.entity.createWatcher(context.target, context.exp, context.scope, function (value) {
+        context.entity.createWatcher(context.target, context.cmdData.exp, context.scope, function (value) {
             context.target.textContent = value;
         });
     },
     /** HTML文本命令 */
     html: function (context) {
-        context.entity.createWatcher(context.target, context.exp, context.scope, function (value) {
+        context.entity.createWatcher(context.target, context.cmdData.exp, context.scope, function (value) {
             var target = context.target;
             target.innerHTML = value;
             // 设置完成后需要重新编译一下当前节点的所有子节点
@@ -46,7 +46,7 @@ exports.commands = {
         // 记录原始class值
         var oriCls = target.getAttribute("class");
         // 生成订阅器
-        context.entity.createWatcher(context.target, context.exp, context.scope, function (params) {
+        context.entity.createWatcher(context.target, context.cmdData.exp, context.scope, function (params) {
             if (typeof params == "string") {
                 // 直接赋值形式
                 if (oriCls)
@@ -72,11 +72,12 @@ exports.commands = {
     },
     /** 修改任意属性命令 */
     attr: function (context) {
+        var cmdData = context.cmdData;
         var target = context.target;
-        context.entity.createWatcher(context.target, context.exp, context.scope, function (value) {
-            if (context.subCmd != "") {
+        context.entity.createWatcher(context.target, cmdData.exp, context.scope, function (value) {
+            if (cmdData.subCmd != "") {
                 // 子命令形式
-                target.setAttribute(context.subCmd, value);
+                target.setAttribute(cmdData.subCmd, value);
             }
             else {
                 // 集成形式，遍历所有value的key，如果其表达式值为true则添加其类型
@@ -89,20 +90,21 @@ exports.commands = {
     },
     /** 绑定事件 */
     on: function (context) {
-        if (context.subCmd != "") {
-            var handler = context.scope[context.exp] || window[context.exp];
+        var cmdData = context.cmdData;
+        if (cmdData.subCmd != "") {
+            var handler = context.scope[cmdData.exp] || window[context.cmdData.exp];
             if (typeof handler == "function") {
                 // 是函数名形式
-                context.target.addEventListener(context.subCmd, handler.bind(context.scope));
+                context.target.addEventListener(cmdData.subCmd, handler.bind(context.scope));
             }
             else {
                 // 是方法执行或者表达式方式
-                context.target.addEventListener(context.subCmd, function (evt) {
+                context.target.addEventListener(cmdData.subCmd, function (evt) {
                     // 创建一个临时的子域，用于保存参数
                     var scope = Object.create(context.scope);
                     scope.$event = evt;
                     scope.$target = context.target;
-                    Utils_1.runExp(context.exp, scope);
+                    Utils_1.runExp(cmdData.exp, scope);
                 });
             }
         }
@@ -115,7 +117,7 @@ exports.commands = {
         var refNode = document.createTextNode("");
         context.target.parentNode.insertBefore(refNode, context.target);
         // 只有在条件为true时才启动编译
-        context.entity.createWatcher(context.target, context.exp, context.scope, function (value) {
+        context.entity.createWatcher(context.target, context.cmdData.exp, context.scope, function (value) {
             if (value == true) {
                 // 启动编译
                 if (!compiled) {
@@ -137,11 +139,12 @@ exports.commands = {
     },
     /** for命令 */
     for: function (context) {
+        var cmdData = context.cmdData;
         // 解析表达式
         var reg = /^\s*(\S+)\s+in\s+(\S+)\s*$/;
-        var res = reg.exec(context.exp);
+        var res = reg.exec(cmdData.exp);
         if (!res) {
-            console.error("for命令表达式错误：" + context.exp);
+            console.error("for命令表达式错误：" + cmdData.exp);
             return;
         }
         var itemName = res[1];
