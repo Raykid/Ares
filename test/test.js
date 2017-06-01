@@ -986,10 +986,19 @@ define("src/ares/pixijs/ViewPortHandler", ["require", "exports"], function (requ
             this._viewPort.y = y;
             this._viewPort.width = width;
             this._viewPort.height = height;
+            // 获取当前被遮罩物体所在容器的全局坐标，作为偏移量
+            var offsetX = 0;
+            var offsetY = 0;
+            var parent = this._target.parent;
+            if (parent) {
+                var gp = parent.getGlobalPosition();
+                offsetX = gp.x;
+                offsetY = gp.y;
+            }
             // 绘制遮罩
             this._masker.clear();
             this._masker.beginFill(0);
-            this._masker.drawRect(x, y, width, height);
+            this._masker.drawRect(x + offsetX, y + offsetY, width, height);
             this._masker.endFill();
             // 归位
             this._ticker.start();
@@ -1957,6 +1966,9 @@ define("test/test", ["require", "exports", "src/ares/Ares", "src/ares/html/HTMLC
         PIXI.loader.load(function () {
             var testSkin = new PIXI.Container();
             stage.addChild(testSkin);
+            var testContainer = new PIXI.Container();
+            testContainer.y = 100;
+            testSkin.addChild(testContainer);
             var testSprite = new PIXI.Sprite();
             testSprite.texture = PIXI.Texture.fromImage("http://pic.qiantucdn.com/58pic/14/45/39/57i58PICI2K_1024.png");
             testSprite.width = testSprite.height = 200;
@@ -1966,7 +1978,7 @@ define("test/test", ["require", "exports", "src/ares/Ares", "src/ares/html/HTMLC
             testSprite["a-y"] = "$target.y + $index * 200";
             testSprite["a-viewport${oneway:true}"] = "$target.x, $target.y, $target.width - 100, $target.height * 2";
             testSprite.x = 200;
-            testSkin.addChild(testSprite);
+            testContainer.addChild(testSprite);
             var testText = new PIXI.Text("text: {{text}}");
             testText["a-tplName"] = "testTpl";
             testText["a-tplGlobal"] = "true";

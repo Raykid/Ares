@@ -49,6 +49,10 @@ function go():void
         var testSkin:PIXI.Container = new PIXI.Container();
         stage.addChild(testSkin);
 
+        var testContainer:PIXI.Container = new PIXI.Container();
+        testContainer.y = 100;
+        testSkin.addChild(testContainer);
+
         var testSprite:PIXI.Sprite = new PIXI.Sprite();
         testSprite.texture = PIXI.Texture.fromImage("http://pic.qiantucdn.com/58pic/14/45/39/57i58PICI2K_1024.png");
         testSprite.width = testSprite.height = 200;
@@ -58,7 +62,7 @@ function go():void
         testSprite["a-y"] = "$target.y + $index * 200";
         testSprite["a-viewport${oneway:true}"] = "$target.x, $target.y, $target.width - 100, $target.height * 2";
         testSprite.x = 200;
-        testSkin.addChild(testSprite);
+        testContainer.addChild(testSprite);
 
         var testText:PIXI.Text = new PIXI.Text("text: {{text}}");
         testText["a-tplName"] = "testTpl";

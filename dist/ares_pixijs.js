@@ -1005,10 +1005,19 @@ var ViewPortHandler = (function () {
         this._viewPort.y = y;
         this._viewPort.width = width;
         this._viewPort.height = height;
+        // 获取当前被遮罩物体所在容器的全局坐标，作为偏移量
+        var offsetX = 0;
+        var offsetY = 0;
+        var parent = this._target.parent;
+        if (parent) {
+            var gp = parent.getGlobalPosition();
+            offsetX = gp.x;
+            offsetY = gp.y;
+        }
         // 绘制遮罩
         this._masker.clear();
         this._masker.beginFill(0);
-        this._masker.drawRect(x, y, width, height);
+        this._masker.drawRect(x + offsetX, y + offsetY, width, height);
         this._masker.endFill();
         // 归位
         this._ticker.start();
