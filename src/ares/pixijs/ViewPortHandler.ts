@@ -285,20 +285,15 @@ export class ViewPortHandler
         this._viewPort.y = y;
         this._viewPort.width = width;
         this._viewPort.height = height;
-        // 获取当前被遮罩物体所在容器的全局坐标，作为偏移量
-        var offsetX:number = 0;
-        var offsetY:number = 0;
-        var parent:PIXI.Container = this._target.parent;
-        if(parent)
+        // 如果masker的父容器不是当前target的父容器则将masker移动过去
+        if(this._masker.parent != this._target.parent && this._target.parent)
         {
-            var gp:PIXI.Point = parent.getGlobalPosition();
-            offsetX = gp.x;
-            offsetY = gp.y;
+            this._target.parent.addChild(this._masker);
         }
         // 绘制遮罩
         this._masker.clear();
         this._masker.beginFill(0);
-        this._masker.drawRect(x + offsetX, y + offsetY, width, height);
+        this._masker.drawRect(x, y, width, height);
         this._masker.endFill();
         // 归位
         this._ticker.start();
