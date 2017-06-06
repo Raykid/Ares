@@ -167,12 +167,16 @@ export class ViewPortHandler
         var bounds:PIXI.Rectangle = this.getContentBounds(targetX, targetY);
         // 计算横向偏移
         var deltaX:number = 0;
-        if(bounds.left > this._viewPort.left) deltaX = this._viewPort.left - bounds.left;
-        else if(bounds.left < this._viewPort.left && bounds.right < this._viewPort.right) deltaX = this._viewPort.right - bounds.right;
+        if(bounds.left > this._viewPort.left)
+            deltaX = this._viewPort.left - bounds.left;
+        else if(bounds.left < this._viewPort.left && bounds.right < this._viewPort.right)
+            deltaX = Math.min(this._viewPort.left - bounds.left, this._viewPort.right - bounds.right);
         // 计算纵向偏移
         var deltaY:number = 0;
-        if(bounds.top > this._viewPort.top) deltaY = this._viewPort.top - bounds.top;
-        else if(bounds.top < this._viewPort.top && bounds.bottom < this._viewPort.bottom) deltaY = this._viewPort.bottom - bounds.bottom;
+        if(bounds.top > this._viewPort.top)
+            deltaY = this._viewPort.top - bounds.top;
+        else if(bounds.top < this._viewPort.top && bounds.bottom < this._viewPort.bottom)
+            deltaY = Math.min(this._viewPort.top - bounds.top, this._viewPort.bottom - bounds.bottom);
         // 返回结果
         return {x: Math.round(deltaX), y: Math.round(deltaY)};
     }
