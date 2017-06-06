@@ -106,7 +106,7 @@ export class ViewPortHandler
             {
                 if(this._options && this._options.oneway)
                 {
-                    if(Math.abs(s.x) > Math.abs(s.y)) this._direction = ViewPortHandler.DIRECTION_H;
+                    if(!this._movableV || (this._movableH && Math.abs(s.x) > Math.abs(s.y))) this._direction = ViewPortHandler.DIRECTION_H;
                     else this._direction = ViewPortHandler.DIRECTION_V;
                 }
                 else
@@ -167,12 +167,12 @@ export class ViewPortHandler
         var bounds:PIXI.Rectangle = this.getContentBounds(targetX, targetY);
         // 计算横向偏移
         var deltaX:number = 0;
-        if(bounds.right < this._viewPort.right) deltaX = this._viewPort.right - bounds.right;
-        else if(bounds.left > this._viewPort.left) deltaX = this._viewPort.left - bounds.left;
+        if(bounds.left > this._viewPort.left) deltaX = this._viewPort.left - bounds.left;
+        else if(bounds.left < this._viewPort.left && bounds.right < this._viewPort.right) deltaX = this._viewPort.right - bounds.right;
         // 计算纵向偏移
         var deltaY:number = 0;
-        if(bounds.bottom < this._viewPort.bottom) deltaY = this._viewPort.bottom - bounds.bottom;
-        else if(bounds.top > this._viewPort.top) deltaY = this._viewPort.top - bounds.top;
+        if(bounds.top > this._viewPort.top) deltaY = this._viewPort.top - bounds.top;
+        else if(bounds.top < this._viewPort.top && bounds.bottom < this._viewPort.bottom) deltaY = this._viewPort.bottom - bounds.bottom;
         // 返回结果
         return {x: Math.round(deltaX), y: Math.round(deltaY)};
     }
@@ -244,7 +244,7 @@ export class ViewPortHandler
             }
             else
             {
-                // 开始横向复位
+                // 开始纵向复位
                 var moveY:number = d.y * delta * 0.07 * ELASTICITY_COEFFICIENT;
                 if(moveY != 0) this._target.y += moveY;
             }

@@ -67,7 +67,7 @@ var ViewPortHandler = (function () {
             // 判断移动方向
             if (this._direction == 0 && s.distance > 0) {
                 if (this._options && this._options.oneway) {
-                    if (Math.abs(s.x) > Math.abs(s.y))
+                    if (!this._movableV || (this._movableH && Math.abs(s.x) > Math.abs(s.y)))
                         this._direction = ViewPortHandler.DIRECTION_H;
                     else
                         this._direction = ViewPortHandler.DIRECTION_V;
@@ -122,16 +122,16 @@ var ViewPortHandler = (function () {
         var bounds = this.getContentBounds(targetX, targetY);
         // 计算横向偏移
         var deltaX = 0;
-        if (bounds.right < this._viewPort.right)
-            deltaX = this._viewPort.right - bounds.right;
-        else if (bounds.left > this._viewPort.left)
+        if (bounds.left > this._viewPort.left)
             deltaX = this._viewPort.left - bounds.left;
+        else if (bounds.left < this._viewPort.left && bounds.right < this._viewPort.right)
+            deltaX = this._viewPort.right - bounds.right;
         // 计算纵向偏移
         var deltaY = 0;
-        if (bounds.bottom < this._viewPort.bottom)
-            deltaY = this._viewPort.bottom - bounds.bottom;
-        else if (bounds.top > this._viewPort.top)
+        if (bounds.top > this._viewPort.top)
             deltaY = this._viewPort.top - bounds.top;
+        else if (bounds.top < this._viewPort.top && bounds.bottom < this._viewPort.bottom)
+            deltaY = this._viewPort.bottom - bounds.bottom;
         // 返回结果
         return { x: Math.round(deltaX), y: Math.round(deltaY) };
     };
@@ -193,7 +193,7 @@ var ViewPortHandler = (function () {
                 this._speed.y = (speedY * this._speed.y < 0 ? 0 : speedY);
             }
             else {
-                // 开始横向复位
+                // 开始纵向复位
                 var moveY = d.y * delta * 0.07 * ELASTICITY_COEFFICIENT;
                 if (moveY != 0)
                     this._target.y += moveY;

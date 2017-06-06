@@ -189,7 +189,7 @@ exports.commands = {
                 return;
             }
             // 清理原始显示
-            for (var i = parent.children.length - 1; i > 0; i--) {
+            for (var i = parent.children.length - 1; i >= 0; i--) {
                 parent.removeChildAt(i).destroy();
             }
             // 如果是数字，构建一个数字列表

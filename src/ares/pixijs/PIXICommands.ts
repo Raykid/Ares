@@ -238,7 +238,7 @@ export const commands:{[name:string]:Command} = {
                 return;
             }
             // 清理原始显示
-            for(var i:number = parent.children.length - 1; i > 0; i--)
+            for(var i:number = parent.children.length - 1; i >= 0; i--)
             {
                 parent.removeChildAt(i).destroy();
             }
