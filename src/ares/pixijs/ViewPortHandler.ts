@@ -299,7 +299,9 @@ export class ViewPortHandler
         this._masker.beginFill(0);
         this._masker.drawRect(x, y, width, height);
         this._masker.endFill();
-        // 归位
-        this._ticker.start();
+        // 瞬移归位
+        var d:{x:number, y:number} = this.getDelta(this._target.x, this._target.y);
+        this._target.x += d.x;
+        this._target.y += d.y;
     }
 }
