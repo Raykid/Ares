@@ -176,10 +176,13 @@ exports.commands = {
             writable: false
         });
         // 如果有viewport命令，则将其转移至容器上
-        var viewportCmd = context.cmdDict["viewport"];
-        if (viewportCmd) {
-            parent[viewportCmd.propName] = viewportCmd.exp;
-            delete context.target[viewportCmd.propName];
+        var viewportCmds = context.cmdDict["viewport"];
+        if (viewportCmds) {
+            var viewportCmd = viewportCmds[0];
+            if (viewportCmd) {
+                parent[viewportCmd.propName] = viewportCmd.exp;
+                delete context.target[viewportCmd.propName];
+            }
         }
         // 添加订阅
         var watcher = context.entity.createWatcher(context.target, arrName, forScope, function (value) {

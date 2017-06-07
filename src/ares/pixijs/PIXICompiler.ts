@@ -55,7 +55,7 @@ export interface CmdData
 
 export interface CmdDict
 {
-    [cmdName:string]:CmdData;
+    [cmdName:string]:CmdData[];
 }
 
 export class PIXICompiler implements Compiler
@@ -124,12 +124,13 @@ export class PIXICompiler implements Compiler
             // 取到子命令名
             var subCmd:string = result[3] || "";
             // 填充字典
-            cmdNameDict[cmdName] = {
+            if(!cmdNameDict[cmdName]) cmdNameDict[cmdName] = [];
+            cmdNameDict[cmdName].push({
                 cmdName: cmdName,
                 subCmd: subCmd,
                 propName: key,
                 exp: exp
-            };
+            });
         }
         return cmdNameDict;
     }
@@ -187,41 +188,48 @@ export class PIXICompiler implements Compiler
         // 开始遍历属性列表
         var cmdDict:CmdDict = this.parseCmd(node);
         var cmdsToCompile:{propName:string, cmd:Command, ctx:CommandContext}[] = [];
+        // 设置label，以便跳出双重循环
+        flag:
         for(var cmdName in cmdDict)
         {
-            var cmdData:CmdData = cmdDict[cmdName];
-            // 用命令名取到Command
-            var cmd:Command = commands[cmdName];
-            // 如果没有找到命令，则认为是自定义命令，套用prop命令
-            if(!cmd)
+            var cmdDatas:CmdData[] = cmdDict[cmdName];
+            for(var i:number = 0, len:number = cmdDatas.length; i < len; i++)
             {
-                cmdData.cmdName = "prop";
-                cmdData.subCmd = cmdName || "";
-                cmd = commands[cmdData.cmdName];
-            }
-            // 推入数组
-            var cmdToCompile:{propName:string, cmd:Command, ctx:CommandContext} = {
-                propName: cmdData.propName,
-                cmd: cmd,
-                ctx: {
-                    scope: scope,
-                    target: node,
-                    compiler: this,
-                    entity: this._entity,
-                    cmdData: cmdData,
-                    cmdDict: cmdDict
+                var cmdData:CmdData = cmdDatas[i];
+                // 用命令名取到Command
+                var cmd:Command = commands[cmdName];
+                // 如果没有找到命令，则认为是自定义命令，套用prop命令
+                if(!cmd)
+                {
+                    cmdData.cmdName = "prop";
+                    cmdData.subCmd = cmdName || "";
+                    cmd = commands[cmdData.cmdName];
                 }
-            };
-            // 如果是tpl命令则需要提前
-            if(cmdData.cmdName == "tpl") cmdsToCompile.unshift(cmdToCompile);
-            else cmdsToCompile.push(cmdToCompile);
-            // 如果是for或者if则设置懒编译
-            if(cmdData.cmdName == "if" || cmdData.cmdName == "for")
-            {
-                hasLazyCompile = true;
-                // 清空数组，仅留下自身的编译
-                cmdsToCompile.splice(0, cmdsToCompile.length - 1);
-                break;
+                // 推入数组
+                var cmdToCompile:{propName:string, cmd:Command, ctx:CommandContext} = {
+                    propName: cmdData.propName,
+                    cmd: cmd,
+                    ctx: {
+                        scope: scope,
+                        target: node,
+                        compiler: this,
+                        entity: this._entity,
+                        cmdData: cmdData,
+                        cmdDict: cmdDict
+                    }
+                };
+                // 如果是tpl命令则需要提前
+                if(cmdData.cmdName == "tpl") cmdsToCompile.unshift(cmdToCompile);
+                else cmdsToCompile.push(cmdToCompile);
+                // 如果是for或者if则设置懒编译
+                if(cmdData.cmdName == "if" || cmdData.cmdName == "for")
+                {
+                    hasLazyCompile = true;
+                    // 清空数组，仅留下自身的编译
+                    cmdsToCompile.splice(0, cmdsToCompile.length - 1);
+                    // 跳出双重循环
+                    break flag;
+                }
             }
         }
         // 开始编译当前节点外部结构

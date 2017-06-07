@@ -237,12 +237,14 @@ var PIXICompiler = (function () {
             // 取到子命令名
             var subCmd = result[3] || "";
             // 填充字典
-            cmdNameDict[cmdName] = {
+            if (!cmdNameDict[cmdName])
+                cmdNameDict[cmdName] = [];
+            cmdNameDict[cmdName].push({
                 cmdName: cmdName,
                 subCmd: subCmd,
                 propName: key,
                 exp: exp
-            };
+            });
         }
         return cmdNameDict;
     };
@@ -291,40 +293,45 @@ var PIXICompiler = (function () {
         // 开始遍历属性列表
         var cmdDict = this.parseCmd(node);
         var cmdsToCompile = [];
-        for (var cmdName in cmdDict) {
-            var cmdData = cmdDict[cmdName];
-            // 用命令名取到Command
-            var cmd = PIXICommands_1.commands[cmdName];
-            // 如果没有找到命令，则认为是自定义命令，套用prop命令
-            if (!cmd) {
-                cmdData.cmdName = "prop";
-                cmdData.subCmd = cmdName || "";
-                cmd = PIXICommands_1.commands[cmdData.cmdName];
-            }
-            // 推入数组
-            var cmdToCompile = {
-                propName: cmdData.propName,
-                cmd: cmd,
-                ctx: {
-                    scope: scope,
-                    target: node,
-                    compiler: this,
-                    entity: this._entity,
-                    cmdData: cmdData,
-                    cmdDict: cmdDict
+        // 设置label，以便跳出双重循环
+        flag: for (var cmdName in cmdDict) {
+            var cmdDatas = cmdDict[cmdName];
+            for (var i = 0, len = cmdDatas.length; i < len; i++) {
+                var cmdData = cmdDatas[i];
+                // 用命令名取到Command
+                var cmd = PIXICommands_1.commands[cmdName];
+                // 如果没有找到命令，则认为是自定义命令，套用prop命令
+                if (!cmd) {
+                    cmdData.cmdName = "prop";
+                    cmdData.subCmd = cmdName || "";
+                    cmd = PIXICommands_1.commands[cmdData.cmdName];
                 }
-            };
-            // 如果是tpl命令则需要提前
-            if (cmdData.cmdName == "tpl")
-                cmdsToCompile.unshift(cmdToCompile);
-            else
-                cmdsToCompile.push(cmdToCompile);
-            // 如果是for或者if则设置懒编译
-            if (cmdData.cmdName == "if" || cmdData.cmdName == "for") {
-                hasLazyCompile = true;
-                // 清空数组，仅留下自身的编译
-                cmdsToCompile.splice(0, cmdsToCompile.length - 1);
-                break;
+                // 推入数组
+                var cmdToCompile = {
+                    propName: cmdData.propName,
+                    cmd: cmd,
+                    ctx: {
+                        scope: scope,
+                        target: node,
+                        compiler: this,
+                        entity: this._entity,
+                        cmdData: cmdData,
+                        cmdDict: cmdDict
+                    }
+                };
+                // 如果是tpl命令则需要提前
+                if (cmdData.cmdName == "tpl")
+                    cmdsToCompile.unshift(cmdToCompile);
+                else
+                    cmdsToCompile.push(cmdToCompile);
+                // 如果是for或者if则设置懒编译
+                if (cmdData.cmdName == "if" || cmdData.cmdName == "for") {
+                    hasLazyCompile = true;
+                    // 清空数组，仅留下自身的编译
+                    cmdsToCompile.splice(0, cmdsToCompile.length - 1);
+                    // 跳出双重循环
+                    break flag;
+                }
             }
         }
         // 开始编译当前节点外部结构
@@ -607,10 +614,13 @@ exports.commands = {
             writable: false
         });
         // 如果有viewport命令，则将其转移至容器上
-        var viewportCmd = context.cmdDict["viewport"];
-        if (viewportCmd) {
-            parent[viewportCmd.propName] = viewportCmd.exp;
-            delete context.target[viewportCmd.propName];
+        var viewportCmds = context.cmdDict["viewport"];
+        if (viewportCmds) {
+            var viewportCmd = viewportCmds[0];
+            if (viewportCmd) {
+                parent[viewportCmd.propName] = viewportCmd.exp;
+                delete context.target[viewportCmd.propName];
+            }
         }
         // 添加订阅
         var watcher = context.entity.createWatcher(context.target, arrName, forScope, function (value) {
