@@ -94,7 +94,7 @@ export const commands:{[name:string]:Command} = {
     /** for命令 */
     for: (context:CommandContext)=>
     {
-        var reg:RegExp = /^\s*(\S+)\s+in\s+(\S+)\s*$/;
+        var reg:RegExp = /^\s*(\S+)\s+in\s+([\s\S]+?)\s*$/;
         var res:RegExpExecArray = reg.exec(context.node.exp);
         if(!res)
         {

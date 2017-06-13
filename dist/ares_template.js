@@ -358,7 +358,7 @@ exports.commands = {
     },
     /** for命令 */
     for: function (context) {
-        var reg = /^\s*(\S+)\s+in\s+(\S+)\s*$/;
+        var reg = /^\s*(\S+)\s+in\s+([\s\S]+?)\s*$/;
         var res = reg.exec(context.node.exp);
         if (!res) {
             console.error("for命令表达式错误：" + context.node.exp);

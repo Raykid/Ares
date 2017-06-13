@@ -568,7 +568,7 @@ define("src/ares/html/HTMLCommands", ["require", "exports", "src/ares/Utils"], f
         for: function (context) {
             var cmdData = context.cmdData;
             // 解析表达式
-            var reg = /^\s*(\S+)\s+in\s+(\S+)\s*$/;
+            var reg = /^\s*(\S+)\s+in\s+([\s\S]+?)\s*$/;
             var res = reg.exec(cmdData.exp);
             if (!res) {
                 console.error("for命令表达式错误：" + cmdData.exp);
@@ -1160,7 +1160,7 @@ define("src/ares/pixijs/PIXICommands", ["require", "exports", "src/ares/pixijs/P
         for: function (context) {
             var cmdData = context.cmdData;
             // 解析表达式
-            var reg = /^\s*(\S+)\s+in\s+(\S+)\s*$/;
+            var reg = /^\s*(\S+)\s+in\s+([\s\S]+?)\s*$/;
             var res = reg.exec(cmdData.exp);
             if (!res) {
                 console.error("for命令表达式错误：" + cmdData.exp);
@@ -1682,7 +1682,7 @@ define("src/ares/template/TemplateCommands", ["require", "exports"], function (r
         },
         /** for命令 */
         for: function (context) {
-            var reg = /^\s*(\S+)\s+in\s+(\S+)\s*$/;
+            var reg = /^\s*(\S+)\s+in\s+([\s\S]+?)\s*$/;
             var res = reg.exec(context.node.exp);
             if (!res) {
                 console.error("for命令表达式错误：" + context.node.exp);

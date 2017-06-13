@@ -291,7 +291,7 @@ exports.commands = {
     for: function (context) {
         var cmdData = context.cmdData;
         // 解析表达式
-        var reg = /^\s*(\S+)\s+in\s+(\S+)\s*$/;
+        var reg = /^\s*(\S+)\s+in\s+([\s\S]+?)\s*$/;
         var res = reg.exec(cmdData.exp);
         if (!res) {
             console.error("for命令表达式错误：" + cmdData.exp);

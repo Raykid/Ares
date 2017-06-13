@@ -185,7 +185,7 @@ export const commands:{[name:string]:Command} = {
     {
         var cmdData:CmdData = context.cmdData;
         // 解析表达式
-        var reg:RegExp = /^\s*(\S+)\s+in\s+(\S+)\s*$/;
+        var reg:RegExp = /^\s*(\S+)\s+in\s+([\s\S]+?)\s*$/;
         var res:RegExpExecArray = reg.exec(cmdData.exp);
         if(!res)
         {
