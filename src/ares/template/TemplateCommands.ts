@@ -116,6 +116,7 @@ export const commands:{[name:string]:Command} = {
             var result:string = "";
             if(value)
             {
+                var arrLength:number = (value instanceof Array ? value.length : -1);
                 for(var key in value)
                 {
                     // 生成子域
@@ -127,6 +128,17 @@ export const commands:{[name:string]:Command} = {
                         value: (value instanceof Array ? parseInt(key) : key),
                         writable: false
                     });
+                    // 如果是数组再添加一个数组长度
+                    if(arrLength >= 0)
+                    {
+                        Object.defineProperty(newScope, "$length", {
+                            configurable: true,
+                            enumerable: false,
+                            value: arrLength,
+                            writable: false
+                        });
+                    }
+                    // 注入遍历名
                     Object.defineProperty(newScope, res[1], {
                         configurable: true,
                         enumerable: true,

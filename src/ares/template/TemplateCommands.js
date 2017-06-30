@@ -74,6 +74,7 @@ exports.commands = {
             }
             var result = "";
             if (value) {
+                var arrLength = (value instanceof Array ? value.length : -1);
                 for (var key in value) {
                     // 生成子域
                     var newScope = Object.create(context.scope);
@@ -84,6 +85,16 @@ exports.commands = {
                         value: (value instanceof Array ? parseInt(key) : key),
                         writable: false
                     });
+                    // 如果是数组再添加一个数组长度
+                    if (arrLength >= 0) {
+                        Object.defineProperty(newScope, "$length", {
+                            configurable: true,
+                            enumerable: false,
+                            value: arrLength,
+                            writable: false
+                        });
+                    }
+                    // 注入遍历名
                     Object.defineProperty(newScope, res[1], {
                         configurable: true,
                         enumerable: true,

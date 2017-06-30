@@ -598,6 +598,8 @@ define("src/ares/html/HTMLCommands", ["require", "exports", "src/ares/Utils"], f
                     value = temp;
                 }
                 // 开始遍历
+                var lastNode = null;
+                var arrLength = (value instanceof Array ? value.length : -1);
                 for (var key in value) {
                     // 拷贝一个target
                     var newNode = context.target.cloneNode(true);
@@ -612,6 +614,23 @@ define("src/ares/html/HTMLCommands", ["require", "exports", "src/ares/Utils"], f
                         value: (value instanceof Array ? parseInt(key) : key),
                         writable: false
                     });
+                    // 注入上一个显示节点
+                    Object.defineProperty(newScope, "$last", {
+                        configurable: true,
+                        enumerable: false,
+                        value: lastNode,
+                        writable: false
+                    });
+                    // 如果是数组再添加一个数组长度
+                    if (arrLength >= 0) {
+                        Object.defineProperty(newScope, "$length", {
+                            configurable: true,
+                            enumerable: false,
+                            value: arrLength,
+                            writable: false
+                        });
+                    }
+                    // 注入遍历名
                     Object.defineProperty(newScope, itemName, {
                         configurable: true,
                         enumerable: true,
@@ -620,6 +639,8 @@ define("src/ares/html/HTMLCommands", ["require", "exports", "src/ares/Utils"], f
                     });
                     // 开始编译新节点
                     context.compiler.compile(newNode, newScope);
+                    // 赋值上一个节点
+                    lastNode = newNode;
                 }
             });
         }
@@ -1210,6 +1231,8 @@ define("src/ares/pixijs/PIXICommands", ["require", "exports", "src/ares/pixijs/P
                     value = temp;
                 }
                 // 开始遍历
+                var lastNode = null;
+                var arrLength = (value instanceof Array ? value.length : -1);
                 for (var key in value) {
                     // 拷贝一个target
                     var newNode = cloneObject(context.target, true);
@@ -1224,6 +1247,23 @@ define("src/ares/pixijs/PIXICommands", ["require", "exports", "src/ares/pixijs/P
                         value: (value instanceof Array ? parseInt(key) : key),
                         writable: false
                     });
+                    // 注入上一个显示节点
+                    Object.defineProperty(newScope, "$last", {
+                        configurable: true,
+                        enumerable: false,
+                        value: lastNode,
+                        writable: false
+                    });
+                    // 如果是数组再添加一个数组长度
+                    if (arrLength >= 0) {
+                        Object.defineProperty(newScope, "$length", {
+                            configurable: true,
+                            enumerable: false,
+                            value: arrLength,
+                            writable: false
+                        });
+                    }
+                    // 注入遍历名
                     Object.defineProperty(newScope, itemName, {
                         configurable: true,
                         enumerable: true,
@@ -1232,6 +1272,8 @@ define("src/ares/pixijs/PIXICommands", ["require", "exports", "src/ares/pixijs/P
                     });
                     // 开始编译新节点
                     context.compiler.compile(newNode, newScope);
+                    // 赋值上一个节点
+                    lastNode = newNode;
                 }
             });
             // 使用原始显示对象编译一次parent
@@ -1699,6 +1741,7 @@ define("src/ares/template/TemplateCommands", ["require", "exports"], function (r
                 }
                 var result = "";
                 if (value) {
+                    var arrLength = (value instanceof Array ? value.length : -1);
                     for (var key in value) {
                         // 生成子域
                         var newScope = Object.create(context.scope);
@@ -1709,6 +1752,16 @@ define("src/ares/template/TemplateCommands", ["require", "exports"], function (r
                             value: (value instanceof Array ? parseInt(key) : key),
                             writable: false
                         });
+                        // 如果是数组再添加一个数组长度
+                        if (arrLength >= 0) {
+                            Object.defineProperty(newScope, "$length", {
+                                configurable: true,
+                                enumerable: false,
+                                value: arrLength,
+                                writable: false
+                            });
+                        }
+                        // 注入遍历名
                         Object.defineProperty(newScope, res[1], {
                             configurable: true,
                             enumerable: true,
