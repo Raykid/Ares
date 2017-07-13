@@ -381,6 +381,7 @@ function cloneObject<T>(target:T, deep:boolean):T
             for(let k in target["_events"])
             {
                 var temp:any = target["_events"][k];
+                result["_events"][k] = cloneObject(temp, false);
                 if(temp.context == target)
                 {
                     result["_events"][k].context = result;

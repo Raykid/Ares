@@ -1346,6 +1346,7 @@ define("src/ares/pixijs/PIXICommands", ["require", "exports", "src/ares/pixijs/P
                 // 如果target的某个监听里的context就是target本身，则将result的context改为result本身
                 for (var k in target["_events"]) {
                     var temp = target["_events"][k];
+                    result["_events"][k] = cloneObject(temp, false);
                     if (temp.context == target) {
                         result["_events"][k].context = result;
                     }
