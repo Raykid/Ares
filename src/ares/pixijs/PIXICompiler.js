@@ -273,9 +273,9 @@ var PIXICompiler = (function () {
         }
         return "`" + exp + "`";
     };
+    PIXICompiler._cmdRegExp = /^a[\-_](\w+)([:\$](.+))?$/;
+    PIXICompiler._textRegExp = /(.*?)\{\{(.*?)\}\}(.*)/;
     return PIXICompiler;
 }());
-PIXICompiler._cmdRegExp = /^a[\-_](\w+)([:\$](.+))?$/;
-PIXICompiler._textRegExp = /(.*?)\{\{(.*?)\}\}(.*)/;
 exports.PIXICompiler = PIXICompiler;
 //# sourceMappingURL=PIXICompiler.js.map

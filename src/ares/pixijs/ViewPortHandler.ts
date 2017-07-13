@@ -199,6 +199,13 @@ export class ViewPortHandler
 
     private onTick(delta:number):void
     {
+        // 进行合法性判断
+        if(this._target["_destroyed"])
+        {
+            this._ticker.stop();
+            this._direction = 0;
+            return;
+        }
         // 如果已经超出范围则直接复位，否则继续运动
         var d:{x:number, y:number} = this.getDelta(this._target.x, this._target.y);
         var doneX:boolean = false;

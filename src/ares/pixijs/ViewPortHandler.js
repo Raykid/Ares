@@ -151,6 +151,12 @@ var ViewPortHandler = (function () {
         }
     };
     ViewPortHandler.prototype.onTick = function (delta) {
+        // 进行合法性判断
+        if (this._target["_destroyed"]) {
+            this._ticker.stop();
+            this._direction = 0;
+            return;
+        }
         // 如果已经超出范围则直接复位，否则继续运动
         var d = this.getDelta(this._target.x, this._target.y);
         var doneX = false;
@@ -244,9 +250,9 @@ var ViewPortHandler = (function () {
         this._target.x += d.x;
         this._target.y += d.y;
     };
+    ViewPortHandler.DIRECTION_H = 1;
+    ViewPortHandler.DIRECTION_V = 2;
     return ViewPortHandler;
 }());
-ViewPortHandler.DIRECTION_H = 1;
-ViewPortHandler.DIRECTION_V = 2;
 exports.ViewPortHandler = ViewPortHandler;
 //# sourceMappingURL=ViewPortHandler.js.map

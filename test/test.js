@@ -187,11 +187,11 @@ define("src/ares/Watcher", ["require", "exports", "src/ares/Utils"], function (r
                 return from;
             }
         };
+        /** 记录当前正在执行update方法的Watcher引用 */
+        Watcher.updating = null;
+        Watcher._uid = 0;
         return Watcher;
     }());
-    /** 记录当前正在执行update方法的Watcher引用 */
-    Watcher.updating = null;
-    Watcher._uid = 0;
     exports.Watcher = Watcher;
 });
 /**
@@ -358,18 +358,18 @@ define("src/ares/Mutator", ["require", "exports", "src/ares/Watcher", "src/ares/
             });
             return result;
         };
+        // 记录数组中会造成数据更新的所有方法名
+        Mutator._arrMethods = [
+            "push",
+            "pop",
+            "unshift",
+            "shift",
+            "splice",
+            "sort",
+            "reverse"
+        ];
         return Mutator;
     }());
-    // 记录数组中会造成数据更新的所有方法名
-    Mutator._arrMethods = [
-        "push",
-        "pop",
-        "unshift",
-        "shift",
-        "splice",
-        "sort",
-        "reverse"
-    ];
     exports.Mutator = Mutator;
 });
 /**
@@ -768,10 +768,10 @@ define("src/ares/html/HTMLCompiler", ["require", "exports", "src/ares/html/HTMLC
             }
             return "`" + exp + "`";
         };
+        HTMLCompiler._cmdRegExp = /^(data\-)?a\-(\w+)(:(.+))?$/;
+        HTMLCompiler._textRegExp = /(.*?)\{\{(.*?)\}\}(.*)/;
         return HTMLCompiler;
     }());
-    HTMLCompiler._cmdRegExp = /^(data\-)?a\-(\w+)(:(.+))?$/;
-    HTMLCompiler._textRegExp = /(.*?)\{\{(.*?)\}\}(.*)/;
     exports.HTMLCompiler = HTMLCompiler;
 });
 define("src/ares/pixijs/ViewPortHandler", ["require", "exports"], function (require, exports) {
@@ -928,6 +928,12 @@ define("src/ares/pixijs/ViewPortHandler", ["require", "exports"], function (requ
             }
         };
         ViewPortHandler.prototype.onTick = function (delta) {
+            // 进行合法性判断
+            if (this._target["_destroyed"]) {
+                this._ticker.stop();
+                this._direction = 0;
+                return;
+            }
             // 如果已经超出范围则直接复位，否则继续运动
             var d = this.getDelta(this._target.x, this._target.y);
             var doneX = false;
@@ -1021,10 +1027,10 @@ define("src/ares/pixijs/ViewPortHandler", ["require", "exports"], function (requ
             this._target.x += d.x;
             this._target.y += d.y;
         };
+        ViewPortHandler.DIRECTION_H = 1;
+        ViewPortHandler.DIRECTION_V = 2;
         return ViewPortHandler;
     }());
-    ViewPortHandler.DIRECTION_H = 1;
-    ViewPortHandler.DIRECTION_V = 2;
     exports.ViewPortHandler = ViewPortHandler;
 });
 define("src/ares/pixijs/PIXICommands", ["require", "exports", "src/ares/pixijs/PIXICompiler", "src/ares/Utils", "src/ares/pixijs/ViewPortHandler"], function (require, exports, PIXICompiler_1, Utils_3, ViewPortHandler_1) {
@@ -1658,10 +1664,10 @@ define("src/ares/pixijs/PIXICompiler", ["require", "exports", "src/ares/pixijs/P
             }
             return "`" + exp + "`";
         };
+        PIXICompiler._cmdRegExp = /^a[\-_](\w+)([:\$](.+))?$/;
+        PIXICompiler._textRegExp = /(.*?)\{\{(.*?)\}\}(.*)/;
         return PIXICompiler;
     }());
-    PIXICompiler._cmdRegExp = /^a[\-_](\w+)([:\$](.+))?$/;
-    PIXICompiler._textRegExp = /(.*?)\{\{(.*?)\}\}(.*)/;
     exports.PIXICompiler = PIXICompiler;
 });
 define("src/ares/template/TemplateCommands", ["require", "exports"], function (require, exports) {

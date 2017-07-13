@@ -123,10 +123,10 @@ var Watcher = (function () {
             return from;
         }
     };
+    /** 记录当前正在执行update方法的Watcher引用 */
+    Watcher.updating = null;
+    Watcher._uid = 0;
     return Watcher;
 }());
-/** 记录当前正在执行update方法的Watcher引用 */
-Watcher.updating = null;
-Watcher._uid = 0;
 exports.Watcher = Watcher;
 //# sourceMappingURL=Watcher.js.map

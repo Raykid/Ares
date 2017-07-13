@@ -120,9 +120,9 @@ var HTMLCompiler = (function () {
         }
         return "`" + exp + "`";
     };
+    HTMLCompiler._cmdRegExp = /^(data\-)?a\-(\w+)(:(.+))?$/;
+    HTMLCompiler._textRegExp = /(.*?)\{\{(.*?)\}\}(.*)/;
     return HTMLCompiler;
 }());
-HTMLCompiler._cmdRegExp = /^(data\-)?a\-(\w+)(:(.+))?$/;
-HTMLCompiler._textRegExp = /(.*?)\{\{(.*?)\}\}(.*)/;
 exports.HTMLCompiler = HTMLCompiler;
 //# sourceMappingURL=HTMLCompiler.js.map
