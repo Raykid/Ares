@@ -760,8 +760,14 @@ function cloneObject(target, deep) {
         }
         // 容器对象的children属性要特殊处理
         if (key == "children" && target instanceof PIXI.Container) {
-            var children = target["children"];
-            for (var j in children) {
+            // 首先要清除已有的显示对象（例如原始对象在构造函数中添加了显示对象的话，再经过复制会产生重复对象）
+            var children = result["children"];
+            for (var j = 0, lenJ = children.length; j < lenJ; j++) {
+                result["removeChildAt"](0).destroy();
+            }
+            // 开始复制子对象
+            children = target["children"];
+            for (var j = 0, lenJ = children.length; j < lenJ; j++) {
                 var child = cloneObject(children[j], true);
                 result["addChild"](child);
             }
