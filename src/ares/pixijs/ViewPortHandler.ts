@@ -48,10 +48,10 @@ export class ViewPortHandler
     private _dragging:boolean = false;
     private _direction:number = 0;
 
-    public constructor(target:PIXI.DisplayObject, options:ViewPortHandlerOptions)
+    public constructor(target:PIXI.DisplayObject, options?:ViewPortHandlerOptions)
     {
         this._target = target;
-        this._options = options;
+        this._options = options || {};
         this._viewPort = new PIXI.Rectangle();
         this._ticker = new PIXI.ticker.Ticker();
         this._ticker.add(this.onTick, this);
