@@ -832,7 +832,7 @@ var ViewPortHandler = (function () {
         this._dragging = false;
         this._direction = 0;
         this._target = target;
-        this._options = options;
+        this._options = options || {};
         this._viewPort = new PIXI.Rectangle();
         this._ticker = new PIXI.ticker.Ticker();
         this._ticker.add(this.onTick, this);
