@@ -819,8 +819,8 @@ define("src/ares/pixijs/ViewPortHandler", ["require", "exports"], function (requ
                 this._direction = 0;
                 this._speed.set(0, 0);
                 // 设置移动性
-                this._movableH = (this._target["width"] || 0) > this._viewPort.width;
-                this._movableV = (this._target["height"] || 0) > this._viewPort.height;
+                this._movableH = !this._options.lockV && (this._target["width"] || 0) > this._viewPort.width;
+                this._movableV = !this._options.lockH && (this._target["height"] || 0) > this._viewPort.height;
                 // 记录最后点位置
                 this._downPoint = this._lastPoint = evt.data.global.clone();
                 // 记录最后时刻
