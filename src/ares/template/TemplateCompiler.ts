@@ -1,4 +1,4 @@
-import {IAres, Compiler} from "../Interfaces";
+import {IAres, Compiler, AresCommandData} from "../Interfaces";
 import {TemplateNode, Command, CommandContext, commands, compileChildren, getChildrenString} from "./TemplateCommands";
 
 /**
@@ -57,17 +57,27 @@ export class TemplateCompiler implements Compiler
     public compile(node:TemplateNode, scope:any):void
     {
         this._scope = scope;
-        // 如果节点的cmd不认识，则不编译该节点，仅编译其子节点
-        var cmd:Command = commands[node.cmd];
-        if(cmd)
+        if(node.cmd)
         {
-            var ctx:CommandContext = {
-                node: node,
-                scope: scope,
-                compiler: this,
-                entity: this._entity
-            };
-            cmd(ctx);
+            // 伪造一个合法的ares命令头
+            var data:AresCommandData = this._entity.parseCommand("a-" + node.cmd, node.exp);
+            // 判断是否是通用命令，是通用命令就不再单独编译节点
+            var isCommonCmd:boolean = this._entity.execCommand(data, node, scope);
+            if(!isCommonCmd)
+            {
+                // 如果节点的cmd不认识，则不编译该节点，仅编译其子节点
+                var cmd:Command = commands[node.cmd];
+                if(cmd)
+                {
+                    var ctx:CommandContext = {
+                        node: node,
+                        scope: scope,
+                        compiler: this,
+                        entity: this._entity
+                    };
+                    cmd(ctx);
+                }
+            }
         }
         // 开始递归编译子节点，但if或者for不编译
         if(node.children && node.cmd != "if" && node.cmd != "for")

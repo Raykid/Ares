@@ -54,48 +54,30 @@ var PIXICompiler = (function () {
     });
     PIXICompiler.prototype.parseCmd = function (node) {
         // 取到属性列表
-        var results = [];
-        var result;
+        var datas = [];
+        var data;
         for (var t in node) {
-            result = PIXICompiler._cmdRegExp.exec(t);
-            if (result)
-                results.push(result);
+            data = this._entity.parseCommand(t, node[t]);
+            if (data)
+                datas.push(data);
         }
         // 把配置中的属性推入属性列表中
         var conf = (this._config && this._config[node.name]);
         for (var t in conf) {
             if (t.indexOf("a-") != 0 && t.indexOf("a_") != 0)
                 t = "a-" + t;
-            result = PIXICompiler._cmdRegExp.exec(t);
-            if (result)
-                results.push(result);
+            data = this._entity.parseCommand(t, node[t]);
+            if (data)
+                datas.push(data);
         }
         // 开始遍历属性列表
         var cmdNameDict = {};
-        for (var i = 0, len = results.length; i < len; i++) {
-            // 首先解析当前节点上面以a_开头的属性，将其认为是绑定属性
-            result = results[i];
-            // 取到key
-            var key = result[0];
-            // 取到命令名
-            var cmdName = result[1];
-            // 取到命令字符串
-            var exp;
-            if (conf)
-                exp = conf[key] || conf[cmdName] || node[key];
-            else
-                exp = node[key];
-            // 取到子命令名
-            var subCmd = result[3] || "";
+        for (var i = 0, len = datas.length; i < len; i++) {
+            data = datas[i];
             // 填充字典
-            if (!cmdNameDict[cmdName])
-                cmdNameDict[cmdName] = [];
-            cmdNameDict[cmdName].push({
-                cmdName: cmdName,
-                subCmd: subCmd,
-                propName: key,
-                exp: exp
-            });
+            if (!cmdNameDict[data.cmdName])
+                cmdNameDict[data.cmdName] = [];
+            cmdNameDict[data.cmdName].push(data);
         }
         return cmdNameDict;
     };
@@ -149,10 +131,11 @@ var PIXICompiler = (function () {
             var cmdDatas = cmdDict[cmdName];
             for (var i = 0, len = cmdDatas.length; i < len; i++) {
                 var cmdData = cmdDatas[i];
+                var isCommonCmd = this._entity.testCommand(cmdData);
                 // 用命令名取到Command
                 var cmd = PIXICommands_1.commands[cmdName];
                 // 如果没有找到命令，则认为是自定义命令，套用prop命令
-                if (!cmd) {
+                if (!isCommonCmd && !cmd) {
                     cmdData.cmdName = "prop";
                     cmdData.subCmd = cmdName || "";
                     cmd = PIXICommands_1.commands[cmdData.cmdName];
@@ -192,8 +175,11 @@ var PIXICompiler = (function () {
             cmdToCompile.ctx.target = node;
             // 移除属性
             delete cmdToCompile.ctx.target[cmdToCompile.propName];
-            // 开始编译
-            node = cmdToCompile.cmd(cmdToCompile.ctx);
+            // 开始编译，首先尝试执行通用命令
+            var isCommonCmd = this._entity.execCommand(cmdToCompile.ctx.cmdData, node, scope);
+            // 如果是通用命令则不再继续执行，否则按照特殊命令执行
+            if (!isCommonCmd)
+                node = cmdToCompile.cmd(cmdToCompile.ctx);
         }
         // 如果没有懒编译则编译内部结构
         if (!hasLazyCompile) {
@@ -273,7 +259,6 @@ var PIXICompiler = (function () {
         }
         return "`" + exp + "`";
     };
-    PIXICompiler._cmdRegExp = /^a[\-_](\w+)([:\$](.+))?$/;
     PIXICompiler._textRegExp = /(.*?)\{\{(.*?)\}\}(.*)/;
     return PIXICompiler;
 }());

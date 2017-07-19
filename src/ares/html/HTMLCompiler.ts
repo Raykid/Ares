@@ -2,25 +2,16 @@
  * Created by Raykid on 2016/12/22.
  */
 
-import {Compiler, IAres} from "../Interfaces";
+import {Compiler, IAres, AresCommandData} from "../Interfaces";
 import {Command, CommandContext, commands, textContent} from "./HTMLCommands";
-
-export interface CmdData
-{
-    cmdName:string;
-    subCmd:string;
-    propName:string;
-    exp:string;
-}
 
 export interface CmdDict
 {
-    [cmdName:string]:CmdData;
+    [cmdName:string]:AresCommandData;
 }
 
 export class HTMLCompiler implements Compiler
 {
-    private static _cmdRegExp:RegExp = /^(data\-)?a\-(\w+)(:(.+))?$/;
     private static _textRegExp:RegExp = /(.*?)\{\{(.*?)\}\}(.*)/;
 
     private _selectorsOrElement:string|HTMLElement;
@@ -68,21 +59,15 @@ export class HTMLCompiler implements Compiler
                 var attr:Attr = attrs[i];
                 var name:string = attr.name;
                 // 检测命令
-                var result:RegExpExecArray = HTMLCompiler._cmdRegExp.exec(name);
-                if(result)
+                var data:AresCommandData = this._entity.parseCommand(name, attr.value);
+                if(data)
                 {
-                    // 取到命令名
-                    var cmdName:string = result[2];
+                    // 判断是否是通用命令
+                    var isCommonCmd:boolean = this._entity.testCommand(data);
                     // 用命令名取到Command
-                    var cmd:Command = commands[cmdName];
-                    if(cmd)
+                    var cmd:Command = commands[data.cmdName];
+                    if(isCommonCmd || cmd)
                     {
-                        var cmdData:CmdData = {
-                            cmdName: cmdName,
-                            subCmd: result[4],
-                            propName: result[0],
-                            exp: attr.value
-                        };
                         // 推入数组
                         cmdsToCompile.push({
                             attr: attr,
@@ -92,12 +77,12 @@ export class HTMLCompiler implements Compiler
                                 target: node as HTMLElement,
                                 compiler: this,
                                 entity: this._entity,
-                                cmdData: cmdData,
+                                cmdData: data,
                                 cmdDict: cmdDict
                             }
                         });
                         // 如果是for或者if则设置懒编译
-                        if(cmdName == "if" || cmdName == "for")
+                        if(data.cmdName == "if" || data.cmdName == "for")
                         {
                             hasLazyCompile = true;
                             // 清空数组，仅留下自身的编译
@@ -113,8 +98,9 @@ export class HTMLCompiler implements Compiler
                 var cmdToCompile:{attr:Attr, cmd:Command, ctx:CommandContext} = cmdsToCompile[i];
                 // 移除属性
                 cmdToCompile.attr.ownerElement.removeAttribute(cmdToCompile.attr.name);
-                // 开始编译
-                cmdToCompile.cmd(cmdToCompile.ctx);
+                // 开始编译，优先通用命令
+                var isCommonCmd:boolean = this._entity.execCommand(cmdToCompile.ctx.cmdData, cmdToCompile.ctx.target, cmdToCompile.ctx.scope);
+                if(!isCommonCmd) cmdToCompile.cmd(cmdToCompile.ctx);
             }
             // 如果没有懒编译则编译内部结构
             if(!hasLazyCompile)

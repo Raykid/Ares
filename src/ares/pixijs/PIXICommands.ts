@@ -1,5 +1,5 @@
-import {IAres, IWatcher} from "../Interfaces";
-import {PIXICompiler, CmdDict, CmdData, getTemplate} from "./PIXICompiler";
+import {IAres, IWatcher, AresCommandData} from "../Interfaces";
+import {PIXICompiler, CmdDict, getTemplate} from "./PIXICompiler";
 import {runExp, evalExp} from "../Utils";
 import {ViewPortHandler, ViewPortHandlerOptions} from "./ViewPortHandler";
 
@@ -22,7 +22,7 @@ export interface CommandContext
     target:PIXI.DisplayObject;
     compiler:PIXICompiler;
     entity:IAres;
-    cmdData:CmdData;
+    cmdData:AresCommandData;
     cmdDict:CmdDict;
     [name:string]:any;
 }
@@ -51,7 +51,7 @@ export const commands:{[name:string]:Command} = {
     /** 视点命令 */
     viewport: (context:CommandContext)=>
     {
-        var cmdData:CmdData = context.cmdData;
+        var cmdData:AresCommandData = context.cmdData;
         var target:PIXI.DisplayObject = context.target;
         var exp:string = "[" + cmdData.exp + "]";
         // 生成处理器
@@ -72,7 +72,7 @@ export const commands:{[name:string]:Command} = {
     /** 模板替换命令 */
     tpl: (context:CommandContext)=>
     {
-        var cmdData:CmdData = context.cmdData;
+        var cmdData:AresCommandData = context.cmdData;
         // 优先从本地模板库取到模板对象
         var template:PIXI.DisplayObject = context.compiler.getTemplate(cmdData.exp);
         // 本地模板库没有找到，去全局模板库里取
@@ -96,7 +96,7 @@ export const commands:{[name:string]:Command} = {
     /** 修改任意属性命令 */
     prop: (context:CommandContext)=>
     {
-        var cmdData:CmdData = context.cmdData;
+        var cmdData:AresCommandData = context.cmdData;
         var target:PIXI.DisplayObject = context.target;
         context.entity.createWatcher(target, cmdData.exp, context.scope, (value:any)=>
         {
@@ -120,7 +120,7 @@ export const commands:{[name:string]:Command} = {
     /** 绑定事件 */
     on: (context:CommandContext)=>
     {
-        var cmdData:CmdData = context.cmdData;
+        var cmdData:AresCommandData = context.cmdData;
         if(cmdData.subCmd != "")
         {
             var handler:Function = context.scope[cmdData.exp] || window[context.cmdData.exp];
@@ -150,7 +150,7 @@ export const commands:{[name:string]:Command} = {
     /** if命令 */
     if: (context:CommandContext)=>
     {
-        var cmdData:CmdData = context.cmdData;
+        var cmdData:AresCommandData = context.cmdData;
         // 记录一个是否编译过的flag
         var compiled:boolean = false;
         // 插入一个占位元素
@@ -198,7 +198,7 @@ export const commands:{[name:string]:Command} = {
     /** for命令 */
     for: (context:CommandContext)=>
     {
-        var cmdData:CmdData = context.cmdData;
+        var cmdData:AresCommandData = context.cmdData;
         // 解析表达式
         var reg:RegExp = /^\s*(\S+)\s+in\s+([\s\S]+?)\s*$/;
         var res:RegExpExecArray = reg.exec(cmdData.exp);
@@ -223,10 +223,10 @@ export const commands:{[name:string]:Command} = {
             writable: false
         });
         // 如果有viewport命令，则将其转移至容器上
-        var viewportCmds:CmdData[] = context.cmdDict["viewport"];
+        var viewportCmds:AresCommandData[] = context.cmdDict["viewport"];
         if(viewportCmds)
         {
-            var viewportCmd:CmdData = viewportCmds[0];
+            var viewportCmd:AresCommandData = viewportCmds[0];
             if(viewportCmd)
             {
                 parent[viewportCmd.propName] = viewportCmd.exp;

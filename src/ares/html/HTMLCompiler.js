@@ -40,19 +40,13 @@ var HTMLCompiler = (function () {
                 var attr = attrs[i];
                 var name = attr.name;
                 // 检测命令
-                var result = HTMLCompiler._cmdRegExp.exec(name);
-                if (result) {
-                    // 取到命令名
-                    var cmdName = result[2];
+                var data = this._entity.parseCommand(name, attr.value);
+                if (data) {
+                    // 判断是否是通用命令
+                    var isCommonCmd = this._entity.testCommand(data);
                     // 用命令名取到Command
-                    var cmd = HTMLCommands_1.commands[cmdName];
-                    if (cmd) {
-                        var cmdData = {
-                            cmdName: cmdName,
-                            subCmd: result[4],
-                            propName: result[0],
-                            exp: attr.value
-                        };
+                    var cmd = HTMLCommands_1.commands[data.cmdName];
+                    if (isCommonCmd || cmd) {
                         // 推入数组
                         cmdsToCompile.push({
                             attr: attr,
@@ -62,12 +56,12 @@ var HTMLCompiler = (function () {
                                 target: node,
                                 compiler: this,
                                 entity: this._entity,
-                                cmdData: cmdData,
+                                cmdData: data,
                                 cmdDict: cmdDict
                             }
                         });
                         // 如果是for或者if则设置懒编译
-                        if (cmdName == "if" || cmdName == "for") {
+                        if (data.cmdName == "if" || data.cmdName == "for") {
                             hasLazyCompile = true;
                             // 清空数组，仅留下自身的编译
                             cmdsToCompile.splice(0, cmdsToCompile.length - 1);
@@ -81,8 +75,10 @@ var HTMLCompiler = (function () {
                 var cmdToCompile = cmdsToCompile[i];
                 // 移除属性
                 cmdToCompile.attr.ownerElement.removeAttribute(cmdToCompile.attr.name);
-                // 开始编译
-                cmdToCompile.cmd(cmdToCompile.ctx);
+                // 开始编译，优先通用命令
+                var isCommonCmd = this._entity.execCommand(cmdToCompile.ctx.cmdData, cmdToCompile.ctx.target, cmdToCompile.ctx.scope);
+                if (!isCommonCmd)
+                    cmdToCompile.cmd(cmdToCompile.ctx);
             }
             // 如果没有懒编译则编译内部结构
             if (!hasLazyCompile) {
@@ -120,7 +116,6 @@ var HTMLCompiler = (function () {
         }
         return "`" + exp + "`";
     };
-    HTMLCompiler._cmdRegExp = /^(data\-)?a\-(\w+)(:(.+))?$/;
     HTMLCompiler._textRegExp = /(.*?)\{\{(.*?)\}\}(.*)/;
     return HTMLCompiler;
 }());

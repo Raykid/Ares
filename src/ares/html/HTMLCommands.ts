@@ -2,8 +2,8 @@
  * Created by Raykid on 2016/12/22.
  */
 
-import {CmdDict, CmdData} from "./HTMLCompiler";
-import {Compiler, IAres} from "../Interfaces";
+import {CmdDict} from "./HTMLCompiler";
+import {Compiler, IAres, AresCommandData} from "../Interfaces";
 import {runExp} from "../Utils";
 
 export interface Command
@@ -17,7 +17,7 @@ export interface CommandContext
     target:Node;
     compiler:Compiler;
     entity:IAres;
-    cmdData:CmdData;
+    cmdData:AresCommandData;
     cmdDict:CmdDict;
     [name:string]:any;
 }
@@ -99,7 +99,7 @@ export const commands:{[name:string]:Command} = {
     /** 修改任意属性命令 */
     attr: (context:CommandContext)=>
     {
-        var cmdData:CmdData = context.cmdData;
+        var cmdData:AresCommandData = context.cmdData;
         var target:HTMLElement = context.target as HTMLElement;
         context.entity.createWatcher(context.target, cmdData.exp, context.scope, (value:any)=>
         {
@@ -122,7 +122,7 @@ export const commands:{[name:string]:Command} = {
     /** 绑定事件 */
     on: (context:CommandContext)=>
     {
-        var cmdData:CmdData = context.cmdData;
+        var cmdData:AresCommandData = context.cmdData;
         if(cmdData.subCmd != "")
         {
             var handler:Function = context.scope[cmdData.exp] || window[context.cmdData.exp];
@@ -183,7 +183,7 @@ export const commands:{[name:string]:Command} = {
     /** for命令 */
     for: (context:CommandContext)=>
     {
-        var cmdData:CmdData = context.cmdData;
+        var cmdData:AresCommandData = context.cmdData;
         // 解析表达式
         var reg:RegExp = /^\s*(\S+)\s+in\s+([\s\S]+?)\s*$/;
         var res:RegExpExecArray = reg.exec(cmdData.exp);

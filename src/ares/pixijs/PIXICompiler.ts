@@ -1,6 +1,6 @@
 /// <reference path="pixi.js.d.ts"/>
 
-import {IAres, Compiler} from "../Interfaces";
+import {IAres, Compiler, AresCommandData} from "../Interfaces";
 import {Command, CommandContext, commands, textContent} from "./PIXICommands";
 
 /**
@@ -45,22 +45,13 @@ export function setTemplate(name:string, tpl:PIXI.DisplayObject):PIXI.DisplayObj
     return tpl;
 }
 
-export interface CmdData
-{
-    cmdName:string;
-    subCmd:string;
-    propName:string;
-    exp:string;
-}
-
 export interface CmdDict
 {
-    [cmdName:string]:CmdData[];
+    [cmdName:string]:AresCommandData[];
 }
 
 export class PIXICompiler implements Compiler
 {
-    private static _cmdRegExp:RegExp = /^a[\-_](\w+)([:\$](.+))?$/;
     private static _textRegExp:RegExp = /(.*?)\{\{(.*?)\}\}(.*)/;
 
     private _root:PIXI.DisplayObject;
@@ -92,45 +83,29 @@ export class PIXICompiler implements Compiler
     private parseCmd(node:PIXI.DisplayObject):CmdDict
     {
         // 取到属性列表
-        var results:RegExpExecArray[] = [];
-        var result:RegExpExecArray;
+        var datas:AresCommandData[] = [];
+        var data:AresCommandData;
         for(var t in node)
         {
-            result = PIXICompiler._cmdRegExp.exec(t);
-            if(result) results.push(result);
+            data = this._entity.parseCommand(t, node[t]);
+            if(data) datas.push(data);
         }
         // 把配置中的属性推入属性列表中
         var conf:PIXIBindConfigCommands = (this._config && this._config[node.name]);
         for(var t in conf)
         {
             if(t.indexOf("a-") != 0 && t.indexOf("a_") != 0) t = "a-" + t;
-            result = PIXICompiler._cmdRegExp.exec(t);
-            if(result) results.push(result);
+            data = this._entity.parseCommand(t, node[t]);
+            if(data) datas.push(data);
         }
         // 开始遍历属性列表
         var cmdNameDict:CmdDict = {};
-        for(var i:number = 0, len:number = results.length; i < len; i++)
+        for(var i:number = 0, len:number = datas.length; i < len; i++)
         {
-            // 首先解析当前节点上面以a_开头的属性，将其认为是绑定属性
-            result = results[i];
-            // 取到key
-            var key:string = result[0];
-            // 取到命令名
-            var cmdName:string = result[1];
-            // 取到命令字符串
-            var exp:string;
-            if(conf) exp = conf[key] || conf[cmdName] || node[key];
-            else exp = node[key];
-            // 取到子命令名
-            var subCmd:string = result[3] || "";
+            data = datas[i];
             // 填充字典
-            if(!cmdNameDict[cmdName]) cmdNameDict[cmdName] = [];
-            cmdNameDict[cmdName].push({
-                cmdName: cmdName,
-                subCmd: subCmd,
-                propName: key,
-                exp: exp
-            });
+            if(!cmdNameDict[data.cmdName]) cmdNameDict[data.cmdName] = [];
+            cmdNameDict[data.cmdName].push(data);
         }
         return cmdNameDict;
     }
@@ -192,14 +167,15 @@ export class PIXICompiler implements Compiler
         flag:
         for(var cmdName in cmdDict)
         {
-            var cmdDatas:CmdData[] = cmdDict[cmdName];
+            var cmdDatas:AresCommandData[] = cmdDict[cmdName];
             for(var i:number = 0, len:number = cmdDatas.length; i < len; i++)
             {
-                var cmdData:CmdData = cmdDatas[i];
+                var cmdData:AresCommandData = cmdDatas[i];
+                var isCommonCmd:boolean = this._entity.testCommand(cmdData);
                 // 用命令名取到Command
                 var cmd:Command = commands[cmdName];
                 // 如果没有找到命令，则认为是自定义命令，套用prop命令
-                if(!cmd)
+                if(!isCommonCmd && !cmd)
                 {
                     cmdData.cmdName = "prop";
                     cmdData.subCmd = cmdName || "";
@@ -240,8 +216,10 @@ export class PIXICompiler implements Compiler
             cmdToCompile.ctx.target = node;
             // 移除属性
             delete cmdToCompile.ctx.target[cmdToCompile.propName];
-            // 开始编译
-            node = cmdToCompile.cmd(cmdToCompile.ctx);
+            // 开始编译，首先尝试执行通用命令
+            var isCommonCmd:boolean = this._entity.execCommand(cmdToCompile.ctx.cmdData, node, scope);
+            // 如果是通用命令则不再继续执行，否则按照特殊命令执行
+            if(!isCommonCmd) node = cmdToCompile.cmd(cmdToCompile.ctx);
         }
         // 如果没有懒编译则编译内部结构
         if(!hasLazyCompile)

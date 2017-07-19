@@ -33,7 +33,7 @@ export function getChildrenString(node:TemplateNode):string
     {
         for(var i:number = 0, len:number = children.length; i < len; i++)
         {
-            result += children[i].value;
+            result += children[i].value || "";
         }
     }
     return result;

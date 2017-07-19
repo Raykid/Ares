@@ -5,7 +5,7 @@ function getChildrenString(node) {
     var children = node.children;
     if (children) {
         for (var i = 0, len = children.length; i < len; i++) {
-            result += children[i].value;
+            result += children[i].value || "";
         }
     }
     return result;
