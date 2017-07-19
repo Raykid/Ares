@@ -1,3 +1,4 @@
+/// <reference path="../src/ares/pixijs/pixi.js.d.ts" />
 declare module "Interfaces" {
     /**
      * Created by Raykid on 2016/12/22.
@@ -113,19 +114,65 @@ declare module "Utils" {
      */
     export function runExp(exp: string, scope: any): void;
 }
-declare module "html/HTMLCommands" {
+declare module "pixijs/ViewPortHandler" {
+    export interface ViewPortHandlerOptions {
+        oneway?: boolean;
+        lockH?: boolean;
+        lockV?: boolean;
+    }
+    export class ViewPortHandler {
+        private static DIRECTION_H;
+        private static DIRECTION_V;
+        private _target;
+        private _viewPort;
+        private _ticker;
+        private _masker;
+        private _options;
+        private _movableH;
+        private _movableV;
+        private _downTarget;
+        private _downPoint;
+        private _lastPoint;
+        private _lastTime;
+        private _speed;
+        private _dragging;
+        private _direction;
+        constructor(target: PIXI.DisplayObject, options?: ViewPortHandlerOptions);
+        private onPointerDown(evt);
+        private onPointerMove(evt);
+        private onPointerUp(evt);
+        private getContentBounds(targetX, targetY);
+        private getDelta(targetX, targetY);
+        private moveTarget(x, y);
+        private onTick(delta);
+        /**
+         * 设置视点范围
+         * @param x 视点横坐标
+         * @param y 视点纵坐标
+         * @param width 视点宽度
+         * @param height 视点高度
+         */
+        setViewPort(x: number, y: number, width: number, height: number): void;
+    }
+}
+declare module "pixijs/PIXICommands" {
+    import { IAres, AresCommandData } from "Interfaces";
+    import { PIXICompiler, CmdDict } from "pixijs/PIXICompiler";
     /**
-     * Created by Raykid on 2016/12/22.
+     * Created by Raykid on 2016/12/27.
      */
-    import { CmdDict } from "html/HTMLCompiler";
-    import { Compiler, IAres, AresCommandData } from "Interfaces";
     export interface Command {
-        (context?: CommandContext): void;
+        /**
+         * 执行命令
+         * @param context 命令上下文
+         * @return {PIXI.DisplayObject} 要替换原显示节点的显示节点
+         */
+        (context?: CommandContext): PIXI.DisplayObject;
     }
     export interface CommandContext {
         scope: any;
-        target: Node;
-        compiler: Compiler;
+        target: PIXI.DisplayObject;
+        compiler: PIXICompiler;
         entity: IAres;
         cmdData: AresCommandData;
         cmdDict: CmdDict;
@@ -143,24 +190,69 @@ declare module "html/HTMLCommands" {
         [name: string]: Command;
     };
 }
-declare module "html/HTMLCompiler" {
+declare module "pixijs/PIXICompiler" {
+    import { IAres, Compiler, AresCommandData } from "Interfaces";
     /**
-     * Created by Raykid on 2016/12/22.
+     * Created by Raykid on 2016/12/27.
      */
-    import { Compiler, IAres, AresCommandData } from "Interfaces";
-    export interface CmdDict {
-        [cmdName: string]: AresCommandData;
+    export interface PIXIBindConfig {
+        [name: string]: PIXIBindConfigCommands;
     }
-    export class HTMLCompiler implements Compiler {
+    export interface PIXIBindConfigCommands {
+        [cmd: string]: any;
+    }
+    /**
+     * 获取全局模板对象，该模板在任何地方都生效
+     * @param name 模板名称
+     * @returns {PIXI.DisplayObject|undefined} 如果模板名称存在则返回模板对象
+     */
+    export function getTemplate(name: string): PIXI.DisplayObject;
+    /**
+     * 设置全局模板对象，该模板在任何地方都生效
+     * @param name 模板名称
+     * @param tpl 模板对象
+     * @returns {PIXI.DisplayObject|null} 如果成功设置了模板则返回模板对象，否则返回null（如已存在同名模板）
+     */
+    export function setTemplate(name: string, tpl: PIXI.DisplayObject): PIXI.DisplayObject;
+    export interface CmdDict {
+        [cmdName: string]: AresCommandData[];
+    }
+    export class PIXICompiler implements Compiler {
         private static _textRegExp;
-        private _selectorsOrElement;
         private _root;
+        private _config;
         private _entity;
-        readonly root: HTMLElement;
-        constructor(selectorsOrElement: string | HTMLElement);
+        private _nameDict;
+        private _tplDict;
+        /** 获取根显示对象 */
+        readonly root: PIXI.DisplayObject;
+        /**
+         * 创建PIXI绑定
+         * @param root 根显示对象，从这里传入的绑定数据属性名必须以“a_”开头
+         * @param config 绑定数据，从这里传入的绑定数据属性名可以不以“a_”开头
+         * @param tplDict 模板字典，可以在这里给出模板定义表
+         */
+        constructor(root: PIXI.DisplayObject, config?: PIXIBindConfig, tplDict?: {
+            [name: string]: PIXI.DisplayObject;
+        });
+        private parseCmd(node);
+        private parseTpl(node);
         init(entity: IAres): void;
-        compile(node: Node, scope: any): void;
-        private compileTextContent(node, scope, cmdDict);
+        compile(node: PIXI.DisplayObject, scope: any): void;
+        /**
+         * 获取模板对象，该模板只在该PIXICompiler内部生效
+         * @param name 模板名称
+         * @returns {PIXI.DisplayObject|undefined} 如果模板名称存在则返回模板对象
+         */
+        getTemplate(name: string): PIXI.DisplayObject;
+        /**
+         * 设置模板，该模板只在该PIXICompiler内部生效
+         * @param name 模板名称
+         * @param tpl 模板对象
+         * @returns {PIXI.DisplayObject|null} 如果成功设置了模板则返回模板对象，否则返回null（如已存在同名模板）
+         */
+        setTemplate(name: string, tpl: PIXI.DisplayObject): PIXI.DisplayObject;
+        private compileTextContent(text, scope, cmdDict);
         private parseTextExp(exp);
     }
 }

@@ -408,9 +408,9 @@ var PIXICompiler = (function () {
         }
         return "`" + exp + "`";
     };
+    PIXICompiler._textRegExp = /(.*?)\{\{(.*?)\}\}(.*)/;
     return PIXICompiler;
 }());
-PIXICompiler._textRegExp = /(.*?)\{\{(.*?)\}\}(.*)/;
 exports.PIXICompiler = PIXICompiler;
 
 
@@ -1049,10 +1049,10 @@ var ViewPortHandler = (function () {
         this._target.x += d.x;
         this._target.y += d.y;
     };
+    ViewPortHandler.DIRECTION_H = 1;
+    ViewPortHandler.DIRECTION_V = 2;
     return ViewPortHandler;
 }());
-ViewPortHandler.DIRECTION_H = 1;
-ViewPortHandler.DIRECTION_V = 2;
 exports.ViewPortHandler = ViewPortHandler;
 
 

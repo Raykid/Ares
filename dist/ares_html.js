@@ -266,9 +266,9 @@ var HTMLCompiler = (function () {
         }
         return "`" + exp + "`";
     };
+    HTMLCompiler._textRegExp = /(.*?)\{\{(.*?)\}\}(.*)/;
     return HTMLCompiler;
 }());
-HTMLCompiler._textRegExp = /(.*?)\{\{(.*?)\}\}(.*)/;
 exports.HTMLCompiler = HTMLCompiler;
 
 

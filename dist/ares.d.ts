@@ -1,8 +1,8 @@
-/**
- * Created by Raykid on 2016/12/22.
- */
-declare namespace ares {
-    interface Compiler {
+declare module "Interfaces" {
+    /**
+     * Created by Raykid on 2016/12/22.
+     */
+    export interface Compiler {
         /** 传递给编译器的皮肤对象 */
         root: any;
         /**
@@ -17,7 +17,7 @@ declare namespace ares {
          */
         compile(target: any, scope: any): void;
     }
-    interface IAres {
+    export interface IAres {
         /** 获取ViewModel */
         data: any;
         /** 获取编译器 */
@@ -30,11 +30,32 @@ declare namespace ares {
          * @param callback 订阅器回调
          */
         createWatcher(target: any, exp: string, scope: any, callback: WatcherCallback): IWatcher;
+        /**
+         * 解析表达式成为命令数据
+         * @param key 属性名，合法的属性名应以a-或a_开头，以:或$分隔主命令和子命令
+         * @param value 属性值，如果属性名合法则会被用来作为表达式的字符串
+         * @return {CommandData|null} 命令数据，如果不是命令则返回null
+         */
+        parseCommand(key: string, value: string): AresCommandData;
+        /**
+         * 测试是否是通用命令
+         * @param data 命令数据
+         * @return {boolean} 返回一个布尔值，表示该表达式是否是通用命令
+         */
+        testCommand(data: AresCommandData): boolean;
+        /**
+         * 执行通用命令，如果该表达式是通用命令则直接执行，否则什么都不做
+         * @param data 命令数据
+         * @param target 目标对象
+         * @param scope 变量作用域
+         * @return {boolean} 返回一个布尔值，表示该表达式是否是通用命令
+         */
+        execCommand(data: AresCommandData, target: any, scope: any): boolean;
     }
-    interface AresOptions {
+    export interface AresOptions {
         inited?: (entity?: IAres) => void;
     }
-    interface IWatcher {
+    export interface IWatcher {
         /**
          * 获取到表达式当前最新值
          * @returns {any} 最新值
@@ -48,23 +69,57 @@ declare namespace ares {
         /** 销毁订阅者 */
         dispose(): void;
     }
-    interface WatcherCallback {
+    export interface WatcherCallback {
         (newValue?: any, oldValue?: any, extra?: any): void;
     }
-    class Dep {
-        private _map;
-        /**
-         * 添加数据变更订阅者
-         * @param watcher 数据变更订阅者
-         */
-        watch(watcher: Watcher): void;
-        /**
-         * 数据变更，通知所有订阅者
-         * @param extra 可能的额外数据
-         */
-        notify(extra?: any): void;
+    export interface AresCommandData {
+        /** 主命令名 */
+        cmdName: string;
+        /** 子命令名 */
+        subCmd: string;
+        /** 命令属性全名 */
+        propName: string;
+        /** 表达式 */
+        exp: string;
     }
-    class Watcher implements IWatcher {
+}
+declare module "Utils" {
+    /**
+     * Created by Raykid on 2016/12/22.
+     */
+    /**
+     * 创建一个表达式求值方法，用于未来执行
+     * @param exp 表达式
+     * @returns {Function} 创建的方法
+     */
+    export function createEvalFunc(exp: string): (scope: any) => any;
+    /**
+     * 表达式求值，无法执行多条语句
+     * @param exp 表达式
+     * @param scope 表达式的作用域
+     * @returns {any} 返回值
+     */
+    export function evalExp(exp: string, scope: any): any;
+    /**
+     * 创建一个执行方法，用于未来执行
+     * @param exp 表达式
+     * @returns {Function} 创建的方法
+     */
+    export function createRunFunc(exp: string): (scope: any) => void;
+    /**
+     * 直接执行表达式，不求值。该方法可以执行多条语句
+     * @param exp 表达式
+     * @param scope 表达式的作用域
+     */
+    export function runExp(exp: string, scope: any): void;
+}
+declare module "Watcher" {
+    import { IAres, IWatcher, WatcherCallback } from "Interfaces";
+    /**
+     * Created by Raykid on 2016/12/22.
+     * 数据更新订阅者，当依赖的数据有更新时会触发callback通知外面
+     */
+    export class Watcher implements IWatcher {
         /** 记录当前正在执行update方法的Watcher引用 */
         static updating: Watcher;
         private static _uid;
@@ -79,7 +134,7 @@ declare namespace ares {
         private _expFunc;
         private _callback;
         private _disposed;
-        constructor(entity: ares.IAres, target: any, exp: string, scope: any, callback: WatcherCallback);
+        constructor(entity: IAres, target: any, exp: string, scope: any, callback: WatcherCallback);
         /**
          * 获取到表达式当前最新值
          * @returns {any} 最新值
@@ -105,7 +160,28 @@ declare namespace ares {
          */
         private static deepCopy(from);
     }
-    class Mutator {
+}
+declare module "Dep" {
+    /**
+     * Created by Raykid on 2016/12/22.
+     */
+    import { Watcher } from "Watcher";
+    export class Dep {
+        private _map;
+        /**
+         * 添加数据变更订阅者
+         * @param watcher 数据变更订阅者
+         */
+        watch(watcher: Watcher): void;
+        /**
+         * 数据变更，通知所有订阅者
+         * @param extra 可能的额外数据
+         */
+        notify(extra?: any): void;
+    }
+}
+declare module "Mutator" {
+    export class Mutator {
         private static _arrMethods;
         /**
          * 将用户传进来的数据“变异”成为具有截获数据变更能力的数据
@@ -117,31 +193,35 @@ declare namespace ares {
         private static mutateArray(arr, dep);
         private static defineReactiveArray(dep);
     }
+}
+declare module "Commands" {
     /**
-     * 创建一个表达式求值方法，用于未来执行
-     * @param exp 表达式
-     * @returns {Function} 创建的方法
+     * Created by Raykid on 2017/7/19.
      */
-    function createEvalFunc(exp: string): (scope: any) => any;
+    import { IAres, AresCommandData } from "Interfaces";
+    export interface CommandContext {
+        target: any;
+        scope: any;
+        entity: IAres;
+        data: AresCommandData;
+    }
+    export interface Command {
+        /**
+         * 执行命令
+         * @param context 命令上下文
+         * @return {any} 要替换原显示节点的显示节点
+         */
+        (context?: CommandContext): any;
+    }
+    export const commands: {
+        [name: string]: Command;
+    };
+}
+declare module "Ares" {
     /**
-     * 表达式求值，无法执行多条语句
-     * @param exp 表达式
-     * @param scope 表达式的作用域
-     * @returns {any} 返回值
+     * Created by Raykid on 2016/12/16.
      */
-    function evalExp(exp: string, scope: any): any;
-    /**
-     * 创建一个执行方法，用于未来执行
-     * @param exp 表达式
-     * @returns {Function} 创建的方法
-     */
-    function createRunFunc(exp: string): (scope: any) => void;
-    /**
-     * 直接执行表达式，不求值。该方法可以执行多条语句
-     * @param exp 表达式
-     * @param scope 表达式的作用域
-     */
-    function runExp(exp: string, scope: any): void;
+    import { IAres, Compiler, AresOptions, IWatcher, WatcherCallback, AresCommandData } from "Interfaces";
     /**
      * 将数据模型和视图进行绑定
      * @param model 数据模型
@@ -149,17 +229,38 @@ declare namespace ares {
      * @param options 一些额外参数
      * @returns {core.AresEntity} 绑定实体对象
      */
-    function bind(data: any, compiler: Compiler, options?: ares.AresOptions): ares.IAres;
-    class Ares implements IAres {
+    export function bind(data: any, compiler: Compiler, options?: AresOptions): IAres;
+    export class Ares implements IAres {
         private _data;
         private _compiler;
         private _options;
+        private _cmdRegExp;
         /** 获取ViewModel */
         readonly data: any;
         /** 获取编译器 */
         readonly compiler: Compiler;
-        constructor(data: any, compiler: ares.Compiler, options?: ares.AresOptions);
+        constructor(data: any, compiler: Compiler, options?: AresOptions);
         createWatcher(target: any, exp: string, scope: any, callback: WatcherCallback): IWatcher;
+        /**
+         * 解析表达式成为命令数据
+         * @param key 属性名，合法的属性名应以a-或a_开头，以:或$分隔主命令和子命令
+         * @param value 属性值，如果属性名合法则会被用来作为表达式的字符串
+         * @return {CommandData|null} 命令数据，如果不是命令则返回null
+         */
+        parseCommand(key: string, value: string): AresCommandData;
+        /**
+         * 测试是否是通用命令
+         * @param data 命令数据
+         * @return {boolean} 返回一个布尔值，表示该表达式是否是通用命令
+         */
+        testCommand(data: AresCommandData): boolean;
+        /**
+         * 执行通用命令，如果该表达式是通用命令则直接执行，否则什么都不做
+         * @param data 命令数据
+         * @param target 目标对象
+         * @param scope 变量作用域
+         * @return {boolean} 返回一个布尔值，表示该表达式是否是通用命令
+         */
+        execCommand(data: AresCommandData, target: any, scope: any): boolean;
     }
 }
-declare var module: any;

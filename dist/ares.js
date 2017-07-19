@@ -271,11 +271,11 @@ var Watcher = (function () {
             return from;
         }
     };
+    /** 记录当前正在执行update方法的Watcher引用 */
+    Watcher.updating = null;
+    Watcher._uid = 0;
     return Watcher;
 }());
-/** 记录当前正在执行update方法的Watcher引用 */
-Watcher.updating = null;
-Watcher._uid = 0;
 exports.Watcher = Watcher;
 
 
@@ -448,18 +448,18 @@ var Mutator = (function () {
         });
         return result;
     };
+    // 记录数组中会造成数据更新的所有方法名
+    Mutator._arrMethods = [
+        "push",
+        "pop",
+        "unshift",
+        "shift",
+        "splice",
+        "sort",
+        "reverse"
+    ];
     return Mutator;
 }());
-// 记录数组中会造成数据更新的所有方法名
-Mutator._arrMethods = [
-    "push",
-    "pop",
-    "unshift",
-    "shift",
-    "splice",
-    "sort",
-    "reverse"
-];
 exports.Mutator = Mutator;
 
 
