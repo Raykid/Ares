@@ -73,7 +73,7 @@ return /******/ (function(modules) { // webpackBootstrap
 /******/ 	__webpack_require__.p = "";
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = 7);
+/******/ 	return __webpack_require__(__webpack_require__.s = 8);
 /******/ })
 /************************************************************************/
 /******/ ([
@@ -287,11 +287,42 @@ exports.Watcher = Watcher;
 "use strict";
 
 /**
+ * Created by Raykid on 2017/7/19.
+ */
+Object.defineProperty(exports, "__esModule", { value: true });
+var Utils_1 = __webpack_require__(0);
+exports.commands = {
+    /** 一次性设置变量命令，在数据中插入一个变量 */
+    set: function (context) {
+        // 设置变量值
+        Utils_1.runExp(context.data.subCmd + "=" + context.data.exp, context.scope);
+        return context.target;
+    },
+    /** 绑定设置变量命令，在数据中插入一个变量（如果不提供子命令则不插入变量），并根据表达式的值同步更新变量的值 */
+    bind: function (context) {
+        // 创建订阅器，监听表达式值变化
+        context.entity.createWatcher(context.target, context.data.exp, context.scope, function (value) {
+            // 如果子命令不为空，则更新变量值
+            if (context.data.subCmd)
+                Utils_1.runExp(context.data.subCmd + "=" + context.data.exp, context.scope);
+        });
+        return context.target;
+    }
+};
+
+
+/***/ }),
+/* 4 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+/**
  * Created by Raykid on 2016/12/22.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 var Watcher_1 = __webpack_require__(1);
-var Dep_1 = __webpack_require__(8);
+var Dep_1 = __webpack_require__(9);
 var Mutator = (function () {
     function Mutator() {
     }
@@ -433,10 +464,10 @@ exports.Mutator = Mutator;
 
 
 /***/ }),
-/* 4 */,
 /* 5 */,
 /* 6 */,
-/* 7 */
+/* 7 */,
+/* 8 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -445,8 +476,9 @@ exports.Mutator = Mutator;
  * Created by Raykid on 2016/12/16.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-var Mutator_1 = __webpack_require__(3);
+var Mutator_1 = __webpack_require__(4);
 var Watcher_1 = __webpack_require__(1);
+var Commands_1 = __webpack_require__(3);
 /**
  * 将数据模型和视图进行绑定
  * @param model 数据模型
@@ -460,6 +492,7 @@ function bind(data, compiler, options) {
 exports.bind = bind;
 var Ares = (function () {
     function Ares(data, compiler, options) {
+        this._cmdRegExp = /^(data\-)?a[\-_](\w+)([:\$](.+))?$/;
         // 记录变异对象
         this._data = Mutator_1.Mutator.mutate(data);
         this._compiler = compiler;
@@ -490,13 +523,77 @@ var Ares = (function () {
     Ares.prototype.createWatcher = function (target, exp, scope, callback) {
         return new Watcher_1.Watcher(this, target, exp, scope, callback);
     };
+    /**
+     * 解析表达式成为命令数据
+     * @param key 属性名，合法的属性名应以a-或a_开头，以:或$分隔主命令和子命令
+     * @param value 属性值，如果属性名合法则会被用来作为表达式的字符串
+     * @return {CommandData|null} 命令数据，如果不是命令则返回null
+     */
+    Ares.prototype.parseCommand = function (key, value) {
+        var result = this._cmdRegExp.exec(key);
+        if (!result)
+            return null;
+        // 取到key
+        var key = result[0];
+        // 取到命令名
+        var cmdName = result[2];
+        // 取到命令字符串
+        var exp = value;
+        // 取到子命令名
+        var subCmd = result[4] || "";
+        // 返回结构体
+        return {
+            cmdName: cmdName,
+            subCmd: subCmd,
+            propName: key,
+            exp: exp
+        };
+    };
+    /**
+     * 测试是否是通用命令
+     * @param data 命令数据
+     * @return {boolean} 返回一个布尔值，表示该表达式是否是通用命令
+     */
+    Ares.prototype.testCommand = function (data) {
+        // 非空判断
+        if (!data)
+            return false;
+        // 取到通用命令
+        var cmd = Commands_1.commands[data.cmdName];
+        return (cmd != null);
+    };
+    /**
+     * 执行通用命令，如果该表达式是通用命令则直接执行，否则什么都不做
+     * @param data 命令数据
+     * @param target 目标对象
+     * @param scope 变量作用域
+     * @return {boolean} 返回一个布尔值，表示该表达式是否是通用命令
+     */
+    Ares.prototype.execCommand = function (data, target, scope) {
+        // 非空判断
+        if (!data || !scope)
+            return false;
+        // 取到通用命令
+        var cmd = Commands_1.commands[data.cmdName];
+        // 没找到命令就返回false
+        if (!cmd)
+            return false;
+        // 找到命令了，执行之
+        cmd({
+            target: target,
+            scope: scope,
+            entity: this,
+            data: data
+        });
+        return true;
+    };
     return Ares;
 }());
 exports.Ares = Ares;
 
 
 /***/ }),
-/* 8 */
+/* 9 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";

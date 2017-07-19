@@ -73,18 +73,18 @@ return /******/ (function(modules) { // webpackBootstrap
 /******/ 	__webpack_require__.p = "";
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = 11);
+/******/ 	return __webpack_require__(__webpack_require__.s = 12);
 /******/ })
 /************************************************************************/
 /******/ ({
 
-/***/ 11:
+/***/ 12:
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", { value: true });
-var TemplateCommands_1 = __webpack_require__(6);
+var TemplateCommands_1 = __webpack_require__(7);
 var TemplateCompiler = (function () {
     /**
      * 创建模板绑定
@@ -117,16 +117,24 @@ var TemplateCompiler = (function () {
     };
     TemplateCompiler.prototype.compile = function (node, scope) {
         this._scope = scope;
-        // 如果节点的cmd不认识，则不编译该节点，仅编译其子节点
-        var cmd = TemplateCommands_1.commands[node.cmd];
-        if (cmd) {
-            var ctx = {
-                node: node,
-                scope: scope,
-                compiler: this,
-                entity: this._entity
-            };
-            cmd(ctx);
+        if (node.cmd) {
+            // 伪造一个合法的ares命令头
+            var data = this._entity.parseCommand("a-" + node.cmd, node.exp);
+            // 判断是否是通用命令，是通用命令就不再单独编译节点
+            var isCommonCmd = this._entity.execCommand(data, node, scope);
+            if (!isCommonCmd) {
+                // 如果节点的cmd不认识，则不编译该节点，仅编译其子节点
+                var cmd = TemplateCommands_1.commands[node.cmd];
+                if (cmd) {
+                    var ctx = {
+                        node: node,
+                        scope: scope,
+                        compiler: this,
+                        entity: this._entity
+                    };
+                    cmd(ctx);
+                }
+            }
         }
         // 开始递归编译子节点，但if或者for不编译
         if (node.children && node.cmd != "if" && node.cmd != "for") {
@@ -295,7 +303,7 @@ exports.TemplateCompiler = TemplateCompiler;
 
 /***/ }),
 
-/***/ 6:
+/***/ 7:
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -306,7 +314,7 @@ function getChildrenString(node) {
     var children = node.children;
     if (children) {
         for (var i = 0, len = children.length; i < len; i++) {
-            result += children[i].value;
+            result += children[i].value || "";
         }
     }
     return result;
