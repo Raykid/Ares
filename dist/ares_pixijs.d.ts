@@ -62,10 +62,11 @@ declare namespace ares_pixijs {
         /**
          * 创建PIXI绑定
          * @param root 根显示对象，从这里传入的绑定数据属性名必须以“a_”开头
+         * @param renderer PIXI渲染器
          * @param config 绑定数据，从这里传入的绑定数据属性名可以不以“a_”开头
          * @param tplDict 模板字典，可以在这里给出模板定义表
          */
-        constructor(root: PIXI.DisplayObject, config?: PIXIBindConfig, tplDict?: {
+        constructor(root: PIXI.DisplayObject, renderer:PIXI.SystemRenderer, config?: PIXIBindConfig, tplDict?: {
             [name: string]: PIXI.DisplayObject;
         });
         private parseCmd(node);

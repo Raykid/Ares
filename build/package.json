@@ -5,7 +5,7 @@
   "main": "test/test.html",
   "dependencies": {
     "ts-loader": "^2.0.3",
-    "typescript": "^2.4.1",
+    "typescript": "^2.4.2",
     "uglifyjs": "^2.4.10",
     "webpack": "^2.4.1"
   },

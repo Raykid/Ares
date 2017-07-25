@@ -7,6 +7,8 @@ import {Mutator} from "./Mutator";
 import {Watcher} from "./Watcher";
 import {CommandContext, Command, commands} from "./Commands"
 
+export const defaultCmdRegExp:RegExp = /^(data\-)?a[\-_](\w+)([:\$](.+))?$/;
+
 /**
  * 将数据模型和视图进行绑定
  * @param model 数据模型
@@ -24,7 +26,6 @@ export class Ares implements IAres
     private _data:any;
     private _compiler:Compiler;
     private _options:any;
-    private _cmdRegExp:RegExp = /^(data\-)?a[\-_](\w+)([:\$](.+))?$/;
 
     /** 获取ViewModel */
     public get data():any
@@ -62,11 +63,12 @@ export class Ares implements IAres
      * 解析表达式成为命令数据
      * @param key 属性名，合法的属性名应以a-或a_开头，以:或$分隔主命令和子命令
      * @param value 属性值，如果属性名合法则会被用来作为表达式的字符串
+     * @param cmdRegExp 可选，如果不传则使用默认的命令正则表达式解析命令
      * @return {CommandData|null} 命令数据，如果不是命令则返回null
      */
-    public parseCommand(key:string, value:string):AresCommandData
+    public parseCommand(key:string, value:string, cmdRegExp?:RegExp):AresCommandData
     {
-        var result:RegExpExecArray = this._cmdRegExp.exec(key);
+        var result:RegExpExecArray = (cmdRegExp || defaultCmdRegExp).exec(key);
         if(!result) return null;
         // 取到key
         var key:string = result[0];

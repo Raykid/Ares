@@ -73,7 +73,7 @@ return /******/ (function(modules) { // webpackBootstrap
 /******/ 	__webpack_require__.p = "";
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = 8);
+/******/ 	return __webpack_require__(__webpack_require__.s = 4);
 /******/ })
 /************************************************************************/
 /******/ ([
@@ -280,8 +280,7 @@ exports.Watcher = Watcher;
 
 
 /***/ }),
-/* 2 */,
-/* 3 */
+/* 2 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -312,7 +311,7 @@ exports.commands = {
 
 
 /***/ }),
-/* 4 */
+/* 3 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -322,7 +321,7 @@ exports.commands = {
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 var Watcher_1 = __webpack_require__(1);
-var Dep_1 = __webpack_require__(9);
+var Dep_1 = __webpack_require__(5);
 var Mutator = (function () {
     function Mutator() {
     }
@@ -464,10 +463,7 @@ exports.Mutator = Mutator;
 
 
 /***/ }),
-/* 5 */,
-/* 6 */,
-/* 7 */,
-/* 8 */
+/* 4 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -476,9 +472,10 @@ exports.Mutator = Mutator;
  * Created by Raykid on 2016/12/16.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-var Mutator_1 = __webpack_require__(4);
+var Mutator_1 = __webpack_require__(3);
 var Watcher_1 = __webpack_require__(1);
-var Commands_1 = __webpack_require__(3);
+var Commands_1 = __webpack_require__(2);
+exports.defaultCmdRegExp = /^(data\-)?a[\-_](\w+)([:\$](.+))?$/;
 /**
  * 将数据模型和视图进行绑定
  * @param model 数据模型
@@ -492,7 +489,6 @@ function bind(data, compiler, options) {
 exports.bind = bind;
 var Ares = (function () {
     function Ares(data, compiler, options) {
-        this._cmdRegExp = /^(data\-)?a[\-_](\w+)([:\$](.+))?$/;
         // 记录变异对象
         this._data = Mutator_1.Mutator.mutate(data);
         this._compiler = compiler;
@@ -527,10 +523,11 @@ var Ares = (function () {
      * 解析表达式成为命令数据
      * @param key 属性名，合法的属性名应以a-或a_开头，以:或$分隔主命令和子命令
      * @param value 属性值，如果属性名合法则会被用来作为表达式的字符串
+     * @param cmdRegExp 可选，如果不传则使用默认的命令正则表达式解析命令
      * @return {CommandData|null} 命令数据，如果不是命令则返回null
      */
-    Ares.prototype.parseCommand = function (key, value) {
-        var result = this._cmdRegExp.exec(key);
+    Ares.prototype.parseCommand = function (key, value, cmdRegExp) {
+        var result = (cmdRegExp || exports.defaultCmdRegExp).exec(key);
         if (!result)
             return null;
         // 取到key
@@ -593,7 +590,7 @@ exports.Ares = Ares;
 
 
 /***/ }),
-/* 9 */
+/* 5 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";

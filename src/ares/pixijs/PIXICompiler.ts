@@ -55,6 +55,7 @@ export class PIXICompiler implements Compiler
     private static _textRegExp:RegExp = /(.*?)\{\{(.*?)\}\}(.*)/;
 
     private _root:PIXI.DisplayObject;
+    private _renderer:PIXI.SystemRenderer;
     private _config:PIXIBindConfig;
     private _entity:IAres;
 
@@ -67,15 +68,23 @@ export class PIXICompiler implements Compiler
         return this._root;
     }
 
+    /** 获取PIXI渲染器 */
+    public get renderer():PIXI.SystemRenderer
+    {
+        return this._renderer;
+    }
+
     /**
      * 创建PIXI绑定
      * @param root 根显示对象，从这里传入的绑定数据属性名必须以“a_”开头
+     * @param renderer PIXI渲染器
      * @param config 绑定数据，从这里传入的绑定数据属性名可以不以“a_”开头
      * @param tplDict 模板字典，可以在这里给出模板定义表
      */
-    public constructor(root:PIXI.DisplayObject, config?:PIXIBindConfig, tplDict?:{[name:string]:PIXI.DisplayObject})
+    public constructor(root:PIXI.DisplayObject, renderer:PIXI.SystemRenderer, config?:PIXIBindConfig, tplDict?:{[name:string]:PIXI.DisplayObject})
     {
         this._root = root;
+        this._renderer = renderer;
         this._config = config;
         this._tplDict = tplDict || {};
     }

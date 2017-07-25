@@ -44,7 +44,7 @@ function go():void
         requestAnimationFrame(render);
     }
 
-    PIXI.loader.add("http://pic.qiantucdn.com/58pic/14/45/39/57i58PICI2K_1024.png");
+    PIXI.loader.add("test.png");
     PIXI.loader.load(()=>{
         var testSkin:PIXI.Container = new PIXI.Container();
         stage.addChild(testSkin);
@@ -54,13 +54,13 @@ function go():void
         testSkin.addChild(testContainer);
 
         var testSprite:PIXI.Sprite = new PIXI.Sprite();
-        testSprite.texture = PIXI.Texture.fromImage("http://pic.qiantucdn.com/58pic/14/45/39/57i58PICI2K_1024.png");
+        testSprite.texture = PIXI.Texture.fromImage("test.png");
         testSprite.width = testSprite.height = 200;
         testSprite.interactive = true;
         testSprite["a-on:click"] = "testFunc";
         testSprite["a-for"] = "item in testFor";
         testSprite["a-y"] = "$target.y + $index * 200";
-        testSprite["a-viewport${oneway:true}"] = "$target.x, $target.y, $target.width - 100, $target.height * 2";
+        testSprite["a-viewport"] = "$target.x, $target.y, $target.width - 100, $target.height * 2";
         testSprite.x = 200;
         testContainer.addChild(testSprite);
 
@@ -72,7 +72,7 @@ function go():void
 
         var testTpl:PIXI.Sprite = new PIXI.Sprite();
         testTpl["a-tpl"] = "testTpl";
-        testTpl["a-for"] = "item in testFor";
+        // testTpl["a-for"] = "item in testFor";
         testTpl["a-x"] = "$index * 200";
         testTpl["a_y"] = "$target.y + $index * 100";
         testSkin.addChild(testTpl);
@@ -80,33 +80,33 @@ function go():void
         var data:any = {
             text: "text",
             testNum: 1,
-            testFor: [1, 2, 3],
+            testFor: [1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,],
             testFunc: function(evt:Event):void
             {
                 this.text = "Fuck!!!";
             }
         };
 
-        ares.bind(data, new ares_pixijs.PIXICompiler(testSkin));
+        ares.bind(data, new ares_pixijs.PIXICompiler(testSkin, renderer));
 
-        ares.bind(data, new ares_html.HTMLCompiler("#div_root"));
+        // ares.bind(data, new ares_html.HTMLCompiler("#div_root"));
 
-        ares.bind(data, new ares_template.TemplateCompiler("abc$a-{for: i in 10}'$a-{i}'$a-{end for}def", (text:string)=>{
-            console.log(text);
-        }));
+        // ares.bind(data, new ares_template.TemplateCompiler("abc$a-{for: i in 10}'$a-{i}'$a-{end for}def", (text:string)=>{
+        //     console.log(text);
+        // }));
 
-        var testSkin2:PIXI.Container = new PIXI.Container();
-        testSkin2["a-tpl"] = "testTpl";
-        testSkin2["a-y"] = 100;
-        stage.addChild(testSkin2);
-        ares.bind(data, new ares_pixijs.PIXICompiler(testSkin2));
+        // var testSkin2:PIXI.Container = new PIXI.Container();
+        // testSkin2["a-tpl"] = "testTpl";
+        // testSkin2["a-y"] = 100;
+        // stage.addChild(testSkin2);
+        // ares.bind(data, new ares_pixijs.PIXICompiler(testSkin2));
 
-        setTimeout(()=>{
-            data.testFor = [3, "jasdf"];
-        }, 2000);
+        // setTimeout(()=>{
+        //     data.testFor = [3, "jasdf"];
+        // }, 2000);
 
-        setTimeout(()=>{
-            data.testFor = ["kn", "j111", "14171a"];
-        }, 4000);
+        // setTimeout(()=>{
+        //     data.testFor = ["kn", "j111", "14171a"];
+        // }, 4000);
     });
 }

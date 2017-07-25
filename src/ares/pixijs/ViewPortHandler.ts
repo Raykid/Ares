@@ -27,6 +27,23 @@ export interface ViewPortHandlerOptions
     lockV?:boolean;
 }
 
+export interface ViewPortData
+{
+    globalRange:PIXI.Rectangle;
+    observe:ViewPortObserve;
+    twowayMoving:boolean;
+}
+
+export interface ViewPortObserver
+{
+    (viewport:PIXI.Rectangle):void;
+}
+
+export interface ViewPortObserve
+{
+    (observer:ViewPortObserver):void;
+}
+
 export class ViewPortHandler
 {
     private static DIRECTION_H:number = 1;
@@ -34,6 +51,7 @@ export class ViewPortHandler
 
     private _target:PIXI.DisplayObject;
     private _viewPort:PIXI.Rectangle;
+    private _viewPortGlobal:PIXI.Rectangle;
     private _ticker:PIXI.ticker.Ticker;
     private _masker:PIXI.Graphics;
     private _options:ViewPortHandlerOptions;
@@ -47,6 +65,10 @@ export class ViewPortHandler
     private _speed:PIXI.Point;
     private _dragging:boolean = false;
     private _direction:number = 0;
+
+    private _observers:ViewPortObserver[] = [];
+    private _observe:ViewPortObserve;
+    private _viewportData:ViewPortData;
 
     public constructor(target:PIXI.DisplayObject, options?:ViewPortHandlerOptions)
     {
@@ -65,6 +87,8 @@ export class ViewPortHandler
         target.on("pointermove", this.onPointerMove, this);
         target.on("pointerup", this.onPointerUp, this);
         target.on("pointerupoutside", this.onPointerUp, this);
+        // 记录observe引用
+        this._observe = this.observe.bind(this);
     }
     
     private onPointerDown(evt:PIXI.interaction.InteractionEvent):void
@@ -195,7 +219,12 @@ export class ViewPortHandler
             var pos:PIXI.Point = this._target.position;
             if(this._movableH) pos.x += (d.x != 0 ? x * 0.33 / ELASTICITY_COEFFICIENT : x);
             if(this._movableV) pos.y += (d.y != 0 ? y * 0.33 / ELASTICITY_COEFFICIENT : y);
+            // 设置双向移动
+            this._viewportData.twowayMoving = (this._target.position.x != pos.x && this._target.position.y != pos.y);
+            // 更新位置
             this._target.position = pos;
+            // 通知观察者
+            this.notify();
         }
     }
 
@@ -276,12 +305,47 @@ export class ViewPortHandler
                 doneY = true;
             }
         }
+        // 设置双向移动
+        this._viewportData.twowayMoving = !(doneX || doneY);
+        // 通知观察者
+        this.notify();
         // 停止tick
         if(doneX && doneY)
         {
             this._ticker.stop();
             // 重置方向
             this._direction = 0;
+        }
+    }
+
+    /**
+     * 获取全局范围
+     * @return 全局范围
+     */
+    private getGlocalBounds():PIXI.Rectangle
+    {
+        var pos:PIXI.Point = this._target.parent.getGlobalPosition();
+        var bounds:PIXI.Rectangle = this._viewPort.clone();
+        bounds.x += (pos.x - this._target.x);
+        bounds.y += (pos.y - this._target.y);
+        return bounds;
+    }
+
+    private observe(observer:ViewPortObserver):void
+    {
+        if(this._observers.indexOf(observer) < 0)
+        {
+            this._observers.push(observer);
+        }
+    }
+
+    private notify():void
+    {
+        // 这里通知所有观察者位置变更
+        for(var i:number = 0, len:number = this._observers.length; i < len; i++)
+        {
+            var observer:ViewPortObserver = this._observers[i];
+            observer(this._viewPort);
         }
     }
 
@@ -298,6 +362,7 @@ export class ViewPortHandler
         this._viewPort.y = y;
         this._viewPort.width = width;
         this._viewPort.height = height;
+        this._viewPortGlobal = this.getGlocalBounds();
         // 如果masker的父容器不是当前target的父容器则将masker移动过去
         if(this._masker.parent != this._target.parent && this._target.parent)
         {
@@ -312,5 +377,11 @@ export class ViewPortHandler
         var d:{x:number, y:number} = this.getDelta(this._target.x, this._target.y);
         this._target.x += d.x;
         this._target.y += d.y;
+        // 为当前显示对象设置viewport范围
+        this._target["__ares_viewport__"] = this._viewportData = <ViewPortData>{
+            globalRange: this._viewPortGlobal,
+            observe: this._observe,
+            twowayMoving: false
+        };
     }
 }

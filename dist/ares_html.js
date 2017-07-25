@@ -153,7 +153,7 @@ exports.runExp = runExp;
  * Created by Raykid on 2016/12/22.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-var HTMLCommands_1 = __webpack_require__(5);
+var HTMLCommands_1 = __webpack_require__(7);
 var HTMLCompiler = (function () {
     function HTMLCompiler(selectorsOrElement) {
         this._selectorsOrElement = selectorsOrElement;
@@ -274,7 +274,7 @@ exports.HTMLCompiler = HTMLCompiler;
 
 /***/ }),
 
-/***/ 5:
+/***/ 7:
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";

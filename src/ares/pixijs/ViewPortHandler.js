@@ -18,6 +18,7 @@ var ViewPortHandler = (function () {
         this._movableV = false;
         this._dragging = false;
         this._direction = 0;
+        this._observers = [];
         this._target = target;
         this._options = options || {};
         this._viewPort = new PIXI.Rectangle();
@@ -33,6 +34,8 @@ var ViewPortHandler = (function () {
         target.on("pointermove", this.onPointerMove, this);
         target.on("pointerup", this.onPointerUp, this);
         target.on("pointerupoutside", this.onPointerUp, this);
+        // 记录observe引用
+        this._observe = this.observe.bind(this);
     }
     ViewPortHandler.prototype.onPointerDown = function (evt) {
         if (!this._downTarget) {
@@ -147,7 +150,12 @@ var ViewPortHandler = (function () {
                 pos.x += (d.x != 0 ? x * 0.33 / ELASTICITY_COEFFICIENT : x);
             if (this._movableV)
                 pos.y += (d.y != 0 ? y * 0.33 / ELASTICITY_COEFFICIENT : y);
+            // 设置双向移动
+            this._viewportData.twowayMoving = (this._target.position.x != pos.x && this._target.position.y != pos.y);
+            // 更新位置
             this._target.position = pos;
+            // 通知观察者
+            this.notify();
         }
     };
     ViewPortHandler.prototype.onTick = function (delta) {
@@ -217,11 +225,38 @@ var ViewPortHandler = (function () {
                 doneY = true;
             }
         }
+        // 设置双向移动
+        this._viewportData.twowayMoving = !(doneX || doneY);
+        // 通知观察者
+        this.notify();
         // 停止tick
         if (doneX && doneY) {
             this._ticker.stop();
             // 重置方向
             this._direction = 0;
+        }
+    };
+    /**
+     * 获取全局范围
+     * @return 全局范围
+     */
+    ViewPortHandler.prototype.getGlocalBounds = function () {
+        var pos = this._target.parent.getGlobalPosition();
+        var bounds = this._viewPort.clone();
+        bounds.x += (pos.x - this._target.x);
+        bounds.y += (pos.y - this._target.y);
+        return bounds;
+    };
+    ViewPortHandler.prototype.observe = function (observer) {
+        if (this._observers.indexOf(observer) < 0) {
+            this._observers.push(observer);
+        }
+    };
+    ViewPortHandler.prototype.notify = function () {
+        // 这里通知所有观察者位置变更
+        for (var i = 0, len = this._observers.length; i < len; i++) {
+            var observer = this._observers[i];
+            observer(this._viewPort);
         }
     };
     /**
@@ -236,6 +271,7 @@ var ViewPortHandler = (function () {
         this._viewPort.y = y;
         this._viewPort.width = width;
         this._viewPort.height = height;
+        this._viewPortGlobal = this.getGlocalBounds();
         // 如果masker的父容器不是当前target的父容器则将masker移动过去
         if (this._masker.parent != this._target.parent && this._target.parent) {
             this._target.parent.addChild(this._masker);
@@ -249,6 +285,12 @@ var ViewPortHandler = (function () {
         var d = this.getDelta(this._target.x, this._target.y);
         this._target.x += d.x;
         this._target.y += d.y;
+        // 为当前显示对象设置viewport范围
+        this._target["__ares_viewport__"] = this._viewportData = {
+            globalRange: this._viewPortGlobal,
+            observe: this._observe,
+            twowayMoving: false
+        };
     };
     ViewPortHandler.DIRECTION_H = 1;
     ViewPortHandler.DIRECTION_V = 2;

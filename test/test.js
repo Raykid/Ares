@@ -403,6 +403,7 @@ define("src/ares/Commands", ["require", "exports", "src/ares/Utils"], function (
 define("src/ares/Ares", ["require", "exports", "src/ares/Mutator", "src/ares/Watcher", "src/ares/Commands"], function (require, exports, Mutator_1, Watcher_2, Commands_1) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
+    exports.defaultCmdRegExp = /^(data\-)?a[\-_](\w+)([:\$](.+))?$/;
     /**
      * 将数据模型和视图进行绑定
      * @param model 数据模型
@@ -416,7 +417,6 @@ define("src/ares/Ares", ["require", "exports", "src/ares/Mutator", "src/ares/Wat
     exports.bind = bind;
     var Ares = (function () {
         function Ares(data, compiler, options) {
-            this._cmdRegExp = /^(data\-)?a[\-_](\w+)([:\$](.+))?$/;
             // 记录变异对象
             this._data = Mutator_1.Mutator.mutate(data);
             this._compiler = compiler;
@@ -451,10 +451,11 @@ define("src/ares/Ares", ["require", "exports", "src/ares/Mutator", "src/ares/Wat
          * 解析表达式成为命令数据
          * @param key 属性名，合法的属性名应以a-或a_开头，以:或$分隔主命令和子命令
          * @param value 属性值，如果属性名合法则会被用来作为表达式的字符串
+         * @param cmdRegExp 可选，如果不传则使用默认的命令正则表达式解析命令
          * @return {CommandData|null} 命令数据，如果不是命令则返回null
          */
-        Ares.prototype.parseCommand = function (key, value) {
-            var result = this._cmdRegExp.exec(key);
+        Ares.prototype.parseCommand = function (key, value, cmdRegExp) {
+            var result = (cmdRegExp || exports.defaultCmdRegExp).exec(key);
             if (!result)
                 return null;
             // 取到key
@@ -880,6 +881,7 @@ define("src/ares/pixijs/ViewPortHandler", ["require", "exports"], function (requ
             this._movableV = false;
             this._dragging = false;
             this._direction = 0;
+            this._observers = [];
             this._target = target;
             this._options = options || {};
             this._viewPort = new PIXI.Rectangle();
@@ -895,6 +897,8 @@ define("src/ares/pixijs/ViewPortHandler", ["require", "exports"], function (requ
             target.on("pointermove", this.onPointerMove, this);
             target.on("pointerup", this.onPointerUp, this);
             target.on("pointerupoutside", this.onPointerUp, this);
+            // 记录observe引用
+            this._observe = this.observe.bind(this);
         }
         ViewPortHandler.prototype.onPointerDown = function (evt) {
             if (!this._downTarget) {
@@ -1009,7 +1013,12 @@ define("src/ares/pixijs/ViewPortHandler", ["require", "exports"], function (requ
                     pos.x += (d.x != 0 ? x * 0.33 / ELASTICITY_COEFFICIENT : x);
                 if (this._movableV)
                     pos.y += (d.y != 0 ? y * 0.33 / ELASTICITY_COEFFICIENT : y);
+                // 设置双向移动
+                this._viewportData.twowayMoving = (this._target.position.x != pos.x && this._target.position.y != pos.y);
+                // 更新位置
                 this._target.position = pos;
+                // 通知观察者
+                this.notify();
             }
         };
         ViewPortHandler.prototype.onTick = function (delta) {
@@ -1079,11 +1088,38 @@ define("src/ares/pixijs/ViewPortHandler", ["require", "exports"], function (requ
                     doneY = true;
                 }
             }
+            // 设置双向移动
+            this._viewportData.twowayMoving = !(doneX || doneY);
+            // 通知观察者
+            this.notify();
             // 停止tick
             if (doneX && doneY) {
                 this._ticker.stop();
                 // 重置方向
                 this._direction = 0;
+            }
+        };
+        /**
+         * 获取全局范围
+         * @return 全局范围
+         */
+        ViewPortHandler.prototype.getGlocalBounds = function () {
+            var pos = this._target.parent.getGlobalPosition();
+            var bounds = this._viewPort.clone();
+            bounds.x += (pos.x - this._target.x);
+            bounds.y += (pos.y - this._target.y);
+            return bounds;
+        };
+        ViewPortHandler.prototype.observe = function (observer) {
+            if (this._observers.indexOf(observer) < 0) {
+                this._observers.push(observer);
+            }
+        };
+        ViewPortHandler.prototype.notify = function () {
+            // 这里通知所有观察者位置变更
+            for (var i = 0, len = this._observers.length; i < len; i++) {
+                var observer = this._observers[i];
+                observer(this._viewPort);
             }
         };
         /**
@@ -1098,6 +1134,7 @@ define("src/ares/pixijs/ViewPortHandler", ["require", "exports"], function (requ
             this._viewPort.y = y;
             this._viewPort.width = width;
             this._viewPort.height = height;
+            this._viewPortGlobal = this.getGlocalBounds();
             // 如果masker的父容器不是当前target的父容器则将masker移动过去
             if (this._masker.parent != this._target.parent && this._target.parent) {
                 this._target.parent.addChild(this._masker);
@@ -1111,6 +1148,12 @@ define("src/ares/pixijs/ViewPortHandler", ["require", "exports"], function (requ
             var d = this.getDelta(this._target.x, this._target.y);
             this._target.x += d.x;
             this._target.y += d.y;
+            // 为当前显示对象设置viewport范围
+            this._target["__ares_viewport__"] = this._viewportData = {
+                globalRange: this._viewPortGlobal,
+                observe: this._observe,
+                twowayMoving: false
+            };
         };
         ViewPortHandler.DIRECTION_H = 1;
         ViewPortHandler.DIRECTION_V = 2;
@@ -1118,7 +1161,238 @@ define("src/ares/pixijs/ViewPortHandler", ["require", "exports"], function (requ
     }());
     exports.ViewPortHandler = ViewPortHandler;
 });
-define("src/ares/pixijs/PIXICommands", ["require", "exports", "src/ares/pixijs/PIXICompiler", "src/ares/Utils", "src/ares/pixijs/ViewPortHandler"], function (require, exports, PIXICompiler_1, Utils_4, ViewPortHandler_1) {
+define("src/ares/pixijs/PIXIUtils", ["require", "exports", "src/ares/Ares"], function (require, exports, Ares_1) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    /**
+     * Created by Raykid on 2017/7/20.
+     */
+    var PIXIUtils = (function () {
+        function PIXIUtils() {
+        }
+        /**
+         * 租赁一个显示对象，如果对象池中有可用对象则返回该对象，否则创建一个新的
+         * @param oriTarget 原始显示对象
+         * @return 被租赁的对象
+         */
+        PIXIUtils.borrowObject = function (oriTarget) {
+            // 如果是空，则原样返回
+            if (oriTarget == null)
+                return oriTarget;
+            // 如果不是显示对象，则直接复制
+            if (!(oriTarget instanceof PIXI.DisplayObject))
+                return PIXIUtils.cloneObject(oriTarget, true);
+            // 如果是显示对象，则放到对象池里
+            var key = oriTarget.constructor.toString();
+            var pool = PIXIUtils._objectPool[key];
+            if (pool == null)
+                PIXIUtils._objectPool[key] = pool = [];
+            var target = null;
+            while (!target) {
+                if (pool.length > 0) {
+                    // 用shift以保证不会产生过于陈旧的对象
+                    target = pool.shift();
+                    // 如果已经销毁则继续生成
+                    if (target["_destroyed"])
+                        continue;
+                    // 属性恢复
+                    restoreProp(oriTarget, target);
+                }
+                else {
+                    target = PIXIUtils.cloneObject(oriTarget, true);
+                }
+            }
+            return target;
+            function restoreProp(oriTarget, curTarget) {
+                // 遍历当前节点，恢复所有Ares属性
+                for (var propName in oriTarget) {
+                    if (Ares_1.defaultCmdRegExp.test(propName))
+                        curTarget[propName] = oriTarget[propName];
+                }
+                // 恢复常用显示属性
+                for (var i in PIXIUtils._commonDisplayProps) {
+                    var propName = PIXIUtils._commonDisplayProps[i];
+                    curTarget[propName] = oriTarget[propName];
+                }
+                // 递归子节点
+                if (oriTarget instanceof PIXI.Container) {
+                    for (var i in oriTarget["children"]) {
+                        restoreProp(oriTarget["children"][i], curTarget["children"][i]);
+                    }
+                }
+            }
+        };
+        /**
+         * 归还被租赁的显示对象到对象池里
+         * @param target 被归还的显示对象
+         */
+        PIXIUtils.returnObject = function (target) {
+            if (target instanceof PIXI.DisplayObject) {
+                // 清除所有事件监听
+                target.removeAllListeners();
+                // 如果没有移除显示，则移除之
+                if (target.parent)
+                    target.parent.removeChild(target);
+                // 执行回收
+                var key = target.constructor.toString();
+                var pool = PIXIUtils._objectPool[key];
+                if (pool == null)
+                    PIXIUtils._objectPool[key] = pool = [];
+                pool.push(target);
+            }
+        };
+        /**
+         * 求两个矩形的相交矩形，并将结果放到第一个矩形中
+         * @param rect1 第一个矩形
+         * @param rect2 第二个矩形
+         * @return {PIXI.Rectangle} 相交后的矩形
+         */
+        PIXIUtils.rectCross = function (rect1, rect2) {
+            var left = Math.max(rect1.x, rect2.x);
+            var right = Math.min(rect1.x + rect1.width, rect2.x + rect2.width);
+            var width = right - left;
+            if (width < 0)
+                width = 0;
+            var top = Math.max(rect1.y, rect2.y);
+            var bottom = Math.min(rect1.y + rect1.height, rect2.y + rect2.height);
+            var height = bottom - top;
+            if (height < 0)
+                height = 0;
+            return new PIXI.Rectangle(left, top, width, height);
+        };
+        /**
+         * 赋值pixi对象（包括显示对象）
+         * @param target 原始对象
+         * @param deep 是否深度复制（复制子对象）
+         * @return 复制对象
+         */
+        PIXIUtils.cloneObject = function (target, deep) {
+            var result;
+            // 基础类型直接返回
+            if (!target || typeof target != "object")
+                return target;
+            // ObservablePoint类型对象需要特殊处理
+            if (target instanceof PIXI.ObservablePoint) {
+                return new PIXI.ObservablePoint(target["cb"], target["scope"]["__ares_cloning__"], target["x"], target["y"]);
+            }
+            // 如果对象有clone方法则直接调用clone方法
+            if (typeof target["clone"] == "function")
+                return target["clone"]();
+            // 浅表复制单独处理
+            if (!deep) {
+                result = Object.create(target["__proto__"] || null);
+                for (var k in target) {
+                    result[k] = target[k];
+                }
+                return result;
+            }
+            // 下面是深表复制了
+            var cls = (target.constructor || Object);
+            try {
+                result = new cls();
+            }
+            catch (err) {
+                return null;
+            }
+            // 打个标签
+            target["__ares_cloning__"] = result;
+            for (var key in target) {
+                // 标签不复制
+                if (key == "__ares_cloning__")
+                    continue;
+                // 非属性方法不复制
+                if (typeof target[key] == "function" && !target.hasOwnProperty(key))
+                    continue;
+                // Text的_texture属性不复制
+                if (key == "_texture" && target instanceof PIXI.Text)
+                    continue;
+                // 显示对象的parent属性要特殊处理
+                if (key == "parent" && target instanceof PIXI.DisplayObject) {
+                    if (target["parent"] && target["parent"]["__ares_cloning__"]) {
+                        // 如果target的parent正在被复制，则使用复制后的parent
+                        result["parent"] = target["parent"]["__ares_cloning__"];
+                    }
+                    else {
+                        // 如果target的parent没有被复制，则直接使用当前parent
+                        result["parent"] = target["parent"];
+                    }
+                    continue;
+                }
+                // EventEmitter的_events属性要进行浅表复制
+                if (key == "_events" && target instanceof PIXI.utils.EventEmitter) {
+                    result["_events"] = PIXIUtils.cloneObject(target["_events"], false);
+                    // 如果target的某个监听里的context就是target本身，则将result的context改为result本身
+                    for (var k in target["_events"]) {
+                        var temp = target["_events"][k];
+                        result["_events"][k] = PIXIUtils.cloneObject(temp, false);
+                        if (temp.context == target) {
+                            result["_events"][k].context = result;
+                        }
+                    }
+                    continue;
+                }
+                // 容器对象的children属性要特殊处理
+                if (key == "children" && target instanceof PIXI.Container) {
+                    // 首先要清除已有的显示对象（例如原始对象在构造函数中添加了显示对象的话，再经过复制会产生重复对象）
+                    var children = result["children"];
+                    for (var j = 0, lenJ = children.length; j < lenJ; j++) {
+                        result["removeChildAt"](0).destroy();
+                    }
+                    // 开始复制子对象
+                    children = target["children"];
+                    for (var j = 0, lenJ = children.length; j < lenJ; j++) {
+                        var child = PIXIUtils.cloneObject(children[j], true);
+                        result["addChild"](child);
+                    }
+                    continue;
+                }
+                // Sprite的vertexData属性需要特殊处理
+                if (key == "vertexData" && target instanceof PIXI.Sprite) {
+                    result[key] = target[key]["slice"]();
+                    continue;
+                }
+                // 通用处理
+                var oriValue = target[key];
+                if (oriValue && oriValue["__ares_cloning__"]) {
+                    // 已经复制过的对象不再复制，直接使用之
+                    result[key] = oriValue["__ares_cloning__"];
+                }
+                else {
+                    // 还没复制过的对象，复制之
+                    var value = PIXIUtils.cloneObject(oriValue, true);
+                    if (value != null) {
+                        try {
+                            // 这里加try catch是为了防止给只读属性赋值时报错
+                            result[key] = value;
+                        }
+                        catch (err) { }
+                    }
+                }
+            }
+            // 移除标签
+            delete target["__ares_cloning__"];
+            return result;
+        };
+        /**
+         * 获取当前显示对象所属的ViewPort数据
+         * @param target 当前显示对象
+         * @return {ViewPortData|null} 当前显示对象所属ViewPort数据，如果没有设定范围则返回null
+         */
+        PIXIUtils.getViewportData = function (target) {
+            for (; target; target = target.parent) {
+                var temp = target["__ares_viewport__"];
+                if (temp)
+                    return temp;
+            }
+            return null;
+        };
+        PIXIUtils._objectPool = {};
+        PIXIUtils._commonDisplayProps = ["position", "scale", "pivot", "skew", "rotation", "mask", "filters"];
+        return PIXIUtils;
+    }());
+    exports.PIXIUtils = PIXIUtils;
+});
+define("src/ares/pixijs/PIXICommands", ["require", "exports", "src/ares/pixijs/PIXICompiler", "src/ares/Utils", "src/ares/pixijs/ViewPortHandler", "src/ares/pixijs/PIXIUtils"], function (require, exports, PIXICompiler_1, Utils_4, ViewPortHandler_1, PIXIUtils_1) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     /**
@@ -1171,7 +1445,7 @@ define("src/ares/pixijs/PIXICommands", ["require", "exports", "src/ares/pixijs/P
             if (!template)
                 return context.target;
             // 拷贝模板
-            template = cloneObject(template, true);
+            template = PIXIUtils_1.PIXIUtils.cloneObject(template, true);
             // 使用模板添加到与目标相同的位置
             var target = context.target;
             var parent = target.parent;
@@ -1271,6 +1545,7 @@ define("src/ares/pixijs/PIXICommands", ["require", "exports", "src/ares/pixijs/P
         /** for命令 */
         for: function (context) {
             var cmdData = context.cmdData;
+            var options = Utils_4.evalExp(cmdData.subCmd, context.scope) || {};
             // 解析表达式
             var reg = /^\s*(\S+)\s+in\s+([\s\S]+?)\s*$/;
             var res = reg.exec(cmdData.exp);
@@ -1302,16 +1577,20 @@ define("src/ares/pixijs/PIXICommands", ["require", "exports", "src/ares/pixijs/P
                     delete context.target[viewportCmd.propName];
                 }
             }
+            // 记录循环数据
+            var forDatas = [];
+            // 记录viewport数据
+            var viewportData;
+            // 记录viewport范围
+            var globalRange;
+            // 记录顺序窗口范围，左闭右开
+            var orderRange;
             // 添加订阅
             var watcher = context.entity.createWatcher(context.target, arrName, forScope, function (value) {
-                // 如果refNode被从显示列表移除了，则表示该if指令要作废了
+                // 如果refNode被从显示列表移除了，则表示该for指令要作废了
                 if (!parent.parent) {
                     watcher.dispose();
                     return;
-                }
-                // 清理原始显示
-                for (var i = parent.children.length - 1; i >= 0; i--) {
-                    parent.removeChildAt(i).destroy();
                 }
                 // 如果是数字，构建一个数字列表
                 if (typeof value == "number") {
@@ -1321,165 +1600,212 @@ define("src/ares/pixijs/PIXICommands", ["require", "exports", "src/ares/pixijs/P
                     }
                     value = temp;
                 }
-                // 开始遍历
-                var lastNode = null;
-                var arrLength = (value instanceof Array ? value.length : -1);
+                // 清理循环数据，并回收显示对象
+                for (var i = 0, len = forDatas.length; i < len; i++) {
+                    var forData = forDatas.pop();
+                    if (forData.target)
+                        PIXIUtils_1.PIXIUtils.returnObject(forData.target);
+                }
+                // 获取隐藏背景，没有就创建一个
+                var bg;
+                if (parent.children.length == 1)
+                    bg = parent.getChildAt(0);
+                else if (parent.children.length > 1)
+                    throw new Error("for容器里出现了不明对象");
+                if (!bg) {
+                    bg = new PIXI.Graphics();
+                    parent.addChildAt(bg, 0);
+                }
+                // 记录viewport在本地的范围
+                if (viewportData) {
+                    globalRange = viewportData.globalRange.clone();
+                }
+                else {
+                    globalRange = new PIXI.Rectangle(0, 0, context.compiler.renderer.width, context.compiler.renderer.height);
+                }
+                // 开始遍历，并记录最大显示范围
+                var maxRange = null;
+                var isArray = (value instanceof Array);
+                var arrLength = (isArray ? value.length : -1);
+                orderRange = (!options.chaos && isArray ? { begin: Number.MAX_VALUE, end: -1 } : null);
+                forData = null;
                 for (var key in value) {
-                    // 拷贝一个target
-                    var newNode = cloneObject(context.target, true);
-                    // 添加到显示里
-                    parent.addChild(newNode);
-                    // 生成子域
-                    var newScope = Object.create(forScope);
-                    // 这里一定要用defineProperty将目标定义在当前节点上，否则会影响forScope
-                    Object.defineProperty(newScope, "$index", {
-                        configurable: true,
-                        enumerable: false,
-                        value: (value instanceof Array ? parseInt(key) : key),
-                        writable: false
-                    });
-                    // 注入上一个显示节点
-                    Object.defineProperty(newScope, "$last", {
-                        configurable: true,
-                        enumerable: false,
-                        value: lastNode,
-                        writable: false
-                    });
-                    // 如果是数组再添加一个数组长度
-                    if (arrLength >= 0) {
-                        Object.defineProperty(newScope, "$length", {
-                            configurable: true,
-                            enumerable: false,
-                            value: arrLength,
-                            writable: false
-                        });
-                    }
-                    // 注入遍历名
-                    Object.defineProperty(newScope, itemName, {
-                        configurable: true,
-                        enumerable: true,
-                        value: value[key],
-                        writable: false
-                    });
-                    // 开始编译新节点
-                    context.compiler.compile(newNode, newScope);
-                    // 赋值上一个节点
-                    lastNode = newNode;
+                    // 生成新节点
+                    var newOne = generateOne(key, value, arrLength, forData && forData.target);
+                    var newScope = newOne.scope;
+                    var newNode = newOne.node;
+                    // 更新最大范围
+                    var newRange = new PIXI.Rectangle(newNode.x, newNode.y, newNode["width"], newNode["height"]);
+                    maxRange ? maxRange.enlarge(newRange) : maxRange = newRange;
+                    // 如果上一个节点不在viewport范围内，则回收之
+                    testReturn(forData, orderRange);
+                    // 记录forData
+                    var forData = {
+                        key: key,
+                        value: value,
+                        data: newScope,
+                        bounds: new PIXI.Rectangle(),
+                        parent: parent,
+                        target: newNode
+                    };
+                    // 记录本地位置
+                    newNode.getBounds(null, forData.bounds);
+                    var parentGlobalPosition = parent.getGlobalPosition();
+                    forData.bounds.x -= parentGlobalPosition.x;
+                    forData.bounds.y -= parentGlobalPosition.y;
+                    forDatas.push(forData);
+                }
+                // 如果最后一个节点也不在viewport范围内，也要回收之
+                testReturn(forData, orderRange);
+                // 如果orderRange不合法，则设置为null
+                if (orderRange && orderRange.begin >= orderRange.end)
+                    orderRange = null;
+                // 更新背景范围
+                bg.clear();
+                if (maxRange) {
+                    bg.beginFill(0, 0);
+                    bg.drawRect(maxRange.x, maxRange.y, maxRange.width, maxRange.height);
+                    bg.endFill();
                 }
             });
             // 使用原始显示对象编译一次parent
             context.compiler.compile(parent, forScope);
+            // 记录viewport数据
+            viewportData = PIXIUtils_1.PIXIUtils.getViewportData(parent);
+            if (viewportData) {
+                // 记录范围
+                globalRange = viewportData.globalRange.clone();
+                // 监听viewport滚动
+                viewportData.observe(updateView);
+            }
             // 返回节点
             return context.target;
+            function generateOne(key, value, len, lastNode) {
+                // 拷贝一个target
+                var newNode = PIXIUtils_1.PIXIUtils.borrowObject(context.target);
+                // 添加到显示里
+                parent.addChild(newNode);
+                // 生成子域
+                var newScope = Object.create(forScope);
+                // 这里一定要用defineProperty将目标定义在当前节点上，否则会影响forScope
+                Object.defineProperty(newScope, "$index", {
+                    configurable: true,
+                    enumerable: false,
+                    value: (value instanceof Array ? parseInt(key) : key),
+                    writable: false
+                });
+                // 注入上一个显示节点
+                Object.defineProperty(newScope, "$last", {
+                    configurable: true,
+                    enumerable: false,
+                    value: lastNode,
+                    writable: false
+                });
+                // 如果是数组再添加一个数组长度
+                if (len >= 0) {
+                    Object.defineProperty(newScope, "$length", {
+                        configurable: true,
+                        enumerable: false,
+                        value: len,
+                        writable: false
+                    });
+                }
+                // 注入遍历名
+                Object.defineProperty(newScope, itemName, {
+                    configurable: true,
+                    enumerable: true,
+                    value: value[key],
+                    writable: false
+                });
+                // 开始编译新节点
+                context.compiler.compile(newNode, newScope);
+                // 返回
+                return { scope: newScope, node: newNode };
+            }
+            function testInViewPort(forData) {
+                var parentGlobalPosition = forData.parent.getGlobalPosition();
+                var tempRect = forData.bounds.clone();
+                tempRect.x += parentGlobalPosition.x;
+                tempRect.y += parentGlobalPosition.y;
+                tempRect = PIXIUtils_1.PIXIUtils.rectCross(tempRect, globalRange);
+                return (tempRect.width * tempRect.height != 0);
+            }
+            function testReturn(forData, orderRange) {
+                if (forData && forData.target) {
+                    var index = parseInt(forData.key);
+                    if (!testInViewPort(forData)) {
+                        // 不在范围内，回收
+                        PIXIUtils_1.PIXIUtils.returnObject(forData.target);
+                        forData.target = null;
+                        // 缩小窗口
+                        if (index <= orderRange.begin)
+                            orderRange.begin = index + 1;
+                        else if (orderRange.end > index)
+                            orderRange.end = index;
+                    }
+                    else {
+                        // 在范围内，扩充窗口
+                        if (orderRange) {
+                            if (orderRange.begin > index)
+                                orderRange.begin = index;
+                            if (orderRange.end < index + 1)
+                                orderRange.end = index + 1;
+                        }
+                    }
+                }
+            }
+            function updateView(viewport) {
+                // 遍历forDatas，为没有target的生成target，并且测试回收
+                var arrLength = forDatas.length;
+                var curRange = { begin: 0, end: arrLength };
+                if (orderRange) {
+                    curRange.begin = orderRange.begin;
+                    curRange.end = orderRange.end;
+                    // 首先反向扩充范围
+                    for (var i = orderRange.begin; i >= 0; i--) {
+                        if (testInViewPort(forDatas[i]))
+                            curRange.begin = i;
+                        else
+                            break;
+                    }
+                    // 然后正向扩充
+                    for (var i = orderRange.end, len = forDatas.length; i < len; i++) {
+                        if (testInViewPort(forDatas[i]))
+                            curRange.end = i + 1;
+                        else
+                            break;
+                    }
+                }
+                // 遍历所有窗口内对象
+                for (var i = curRange.begin, end = curRange.end; i < end; i++) {
+                    var forData = forDatas[i];
+                    var lastForData = forDatas[i - 1];
+                    if (!forData.target) {
+                        var newOne = generateOne(forData.key, forData.value, arrLength, lastForData && lastForData.target);
+                        forData.target = newOne.node;
+                    }
+                    // 如果上一个节点不在viewport范围内，则回收之
+                    testReturn(lastForData, curRange);
+                }
+                // 如果最后一个节点也不在viewport范围内，也要回收之
+                testReturn(forData, curRange);
+                // 然后更新顺序范围
+                if (orderRange) {
+                    // 单向滚动即使全部超出范围也不会造成扫描缺失，所以在超出范围时不更新下次扫描范围即可
+                    if (curRange.begin < curRange.end) {
+                        // 没有全部超出范围
+                        orderRange.begin = curRange.begin;
+                        orderRange.end = curRange.end;
+                    }
+                    else if (viewportData.twowayMoving) {
+                        // 全部超出范围了，并且是双向滚动，下次需要全扫描，防止有遗漏
+                        orderRange.begin = 0;
+                        orderRange.end = arrLength;
+                    }
+                }
+            }
         }
     };
-    function cloneObject(target, deep) {
-        var result;
-        // 基础类型直接返回
-        if (!target || typeof target != "object")
-            return target;
-        // ObservablePoint类型对象需要特殊处理
-        if (target instanceof PIXI.ObservablePoint) {
-            return new PIXI.ObservablePoint(target["cb"], target["scope"]["__ares_cloning__"], target["x"], target["y"]);
-        }
-        // 如果对象有clone方法则直接调用clone方法
-        if (typeof target["clone"] == "function")
-            return target["clone"]();
-        // 浅表复制单独处理
-        if (!deep) {
-            result = Object.create(target["__proto__"] || null);
-            for (var k in target) {
-                result[k] = target[k];
-            }
-            return result;
-        }
-        // 下面是深表复制了
-        var cls = (target.constructor || Object);
-        try {
-            result = new cls();
-        }
-        catch (err) {
-            return null;
-        }
-        // 打个标签
-        target["__ares_cloning__"] = result;
-        for (var key in target) {
-            // 标签不复制
-            if (key == "__ares_cloning__")
-                continue;
-            // 非属性方法不复制
-            if (typeof target[key] == "function" && !target.hasOwnProperty(key))
-                continue;
-            // Text的_texture属性不复制
-            if (key == "_texture" && target instanceof PIXI.Text)
-                continue;
-            // 显示对象的parent属性要特殊处理
-            if (key == "parent" && target instanceof PIXI.DisplayObject) {
-                if (target["parent"] && target["parent"]["__ares_cloning__"]) {
-                    // 如果target的parent正在被复制，则使用复制后的parent
-                    result["parent"] = target["parent"]["__ares_cloning__"];
-                }
-                else {
-                    // 如果target的parent没有被复制，则直接使用当前parent
-                    result["parent"] = target["parent"];
-                }
-                continue;
-            }
-            // EventEmitter的_events属性要进行浅表复制
-            if (key == "_events" && target instanceof PIXI.utils.EventEmitter) {
-                result["_events"] = cloneObject(target["_events"], false);
-                // 如果target的某个监听里的context就是target本身，则将result的context改为result本身
-                for (var k in target["_events"]) {
-                    var temp = target["_events"][k];
-                    result["_events"][k] = cloneObject(temp, false);
-                    if (temp.context == target) {
-                        result["_events"][k].context = result;
-                    }
-                }
-                continue;
-            }
-            // 容器对象的children属性要特殊处理
-            if (key == "children" && target instanceof PIXI.Container) {
-                // 首先要清除已有的显示对象（例如原始对象在构造函数中添加了显示对象的话，再经过复制会产生重复对象）
-                var children = result["children"];
-                for (var j = 0, lenJ = children.length; j < lenJ; j++) {
-                    result["removeChildAt"](0).destroy();
-                }
-                // 开始复制子对象
-                children = target["children"];
-                for (var j = 0, lenJ = children.length; j < lenJ; j++) {
-                    var child = cloneObject(children[j], true);
-                    result["addChild"](child);
-                }
-                continue;
-            }
-            // Sprite的vertexData属性需要特殊处理
-            if (key == "vertexData" && target instanceof PIXI.Sprite) {
-                result[key] = target[key]["slice"]();
-                continue;
-            }
-            // 通用处理
-            var oriValue = target[key];
-            if (oriValue && oriValue["__ares_cloning__"]) {
-                // 已经复制过的对象不再复制，直接使用之
-                result[key] = oriValue["__ares_cloning__"];
-            }
-            else {
-                // 还没复制过的对象，复制之
-                var value = cloneObject(oriValue, true);
-                if (value != null) {
-                    try {
-                        // 这里加try catch是为了防止给只读属性赋值时报错
-                        result[key] = value;
-                    }
-                    catch (err) { }
-                }
-            }
-        }
-        // 移除标签
-        delete target["__ares_cloning__"];
-        return result;
-    }
 });
 /// <reference path="pixi.js.d.ts"/>
 define("src/ares/pixijs/PIXICompiler", ["require", "exports", "src/ares/pixijs/PIXICommands"], function (require, exports, PIXICommands_1) {
@@ -1518,12 +1844,14 @@ define("src/ares/pixijs/PIXICompiler", ["require", "exports", "src/ares/pixijs/P
         /**
          * 创建PIXI绑定
          * @param root 根显示对象，从这里传入的绑定数据属性名必须以“a_”开头
+         * @param renderer PIXI渲染器
          * @param config 绑定数据，从这里传入的绑定数据属性名可以不以“a_”开头
          * @param tplDict 模板字典，可以在这里给出模板定义表
          */
-        function PIXICompiler(root, config, tplDict) {
+        function PIXICompiler(root, renderer, config, tplDict) {
             this._nameDict = {};
             this._root = root;
+            this._renderer = renderer;
             this._config = config;
             this._tplDict = tplDict || {};
         }
@@ -1531,6 +1859,14 @@ define("src/ares/pixijs/PIXICompiler", ["require", "exports", "src/ares/pixijs/P
             /** 获取根显示对象 */
             get: function () {
                 return this._root;
+            },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(PIXICompiler.prototype, "renderer", {
+            /** 获取PIXI渲染器 */
+            get: function () {
+                return this._renderer;
             },
             enumerable: true,
             configurable: true
@@ -2085,7 +2421,7 @@ define("src/ares/template/TemplateCompiler", ["require", "exports", "src/ares/te
 // / <reference path="../dist/ares_html.d.ts"/>
 // / <reference path="../dist/ares_pixijs.d.ts"/>
 // / <reference path="../dist/ares_template.d.ts"/>
-define("test/test", ["require", "exports", "src/ares/Ares", "src/ares/html/HTMLCompiler", "src/ares/pixijs/PIXICompiler", "src/ares/template/TemplateCompiler"], function (require, exports, ares, ares_html, ares_pixijs, ares_template) {
+define("test/test", ["require", "exports", "src/ares/Ares", "src/ares/pixijs/PIXICompiler"], function (require, exports, ares, ares_pixijs) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     /**
@@ -2113,7 +2449,7 @@ define("test/test", ["require", "exports", "src/ares/Ares", "src/ares/html/HTMLC
             // 计划下一次渲染
             requestAnimationFrame(render);
         }
-        PIXI.loader.add("http://pic.qiantucdn.com/58pic/14/45/39/57i58PICI2K_1024.png");
+        PIXI.loader.add("test.png");
         PIXI.loader.load(function () {
             var testSkin = new PIXI.Container();
             stage.addChild(testSkin);
@@ -2121,13 +2457,13 @@ define("test/test", ["require", "exports", "src/ares/Ares", "src/ares/html/HTMLC
             testContainer.y = 100;
             testSkin.addChild(testContainer);
             var testSprite = new PIXI.Sprite();
-            testSprite.texture = PIXI.Texture.fromImage("http://pic.qiantucdn.com/58pic/14/45/39/57i58PICI2K_1024.png");
+            testSprite.texture = PIXI.Texture.fromImage("test.png");
             testSprite.width = testSprite.height = 200;
             testSprite.interactive = true;
             testSprite["a-on:click"] = "testFunc";
             testSprite["a-for"] = "item in testFor";
             testSprite["a-y"] = "$target.y + $index * 200";
-            testSprite["a-viewport${oneway:true}"] = "$target.x, $target.y, $target.width - 100, $target.height * 2";
+            testSprite["a-viewport"] = "$target.x, $target.y, $target.width - 100, $target.height * 2";
             testSprite.x = 200;
             testContainer.addChild(testSprite);
             var testText = new PIXI.Text("text: {{text}}");
@@ -2137,34 +2473,34 @@ define("test/test", ["require", "exports", "src/ares/Ares", "src/ares/html/HTMLC
             testSkin.addChild(testText);
             var testTpl = new PIXI.Sprite();
             testTpl["a-tpl"] = "testTpl";
-            testTpl["a-for"] = "item in testFor";
+            // testTpl["a-for"] = "item in testFor";
             testTpl["a-x"] = "$index * 200";
             testTpl["a_y"] = "$target.y + $index * 100";
             testSkin.addChild(testTpl);
             var data = {
                 text: "text",
                 testNum: 1,
-                testFor: [1, 2, 3],
+                testFor: [1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3,],
                 testFunc: function (evt) {
                     this.text = "Fuck!!!";
                 }
             };
-            ares.bind(data, new ares_pixijs.PIXICompiler(testSkin));
-            ares.bind(data, new ares_html.HTMLCompiler("#div_root"));
-            ares.bind(data, new ares_template.TemplateCompiler("abc$a-{for: i in 10}'$a-{i}'$a-{end for}def", function (text) {
-                console.log(text);
-            }));
-            var testSkin2 = new PIXI.Container();
-            testSkin2["a-tpl"] = "testTpl";
-            testSkin2["a-y"] = 100;
-            stage.addChild(testSkin2);
-            ares.bind(data, new ares_pixijs.PIXICompiler(testSkin2));
-            setTimeout(function () {
-                data.testFor = [3, "jasdf"];
-            }, 2000);
-            setTimeout(function () {
-                data.testFor = ["kn", "j111", "14171a"];
-            }, 4000);
+            ares.bind(data, new ares_pixijs.PIXICompiler(testSkin, renderer));
+            // ares.bind(data, new ares_html.HTMLCompiler("#div_root"));
+            // ares.bind(data, new ares_template.TemplateCompiler("abc$a-{for: i in 10}'$a-{i}'$a-{end for}def", (text:string)=>{
+            //     console.log(text);
+            // }));
+            // var testSkin2:PIXI.Container = new PIXI.Container();
+            // testSkin2["a-tpl"] = "testTpl";
+            // testSkin2["a-y"] = 100;
+            // stage.addChild(testSkin2);
+            // ares.bind(data, new ares_pixijs.PIXICompiler(testSkin2));
+            // setTimeout(()=>{
+            //     data.testFor = [3, "jasdf"];
+            // }, 2000);
+            // setTimeout(()=>{
+            //     data.testFor = ["kn", "j111", "14171a"];
+            // }, 4000);
         });
     }
 });
