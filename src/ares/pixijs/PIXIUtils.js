@@ -1,6 +1,5 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-var Ares_1 = require("../Ares");
 /**
  * Created by Raykid on 2017/7/20.
  */
@@ -32,32 +31,12 @@ var PIXIUtils = (function () {
                 // 如果已经销毁则继续生成
                 if (target["_destroyed"])
                     continue;
-                // 属性恢复
-                restoreProp(oriTarget, target);
             }
             else {
                 target = PIXIUtils.cloneObject(oriTarget, true);
             }
         }
         return target;
-        function restoreProp(oriTarget, curTarget) {
-            // 遍历当前节点，恢复所有Ares属性
-            for (var propName in oriTarget) {
-                if (Ares_1.defaultCmdRegExp.test(propName))
-                    curTarget[propName] = oriTarget[propName];
-            }
-            // 恢复常用显示属性
-            for (var i in PIXIUtils._commonDisplayProps) {
-                var propName = PIXIUtils._commonDisplayProps[i];
-                curTarget[propName] = oriTarget[propName];
-            }
-            // 递归子节点
-            if (oriTarget instanceof PIXI.Container) {
-                for (var i in oriTarget["children"]) {
-                    restoreProp(oriTarget["children"][i], curTarget["children"][i]);
-                }
-            }
-        }
     };
     /**
      * 归还被租赁的显示对象到对象池里
@@ -135,7 +114,7 @@ var PIXIUtils = (function () {
         target["__ares_cloning__"] = result;
         for (var key in target) {
             // 标签不复制
-            if (key == "__ares_cloning__")
+            if (key == "__ares_cloning__" || key == "__ares_compiling__")
                 continue;
             // 非属性方法不复制
             if (typeof target[key] == "function" && !target.hasOwnProperty(key))

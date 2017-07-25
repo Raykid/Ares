@@ -33,8 +33,6 @@ export class PIXIUtils
                 target = pool.shift();
                 // 如果已经销毁则继续生成
                 if(target["_destroyed"]) continue;
-                // 属性恢复
-                restoreProp(oriTarget, target);
             }
             else
             {
@@ -42,31 +40,6 @@ export class PIXIUtils
             }
         }
         return target;
-
-
-        function restoreProp(oriTarget:PIXI.DisplayObject, curTarget:PIXI.DisplayObject):void
-        {
-            // 遍历当前节点，恢复所有Ares属性
-            for(var propName in oriTarget)
-            {
-                if(defaultCmdRegExp.test(propName))
-                    curTarget[propName] = oriTarget[propName];
-            }
-            // 恢复常用显示属性
-            for(var i in PIXIUtils._commonDisplayProps)
-            {
-                var propName:string = PIXIUtils._commonDisplayProps[i];
-                curTarget[propName] = oriTarget[propName];
-            }
-            // 递归子节点
-            if(oriTarget instanceof PIXI.Container)
-            {
-                for(var i in oriTarget["children"])
-                {
-                    restoreProp(oriTarget["children"][i], curTarget["children"][i]);
-                }
-            }
-        }
     }
 
     /**
@@ -156,7 +129,7 @@ export class PIXIUtils
         for(var key in target)
         {
             // 标签不复制
-            if(key == "__ares_cloning__") continue;
+            if(key == "__ares_cloning__" || key == "__ares_compiling__") continue;
             // 非属性方法不复制
             if(typeof target[key] == "function" && !target.hasOwnProperty(key)) continue;
             // Text的_texture属性不复制

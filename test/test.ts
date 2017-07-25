@@ -80,7 +80,7 @@ function go():void
         var data:any = {
             text: "text",
             testNum: 1,
-            testFor: [1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,1, 2, 3,],
+            testFor: [1, 2, 3],
             testFunc: function(evt:Event):void
             {
                 this.text = "Fuck!!!";
@@ -89,24 +89,24 @@ function go():void
 
         ares.bind(data, new ares_pixijs.PIXICompiler(testSkin, renderer));
 
-        // ares.bind(data, new ares_html.HTMLCompiler("#div_root"));
+        ares.bind(data, new ares_html.HTMLCompiler("#div_root"));
 
-        // ares.bind(data, new ares_template.TemplateCompiler("abc$a-{for: i in 10}'$a-{i}'$a-{end for}def", (text:string)=>{
-        //     console.log(text);
-        // }));
+        ares.bind(data, new ares_template.TemplateCompiler("abc$a-{for: i in 10}'$a-{i}'$a-{end for}def", (text:string)=>{
+            console.log(text);
+        }));
 
-        // var testSkin2:PIXI.Container = new PIXI.Container();
-        // testSkin2["a-tpl"] = "testTpl";
-        // testSkin2["a-y"] = 100;
-        // stage.addChild(testSkin2);
-        // ares.bind(data, new ares_pixijs.PIXICompiler(testSkin2));
+        var testSkin2:PIXI.Container = new PIXI.Container();
+        testSkin2["a-tpl"] = "testTpl";
+        testSkin2["a-y"] = 100;
+        stage.addChild(testSkin2);
+        ares.bind(data, new ares_pixijs.PIXICompiler(testSkin2, renderer));
 
-        // setTimeout(()=>{
-        //     data.testFor = [3, "jasdf"];
-        // }, 2000);
+        setTimeout(()=>{
+            data.testFor = [3, "jasdf"];
+        }, 2000);
 
-        // setTimeout(()=>{
-        //     data.testFor = ["kn", "j111", "14171a"];
-        // }, 4000);
+        setTimeout(()=>{
+            data.testFor = ["kn", "j111", "14171a"];
+        }, 4000);
     });
 }

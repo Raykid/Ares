@@ -21,6 +21,7 @@ export interface CommandContext
 {
     scope:any;
     target:PIXI.DisplayObject;
+    $target:PIXI.DisplayObject;
     compiler:PIXICompiler;
     entity:IAres;
     cmdData:AresCommandData;
@@ -56,7 +57,7 @@ export function addCommand(name:string, command:Command):void
 /** 文本域命令 */
 export function textContent(context:CommandContext):void
 {
-    context.entity.createWatcher(context.target, context.cmdData.exp, context.scope, (value:string)=>
+    context.entity.createWatcher(context.$target, context.cmdData.exp, context.scope, (value:string)=>
     {
         var text:PIXI.Text = context.target as PIXI.Text;
         text.text = value;
@@ -113,9 +114,9 @@ export const commands:{[name:string]:Command} = {
     prop: (context:CommandContext)=>
     {
         var cmdData:AresCommandData = context.cmdData;
-        var target:PIXI.DisplayObject = context.target;
-        context.entity.createWatcher(target, cmdData.exp, context.scope, (value:any)=>
+        context.entity.createWatcher(context.$target, cmdData.exp, context.scope, (value:any)=>
         {
+            var target:PIXI.DisplayObject = context.target;
             if(cmdData.subCmd != "")
             {
                 // 子命令形式
@@ -131,7 +132,7 @@ export const commands:{[name:string]:Command} = {
             }
         });
         // 返回节点
-        return target;
+        return context.target;
     },
     /** 绑定事件 */
     on: (context:CommandContext)=>
@@ -176,7 +177,7 @@ export const commands:{[name:string]:Command} = {
         var index:number = parent.getChildIndex(context.target);
         parent.addChildAt(refNode, index);
         // 只有在条件为true时才启动编译
-        var watcher:IWatcher = context.entity.createWatcher(context.target, cmdData.exp, context.scope, (value:boolean)=>
+        var watcher:IWatcher = context.entity.createWatcher(context.$target, cmdData.exp, context.scope, (value:boolean)=>
         {
             // 如果refNode被从显示列表移除了，则表示该if指令要作废了
             if(!refNode.parent)
@@ -259,7 +260,7 @@ export const commands:{[name:string]:Command} = {
         // 记录顺序窗口范围，左闭右开
         var orderRange:{begin:number, end:number};
         // 添加订阅
-        var watcher:IWatcher = context.entity.createWatcher(context.target, arrName, forScope, (value:any)=>{
+        var watcher:IWatcher = context.entity.createWatcher(context.$target, arrName, forScope, (value:any)=>{
             // 如果refNode被从显示列表移除了，则表示该for指令要作废了
             if(!parent.parent)
             {
@@ -347,7 +348,7 @@ export const commands:{[name:string]:Command} = {
             }
         });
         // 使用原始显示对象编译一次parent
-        context.compiler.compile(parent, forScope);
+        context.compiler.compile(parent, forScope, {recursive: false});
         // 记录viewport数据
         viewportData = PIXIUtils.getViewportData(parent);
         if(viewportData)
@@ -365,6 +366,10 @@ export const commands:{[name:string]:Command} = {
         {
             // 拷贝一个target
             var newNode:PIXI.DisplayObject = PIXIUtils.borrowObject(context.target);
+            // 删除for命令，防止递归编译导致堆栈溢出
+            delete newNode["__ares_cmd_dict__"].for;
+            // 删除viewport命令，因为该命令已经转移到父容器上了
+            delete newNode["__ares_cmd_dict__"].viewport;
             // 添加到显示里
             parent.addChild(newNode);
             // 生成子域
@@ -401,7 +406,7 @@ export const commands:{[name:string]:Command} = {
                 writable: false
             });
             // 开始编译新节点
-            context.compiler.compile(newNode, newScope);
+            context.compiler.compile(newNode, newScope, {target: context.target});
             // 返回
             return {scope: newScope, node: newNode};
         }

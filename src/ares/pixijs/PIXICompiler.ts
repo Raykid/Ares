@@ -16,6 +16,12 @@ export interface PIXIBindConfigCommands
     [cmd:string]:any;
 }
 
+export interface CompileOptions
+{
+    recursive?:boolean;
+    target?:PIXI.DisplayObject;
+}
+
 var _tplDict:{[name:string]:PIXI.DisplayObject} = {};
 /**
  * 获取全局模板对象，该模板在任何地方都生效
@@ -91,6 +97,11 @@ export class PIXICompiler implements Compiler
 
     private parseCmd(node:PIXI.DisplayObject):CmdDict
     {
+        // 如果node已经编译过，保留了之前编译的CmdDict，则不再重新编译，直接用
+        var cmdNameDict:CmdDict = node["__ares_cmd_dict__"];
+        if(cmdNameDict) return cmdNameDict;
+        // 还没有编译过，创建新的CmdDict并记录在显示对象上
+        node["__ares_cmd_dict__"] = cmdNameDict = {};
         // 取到属性列表
         var datas:AresCommandData[] = [];
         var data:AresCommandData;
@@ -108,7 +119,6 @@ export class PIXICompiler implements Compiler
             if(data) datas.push(data);
         }
         // 开始遍历属性列表
-        var cmdNameDict:CmdDict = {};
         for(var i:number = 0, len:number = datas.length; i < len; i++)
         {
             data = datas[i];
@@ -160,10 +170,14 @@ export class PIXICompiler implements Compiler
         this.compile(this._root, entity.data);
     }
 
-    public compile(node:PIXI.DisplayObject, scope:any):void
+    public compile(node:PIXI.DisplayObject, scope:any, options?:CompileOptions):void
     {
         // 首先判断是否是模板，是的话就设置模板，但是不编译
         if(this.parseTpl(node)) return;
+        // 判断如果当前节点正在编译中则不再进行编译
+        if(node["__ares_compiling__"]) return;
+        // 打标签，表示正在编译
+        node["__ares_compiling__"] = true;
         // 开始编译
         var hasLazyCompile:boolean = false;
         // 如果有名字就记下来
@@ -197,6 +211,7 @@ export class PIXICompiler implements Compiler
                     ctx: {
                         scope: scope,
                         target: node,
+                        $target: (options && options.target) || node,
                         compiler: this,
                         entity: this._entity,
                         cmdData: cmdData,
@@ -239,7 +254,7 @@ export class PIXICompiler implements Compiler
                 this.compileTextContent(node as PIXI.Text, scope, cmdDict);
             }
             // 然后递归解析子节点
-            if(node instanceof PIXI.Container)
+            if((!options || options.recursive) && node instanceof PIXI.Container)
             {
                 var children:PIXI.DisplayObject[] = (node as PIXI.Container).children;
                 var nextChild:PIXI.DisplayObject;
@@ -260,6 +275,8 @@ export class PIXICompiler implements Compiler
                 }
             }
         }
+        // 移除标签
+        delete node["__ares_compiling__"];
     }
 
     /**
@@ -299,6 +316,7 @@ export class PIXICompiler implements Compiler
             textContent({
                 scope: scope,
                 target: text,
+                $target: text,
                 compiler: this,
                 entity: this._entity,
                 cmdData: {

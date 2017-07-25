@@ -73,7 +73,7 @@ return /******/ (function(modules) { // webpackBootstrap
 /******/ 	__webpack_require__.p = "";
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = 6);
+/******/ 	return __webpack_require__(__webpack_require__.s = 2);
 /******/ })
 /************************************************************************/
 /******/ ([
@@ -142,500 +142,15 @@ exports.runExp = runExp;
 
 
 /***/ }),
-/* 1 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-var Utils_1 = __webpack_require__(0);
-/**
- * Created by Raykid on 2016/12/22.
- * 数据更新订阅者，当依赖的数据有更新时会触发callback通知外面
- */
-var Watcher = (function () {
-    function Watcher(entity, target, exp, scope, callback) {
-        this._disposed = false;
-        // 记录entity
-        this._entity = entity;
-        // 生成一个全局唯一的ID
-        this._uid = Watcher._uid++;
-        // 记录作用目标、表达式和作用域
-        this._target = target;
-        this._exp = exp;
-        this._scope = scope;
-        // 将表达式和作用域解析为一个Function
-        this._expFunc = Utils_1.createEvalFunc(exp);
-        // 记录回调函数
-        this._callback = callback;
-        // 进行首次更新
-        this.update();
-    }
-    Object.defineProperty(Watcher.prototype, "uid", {
-        /** 获取Watcher的全局唯一ID */
-        get: function () {
-            return this._uid;
-        },
-        enumerable: true,
-        configurable: true
-    });
-    /**
-     * 获取到表达式当前最新值
-     * @returns {any} 最新值
-     */
-    Watcher.prototype.getValue = function () {
-        if (this._disposed)
-            return null;
-        var value = null;
-        // 记录自身
-        Watcher.updating = this;
-        // 设置通用属性
-        // 这里一定要用defineProperty将目标定义在当前节点上，否则会影响context.scope
-        Object.defineProperty(this._scope, "$root", {
-            configurable: true,
-            enumerable: false,
-            value: this._entity.compiler.root,
-            writable: false
-        });
-        // 这里一定要用defineProperty将目标定义在当前节点上，否则会影响context.scope
-        Object.defineProperty(this._scope, "$target", {
-            configurable: true,
-            enumerable: false,
-            value: this._target,
-            writable: false
-        });
-        // 表达式求值
-        try {
-            value = this._expFunc.call(this._scope, this._scope);
-        }
-        catch (err) {
-            // 输出错误日志
-            console.warn("表达式求值错误\nerr: " + err.toString() + "\nexp：" + this._exp + "，scope：" + JSON.stringify(this._scope));
-        }
-        // 移除通用属性
-        delete this._scope["$root"];
-        delete this._scope["$target"];
-        // 移除自身记录
-        Watcher.updating = null;
-        return value;
-    };
-    /**
-     * 当依赖的数据有更新时调用该方法
-     * @param extra 可能的额外数据
-     */
-    Watcher.prototype.update = function (extra) {
-        if (this._disposed)
-            return;
-        var value = this.getValue();
-        if (!Watcher.isEqual(value, this._value)) {
-            this._callback && this._callback(value, this._value, extra);
-            this._value = Watcher.deepCopy(value);
-        }
-    };
-    /** 销毁订阅者 */
-    Watcher.prototype.dispose = function () {
-        if (this._disposed)
-            return;
-        this._value = null;
-        this._target = null;
-        this._exp = null;
-        this._scope = null;
-        this._expFunc = null;
-        this._callback = null;
-        this._disposed = true;
-    };
-    /**
-     * 是否相等，包括基础类型和对象/数组的对比
-     */
-    Watcher.isEqual = function (a, b) {
-        return (a == b || (Watcher.isObject(a) && Watcher.isObject(b)
-            ? JSON.stringify(a) == JSON.stringify(b)
-            : false));
-    };
-    /**
-     * 是否为对象(包括数组、正则等)
-     */
-    Watcher.isObject = function (obj) {
-        return (obj && typeof obj == "object");
-    };
-    /**
-     * 复制对象，若为对象则深度复制
-     */
-    Watcher.deepCopy = function (from) {
-        if (Watcher.isObject(from)) {
-            // 复杂类型对象，先字符串化，再对象化
-            return JSON.parse(JSON.stringify(from));
-        }
-        else {
-            // 基本类型对象，直接返回之
-            return from;
-        }
-    };
-    /** 记录当前正在执行update方法的Watcher引用 */
-    Watcher.updating = null;
-    Watcher._uid = 0;
-    return Watcher;
-}());
-exports.Watcher = Watcher;
-
-
-/***/ }),
+/* 1 */,
 /* 2 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-/**
- * Created by Raykid on 2017/7/19.
- */
-Object.defineProperty(exports, "__esModule", { value: true });
-var Utils_1 = __webpack_require__(0);
-exports.commands = {
-    /** 一次性设置变量命令，在数据中插入一个变量 */
-    set: function (context) {
-        // 设置变量值
-        Utils_1.runExp(context.data.subCmd + "=" + context.data.exp, context.scope);
-        return context.target;
-    },
-    /** 绑定设置变量命令，在数据中插入一个变量（如果不提供子命令则不插入变量），并根据表达式的值同步更新变量的值 */
-    bind: function (context) {
-        // 创建订阅器，监听表达式值变化
-        context.entity.createWatcher(context.target, context.data.exp, context.scope, function (value) {
-            // 如果子命令不为空，则更新变量值
-            if (context.data.subCmd)
-                Utils_1.runExp(context.data.subCmd + "=" + context.data.exp, context.scope);
-        });
-        return context.target;
-    }
-};
-
-
-/***/ }),
-/* 3 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-/**
- * Created by Raykid on 2016/12/22.
- */
-Object.defineProperty(exports, "__esModule", { value: true });
-var Watcher_1 = __webpack_require__(1);
-var Dep_1 = __webpack_require__(5);
-var Mutator = (function () {
-    function Mutator() {
-    }
-    /**
-     * 将用户传进来的数据“变异”成为具有截获数据变更能力的数据
-     * @param data 原始数据
-     * @returns {any} 变异后的数据
-     */
-    Mutator.mutate = function (data) {
-        // 如果是简单类型，则啥也不做
-        if (!data || typeof data != "object")
-            return;
-        // 是个复杂类型对象，但是以前变异过了就不再重做一遍了
-        if (!data.__ares_mutated__) {
-            // 针对每个内部变量都进行一次变异
-            for (var key in data) {
-                Mutator.mutateObject(data, key, data[key]);
-            }
-            // 打一个标记表示已经变异过了
-            Object.defineProperty(data, "__ares_mutated__", {
-                value: true,
-                writable: false,
-                enumerable: false,
-                configurable: false
-            });
-        }
-        return data;
-    };
-    Mutator.mutateObject = function (data, key, value) {
-        // 对每个复杂类型对象都要有一个对应的依赖列表
-        var dep = new Dep_1.Dep();
-        // 变异过程
-        Object.defineProperty(data, key, {
-            enumerable: true,
-            configurable: false,
-            get: function () {
-                // 如果Watcher.updating不是null，说明当前正在执行表达式，那么获取的变量自然是其需要依赖的
-                var watcher = Watcher_1.Watcher.updating;
-                if (watcher)
-                    dep.watch(watcher);
-                // 利用闭包保存原始值
-                return value;
-            },
-            set: function (v) {
-                if (v == value)
-                    return;
-                value = v;
-                // 如果是数组就走专门的数组变异方法，否则递归变异对象
-                if (Array.isArray(v))
-                    Mutator.mutateArray(v, dep);
-                else
-                    Mutator.mutate(v);
-                // 触发通知
-                dep.notify();
-            }
-        });
-        // 递归变异
-        Mutator.mutate(value);
-    };
-    Mutator.mutateArray = function (arr, dep) {
-        // 变异当前数组
-        arr["__proto__"] = Mutator.defineReactiveArray(dep);
-        // 遍历当前数组，将内容对象全部变异
-        for (var i = 0, len = arr.length; i < len; i++) {
-            Mutator.mutate(arr[i]);
-        }
-    };
-    Mutator.defineReactiveArray = function (dep) {
-        var proto = Array.prototype;
-        var result = Object.create(proto);
-        // 遍历所有方法，一个一个地变异
-        Mutator._arrMethods.forEach(function (method) {
-            // 利用闭包记录一个原始方法
-            var oriMethod = proto[method];
-            // 开始变异
-            Object.defineProperty(result, method, {
-                value: function () {
-                    var args = [];
-                    for (var _i = 0; _i < arguments.length; _i++) {
-                        args[_i] = arguments[_i];
-                    }
-                    // 首先调用原始方法，获取返回值
-                    var result = oriMethod.apply(this, args);
-                    // 数组插入项
-                    var inserted;
-                    switch (method) {
-                        case "push":
-                        case "unshift":
-                            inserted = args;
-                            break;
-                        case "splice":
-                            inserted = args.slice(2);
-                            break;
-                    }
-                    // 监视数组插入项，而不是重新监视整个数组
-                    if (inserted && inserted.length) {
-                        Mutator.mutateArray(inserted, dep);
-                    }
-                    // 触发更新
-                    dep.notify({ method: args });
-                    // 返回值
-                    return result;
-                }
-            });
-        });
-        // 提供替换数组设置的方法，因为直接设置数组下标的方式无法变异
-        Object.defineProperty(result, "$set", {
-            value: function (index, value) {
-                // 超出数组长度默认追加到最后
-                if (index >= this.length)
-                    index = this.length;
-                return this.splice(index, 1, value)[0];
-            }
-        });
-        // 提供替换数组移除的方法，因为直接移除的方式无法变异
-        Object.defineProperty(result, "$remove", {
-            value: function (item) {
-                var index = this.indexOf(item);
-                if (index > -1)
-                    return this.splice(index, 1);
-                return null;
-            }
-        });
-        return result;
-    };
-    // 记录数组中会造成数据更新的所有方法名
-    Mutator._arrMethods = [
-        "push",
-        "pop",
-        "unshift",
-        "shift",
-        "splice",
-        "sort",
-        "reverse"
-    ];
-    return Mutator;
-}());
-exports.Mutator = Mutator;
-
-
-/***/ }),
-/* 4 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-/**
- * Created by Raykid on 2016/12/16.
- */
-Object.defineProperty(exports, "__esModule", { value: true });
-var Mutator_1 = __webpack_require__(3);
-var Watcher_1 = __webpack_require__(1);
-var Commands_1 = __webpack_require__(2);
-exports.defaultCmdRegExp = /^(data\-)?a[\-_](\w+)([:\$](.+))?$/;
-/**
- * 将数据模型和视图进行绑定
- * @param model 数据模型
- * @param compiler 视图解析器，不同类型的视图需要使用不同的解析器解析后方可使用
- * @param options 一些额外参数
- * @returns {core.AresEntity} 绑定实体对象
- */
-function bind(data, compiler, options) {
-    return new Ares(data, compiler, options);
-}
-exports.bind = bind;
-var Ares = (function () {
-    function Ares(data, compiler, options) {
-        // 记录变异对象
-        this._data = Mutator_1.Mutator.mutate(data);
-        this._compiler = compiler;
-        this._options = options;
-        // 初始化Compiler
-        this._compiler.init(this);
-        // 调用回调
-        if (this._options && this._options.inited) {
-            this._options.inited.call(this._data, this);
-        }
-    }
-    Object.defineProperty(Ares.prototype, "data", {
-        /** 获取ViewModel */
-        get: function () {
-            return this._data;
-        },
-        enumerable: true,
-        configurable: true
-    });
-    Object.defineProperty(Ares.prototype, "compiler", {
-        /** 获取编译器 */
-        get: function () {
-            return this._compiler;
-        },
-        enumerable: true,
-        configurable: true
-    });
-    Ares.prototype.createWatcher = function (target, exp, scope, callback) {
-        return new Watcher_1.Watcher(this, target, exp, scope, callback);
-    };
-    /**
-     * 解析表达式成为命令数据
-     * @param key 属性名，合法的属性名应以a-或a_开头，以:或$分隔主命令和子命令
-     * @param value 属性值，如果属性名合法则会被用来作为表达式的字符串
-     * @param cmdRegExp 可选，如果不传则使用默认的命令正则表达式解析命令
-     * @return {CommandData|null} 命令数据，如果不是命令则返回null
-     */
-    Ares.prototype.parseCommand = function (key, value, cmdRegExp) {
-        var result = (cmdRegExp || exports.defaultCmdRegExp).exec(key);
-        if (!result)
-            return null;
-        // 取到key
-        var key = result[0];
-        // 取到命令名
-        var cmdName = result[2];
-        // 取到命令字符串
-        var exp = value;
-        // 取到子命令名
-        var subCmd = result[4] || "";
-        // 返回结构体
-        return {
-            cmdName: cmdName,
-            subCmd: subCmd,
-            propName: key,
-            exp: exp
-        };
-    };
-    /**
-     * 测试是否是通用命令
-     * @param data 命令数据
-     * @return {boolean} 返回一个布尔值，表示该表达式是否是通用命令
-     */
-    Ares.prototype.testCommand = function (data) {
-        // 非空判断
-        if (!data)
-            return false;
-        // 取到通用命令
-        var cmd = Commands_1.commands[data.cmdName];
-        return (cmd != null);
-    };
-    /**
-     * 执行通用命令，如果该表达式是通用命令则直接执行，否则什么都不做
-     * @param data 命令数据
-     * @param target 目标对象
-     * @param scope 变量作用域
-     * @return {boolean} 返回一个布尔值，表示该表达式是否是通用命令
-     */
-    Ares.prototype.execCommand = function (data, target, scope) {
-        // 非空判断
-        if (!data || !scope)
-            return false;
-        // 取到通用命令
-        var cmd = Commands_1.commands[data.cmdName];
-        // 没找到命令就返回false
-        if (!cmd)
-            return false;
-        // 找到命令了，执行之
-        cmd({
-            target: target,
-            scope: scope,
-            entity: this,
-            data: data
-        });
-        return true;
-    };
-    return Ares;
-}());
-exports.Ares = Ares;
-
-
-/***/ }),
-/* 5 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-/**
- * Created by Raykid on 2016/12/22.
- */
-Object.defineProperty(exports, "__esModule", { value: true });
-var Dep = (function () {
-    function Dep() {
-        this._map = {};
-    }
-    /**
-     * 添加数据变更订阅者
-     * @param watcher 数据变更订阅者
-     */
-    Dep.prototype.watch = function (watcher) {
-        if (!this._map[watcher.uid]) {
-            this._map[watcher.uid] = watcher;
-        }
-    };
-    /**
-     * 数据变更，通知所有订阅者
-     * @param extra 可能的额外数据
-     */
-    Dep.prototype.notify = function (extra) {
-        for (var uid in this._map) {
-            var watcher = this._map[uid];
-            watcher.update(extra);
-        }
-    };
-    return Dep;
-}());
-exports.Dep = Dep;
-
-
-/***/ }),
-/* 6 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 /// <reference path="pixi.js.d.ts"/>
 Object.defineProperty(exports, "__esModule", { value: true });
-var PIXICommands_1 = __webpack_require__(8);
+var PIXICommands_1 = __webpack_require__(6);
 var _tplDict = {};
 /**
  * 获取全局模板对象，该模板在任何地方都生效
@@ -697,6 +212,12 @@ var PIXICompiler = (function () {
         configurable: true
     });
     PIXICompiler.prototype.parseCmd = function (node) {
+        // 如果node已经编译过，保留了之前编译的CmdDict，则不再重新编译，直接用
+        var cmdNameDict = node["__ares_cmd_dict__"];
+        if (cmdNameDict)
+            return cmdNameDict;
+        // 还没有编译过，创建新的CmdDict并记录在显示对象上
+        node["__ares_cmd_dict__"] = cmdNameDict = {};
         // 取到属性列表
         var datas = [];
         var data;
@@ -715,7 +236,6 @@ var PIXICompiler = (function () {
                 datas.push(data);
         }
         // 开始遍历属性列表
-        var cmdNameDict = {};
         for (var i = 0, len = datas.length; i < len; i++) {
             data = datas[i];
             // 填充字典
@@ -757,10 +277,15 @@ var PIXICompiler = (function () {
         // 开始编译root节点
         this.compile(this._root, entity.data);
     };
-    PIXICompiler.prototype.compile = function (node, scope) {
+    PIXICompiler.prototype.compile = function (node, scope, options) {
         // 首先判断是否是模板，是的话就设置模板，但是不编译
         if (this.parseTpl(node))
             return;
+        // 判断如果当前节点正在编译中则不再进行编译
+        if (node["__ares_compiling__"])
+            return;
+        // 打标签，表示正在编译
+        node["__ares_compiling__"] = true;
         // 开始编译
         var hasLazyCompile = false;
         // 如果有名字就记下来
@@ -791,6 +316,7 @@ var PIXICompiler = (function () {
                     ctx: {
                         scope: scope,
                         target: node,
+                        $target: (options && options.target) || node,
                         compiler: this,
                         entity: this._entity,
                         cmdData: cmdData,
@@ -832,7 +358,7 @@ var PIXICompiler = (function () {
                 this.compileTextContent(node, scope, cmdDict);
             }
             // 然后递归解析子节点
-            if (node instanceof PIXI.Container) {
+            if ((!options || options.recursive) && node instanceof PIXI.Container) {
                 var children = node.children;
                 var nextChild;
                 for (var i = 0, len = children.length; i < len; i++) {
@@ -850,6 +376,8 @@ var PIXICompiler = (function () {
                 }
             }
         }
+        // 移除标签
+        delete node["__ares_compiling__"];
     };
     /**
      * 获取模板对象，该模板只在该PIXICompiler内部生效
@@ -884,6 +412,7 @@ var PIXICompiler = (function () {
             PIXICommands_1.textContent({
                 scope: scope,
                 target: text,
+                $target: text,
                 compiler: this,
                 entity: this._entity,
                 cmdData: {
@@ -910,14 +439,16 @@ exports.PIXICompiler = PIXICompiler;
 
 
 /***/ }),
-/* 7 */,
-/* 8 */
+/* 3 */,
+/* 4 */,
+/* 5 */,
+/* 6 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", { value: true });
-var PIXICompiler_1 = __webpack_require__(6);
+var PIXICompiler_1 = __webpack_require__(2);
 var Utils_1 = __webpack_require__(0);
 var ViewPortHandler_1 = __webpack_require__(12);
 var PIXIUtils_1 = __webpack_require__(11);
@@ -933,7 +464,7 @@ function addCommand(name, command) {
 exports.addCommand = addCommand;
 /** 文本域命令 */
 function textContent(context) {
-    context.entity.createWatcher(context.target, context.cmdData.exp, context.scope, function (value) {
+    context.entity.createWatcher(context.$target, context.cmdData.exp, context.scope, function (value) {
         var text = context.target;
         text.text = value;
     });
@@ -987,8 +518,8 @@ exports.commands = {
     /** 修改任意属性命令 */
     prop: function (context) {
         var cmdData = context.cmdData;
-        var target = context.target;
-        context.entity.createWatcher(target, cmdData.exp, context.scope, function (value) {
+        context.entity.createWatcher(context.$target, cmdData.exp, context.scope, function (value) {
+            var target = context.target;
             if (cmdData.subCmd != "") {
                 // 子命令形式
                 target[cmdData.subCmd] = value;
@@ -1001,7 +532,7 @@ exports.commands = {
             }
         });
         // 返回节点
-        return target;
+        return context.target;
     },
     /** 绑定事件 */
     on: function (context) {
@@ -1040,7 +571,7 @@ exports.commands = {
         var index = parent.getChildIndex(context.target);
         parent.addChildAt(refNode, index);
         // 只有在条件为true时才启动编译
-        var watcher = context.entity.createWatcher(context.target, cmdData.exp, context.scope, function (value) {
+        var watcher = context.entity.createWatcher(context.$target, cmdData.exp, context.scope, function (value) {
             // 如果refNode被从显示列表移除了，则表示该if指令要作废了
             if (!refNode.parent) {
                 watcher.dispose();
@@ -1112,7 +643,7 @@ exports.commands = {
         // 记录顺序窗口范围，左闭右开
         var orderRange;
         // 添加订阅
-        var watcher = context.entity.createWatcher(context.target, arrName, forScope, function (value) {
+        var watcher = context.entity.createWatcher(context.$target, arrName, forScope, function (value) {
             // 如果refNode被从显示列表移除了，则表示该for指令要作废了
             if (!parent.parent) {
                 watcher.dispose();
@@ -1195,7 +726,7 @@ exports.commands = {
             }
         });
         // 使用原始显示对象编译一次parent
-        context.compiler.compile(parent, forScope);
+        context.compiler.compile(parent, forScope, { recursive: false });
         // 记录viewport数据
         viewportData = PIXIUtils_1.PIXIUtils.getViewportData(parent);
         if (viewportData) {
@@ -1209,6 +740,10 @@ exports.commands = {
         function generateOne(key, value, len, lastNode) {
             // 拷贝一个target
             var newNode = PIXIUtils_1.PIXIUtils.borrowObject(context.target);
+            // 删除for命令，防止递归编译导致堆栈溢出
+            delete newNode["__ares_cmd_dict__"].for;
+            // 删除viewport命令，因为该命令已经转移到父容器上了
+            delete newNode["__ares_cmd_dict__"].viewport;
             // 添加到显示里
             parent.addChild(newNode);
             // 生成子域
@@ -1244,7 +779,7 @@ exports.commands = {
                 writable: false
             });
             // 开始编译新节点
-            context.compiler.compile(newNode, newScope);
+            context.compiler.compile(newNode, newScope, { target: context.target });
             // 返回
             return { scope: newScope, node: newNode };
         }
@@ -1335,6 +870,8 @@ exports.commands = {
 
 
 /***/ }),
+/* 7 */,
+/* 8 */,
 /* 9 */,
 /* 10 */,
 /* 11 */
@@ -1343,7 +880,6 @@ exports.commands = {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", { value: true });
-var Ares_1 = __webpack_require__(4);
 /**
  * Created by Raykid on 2017/7/20.
  */
@@ -1375,32 +911,12 @@ var PIXIUtils = (function () {
                 // 如果已经销毁则继续生成
                 if (target["_destroyed"])
                     continue;
-                // 属性恢复
-                restoreProp(oriTarget, target);
             }
             else {
                 target = PIXIUtils.cloneObject(oriTarget, true);
             }
         }
         return target;
-        function restoreProp(oriTarget, curTarget) {
-            // 遍历当前节点，恢复所有Ares属性
-            for (var propName in oriTarget) {
-                if (Ares_1.defaultCmdRegExp.test(propName))
-                    curTarget[propName] = oriTarget[propName];
-            }
-            // 恢复常用显示属性
-            for (var i in PIXIUtils._commonDisplayProps) {
-                var propName = PIXIUtils._commonDisplayProps[i];
-                curTarget[propName] = oriTarget[propName];
-            }
-            // 递归子节点
-            if (oriTarget instanceof PIXI.Container) {
-                for (var i in oriTarget["children"]) {
-                    restoreProp(oriTarget["children"][i], curTarget["children"][i]);
-                }
-            }
-        }
     };
     /**
      * 归还被租赁的显示对象到对象池里
@@ -1478,7 +994,7 @@ var PIXIUtils = (function () {
         target["__ares_cloning__"] = result;
         for (var key in target) {
             // 标签不复制
-            if (key == "__ares_cloning__")
+            if (key == "__ares_cloning__" || key == "__ares_compiling__")
                 continue;
             // 非属性方法不复制
             if (typeof target[key] == "function" && !target.hasOwnProperty(key))

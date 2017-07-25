@@ -73,7 +73,7 @@ return /******/ (function(modules) { // webpackBootstrap
 /******/ 	__webpack_require__.p = "";
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = 4);
+/******/ 	return __webpack_require__(__webpack_require__.s = 8);
 /******/ })
 /************************************************************************/
 /******/ ([
@@ -280,7 +280,8 @@ exports.Watcher = Watcher;
 
 
 /***/ }),
-/* 2 */
+/* 2 */,
+/* 3 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -311,7 +312,7 @@ exports.commands = {
 
 
 /***/ }),
-/* 3 */
+/* 4 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -321,7 +322,7 @@ exports.commands = {
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 var Watcher_1 = __webpack_require__(1);
-var Dep_1 = __webpack_require__(5);
+var Dep_1 = __webpack_require__(9);
 var Mutator = (function () {
     function Mutator() {
     }
@@ -463,7 +464,10 @@ exports.Mutator = Mutator;
 
 
 /***/ }),
-/* 4 */
+/* 5 */,
+/* 6 */,
+/* 7 */,
+/* 8 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -472,9 +476,9 @@ exports.Mutator = Mutator;
  * Created by Raykid on 2016/12/16.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-var Mutator_1 = __webpack_require__(3);
+var Mutator_1 = __webpack_require__(4);
 var Watcher_1 = __webpack_require__(1);
-var Commands_1 = __webpack_require__(2);
+var Commands_1 = __webpack_require__(3);
 exports.defaultCmdRegExp = /^(data\-)?a[\-_](\w+)([:\$](.+))?$/;
 /**
  * 将数据模型和视图进行绑定
@@ -590,7 +594,7 @@ exports.Ares = Ares;
 
 
 /***/ }),
-/* 5 */
+/* 9 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";

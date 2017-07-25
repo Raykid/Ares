@@ -1161,7 +1161,7 @@ define("src/ares/pixijs/ViewPortHandler", ["require", "exports"], function (requ
     }());
     exports.ViewPortHandler = ViewPortHandler;
 });
-define("src/ares/pixijs/PIXIUtils", ["require", "exports", "src/ares/Ares"], function (require, exports, Ares_1) {
+define("src/ares/pixijs/PIXIUtils", ["require", "exports"], function (require, exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     /**
@@ -1195,32 +1195,12 @@ define("src/ares/pixijs/PIXIUtils", ["require", "exports", "src/ares/Ares"], fun
                     // 如果已经销毁则继续生成
                     if (target["_destroyed"])
                         continue;
-                    // 属性恢复
-                    restoreProp(oriTarget, target);
                 }
                 else {
                     target = PIXIUtils.cloneObject(oriTarget, true);
                 }
             }
             return target;
-            function restoreProp(oriTarget, curTarget) {
-                // 遍历当前节点，恢复所有Ares属性
-                for (var propName in oriTarget) {
-                    if (Ares_1.defaultCmdRegExp.test(propName))
-                        curTarget[propName] = oriTarget[propName];
-                }
-                // 恢复常用显示属性
-                for (var i in PIXIUtils._commonDisplayProps) {
-                    var propName = PIXIUtils._commonDisplayProps[i];
-                    curTarget[propName] = oriTarget[propName];
-                }
-                // 递归子节点
-                if (oriTarget instanceof PIXI.Container) {
-                    for (var i in oriTarget["children"]) {
-                        restoreProp(oriTarget["children"][i], curTarget["children"][i]);
-                    }
-                }
-            }
         };
         /**
          * 归还被租赁的显示对象到对象池里
@@ -1298,7 +1278,7 @@ define("src/ares/pixijs/PIXIUtils", ["require", "exports", "src/ares/Ares"], fun
             target["__ares_cloning__"] = result;
             for (var key in target) {
                 // 标签不复制
-                if (key == "__ares_cloning__")
+                if (key == "__ares_cloning__" || key == "__ares_compiling__")
                     continue;
                 // 非属性方法不复制
                 if (typeof target[key] == "function" && !target.hasOwnProperty(key))
@@ -1407,7 +1387,7 @@ define("src/ares/pixijs/PIXICommands", ["require", "exports", "src/ares/pixijs/P
     exports.addCommand = addCommand;
     /** 文本域命令 */
     function textContent(context) {
-        context.entity.createWatcher(context.target, context.cmdData.exp, context.scope, function (value) {
+        context.entity.createWatcher(context.$target, context.cmdData.exp, context.scope, function (value) {
             var text = context.target;
             text.text = value;
         });
@@ -1461,8 +1441,8 @@ define("src/ares/pixijs/PIXICommands", ["require", "exports", "src/ares/pixijs/P
         /** 修改任意属性命令 */
         prop: function (context) {
             var cmdData = context.cmdData;
-            var target = context.target;
-            context.entity.createWatcher(target, cmdData.exp, context.scope, function (value) {
+            context.entity.createWatcher(context.$target, cmdData.exp, context.scope, function (value) {
+                var target = context.target;
                 if (cmdData.subCmd != "") {
                     // 子命令形式
                     target[cmdData.subCmd] = value;
@@ -1475,7 +1455,7 @@ define("src/ares/pixijs/PIXICommands", ["require", "exports", "src/ares/pixijs/P
                 }
             });
             // 返回节点
-            return target;
+            return context.target;
         },
         /** 绑定事件 */
         on: function (context) {
@@ -1514,7 +1494,7 @@ define("src/ares/pixijs/PIXICommands", ["require", "exports", "src/ares/pixijs/P
             var index = parent.getChildIndex(context.target);
             parent.addChildAt(refNode, index);
             // 只有在条件为true时才启动编译
-            var watcher = context.entity.createWatcher(context.target, cmdData.exp, context.scope, function (value) {
+            var watcher = context.entity.createWatcher(context.$target, cmdData.exp, context.scope, function (value) {
                 // 如果refNode被从显示列表移除了，则表示该if指令要作废了
                 if (!refNode.parent) {
                     watcher.dispose();
@@ -1586,7 +1566,7 @@ define("src/ares/pixijs/PIXICommands", ["require", "exports", "src/ares/pixijs/P
             // 记录顺序窗口范围，左闭右开
             var orderRange;
             // 添加订阅
-            var watcher = context.entity.createWatcher(context.target, arrName, forScope, function (value) {
+            var watcher = context.entity.createWatcher(context.$target, arrName, forScope, function (value) {
                 // 如果refNode被从显示列表移除了，则表示该for指令要作废了
                 if (!parent.parent) {
                     watcher.dispose();
@@ -1669,7 +1649,7 @@ define("src/ares/pixijs/PIXICommands", ["require", "exports", "src/ares/pixijs/P
                 }
             });
             // 使用原始显示对象编译一次parent
-            context.compiler.compile(parent, forScope);
+            context.compiler.compile(parent, forScope, { recursive: false });
             // 记录viewport数据
             viewportData = PIXIUtils_1.PIXIUtils.getViewportData(parent);
             if (viewportData) {
@@ -1683,6 +1663,10 @@ define("src/ares/pixijs/PIXICommands", ["require", "exports", "src/ares/pixijs/P
             function generateOne(key, value, len, lastNode) {
                 // 拷贝一个target
                 var newNode = PIXIUtils_1.PIXIUtils.borrowObject(context.target);
+                // 删除for命令，防止递归编译导致堆栈溢出
+                delete newNode["__ares_cmd_dict__"].for;
+                // 删除viewport命令，因为该命令已经转移到父容器上了
+                delete newNode["__ares_cmd_dict__"].viewport;
                 // 添加到显示里
                 parent.addChild(newNode);
                 // 生成子域
@@ -1718,7 +1702,7 @@ define("src/ares/pixijs/PIXICommands", ["require", "exports", "src/ares/pixijs/P
                     writable: false
                 });
                 // 开始编译新节点
-                context.compiler.compile(newNode, newScope);
+                context.compiler.compile(newNode, newScope, { target: context.target });
                 // 返回
                 return { scope: newScope, node: newNode };
             }
@@ -1872,6 +1856,12 @@ define("src/ares/pixijs/PIXICompiler", ["require", "exports", "src/ares/pixijs/P
             configurable: true
         });
         PIXICompiler.prototype.parseCmd = function (node) {
+            // 如果node已经编译过，保留了之前编译的CmdDict，则不再重新编译，直接用
+            var cmdNameDict = node["__ares_cmd_dict__"];
+            if (cmdNameDict)
+                return cmdNameDict;
+            // 还没有编译过，创建新的CmdDict并记录在显示对象上
+            node["__ares_cmd_dict__"] = cmdNameDict = {};
             // 取到属性列表
             var datas = [];
             var data;
@@ -1890,7 +1880,6 @@ define("src/ares/pixijs/PIXICompiler", ["require", "exports", "src/ares/pixijs/P
                     datas.push(data);
             }
             // 开始遍历属性列表
-            var cmdNameDict = {};
             for (var i = 0, len = datas.length; i < len; i++) {
                 data = datas[i];
                 // 填充字典
@@ -1932,10 +1921,15 @@ define("src/ares/pixijs/PIXICompiler", ["require", "exports", "src/ares/pixijs/P
             // 开始编译root节点
             this.compile(this._root, entity.data);
         };
-        PIXICompiler.prototype.compile = function (node, scope) {
+        PIXICompiler.prototype.compile = function (node, scope, options) {
             // 首先判断是否是模板，是的话就设置模板，但是不编译
             if (this.parseTpl(node))
                 return;
+            // 判断如果当前节点正在编译中则不再进行编译
+            if (node["__ares_compiling__"])
+                return;
+            // 打标签，表示正在编译
+            node["__ares_compiling__"] = true;
             // 开始编译
             var hasLazyCompile = false;
             // 如果有名字就记下来
@@ -1966,6 +1960,7 @@ define("src/ares/pixijs/PIXICompiler", ["require", "exports", "src/ares/pixijs/P
                         ctx: {
                             scope: scope,
                             target: node,
+                            $target: (options && options.target) || node,
                             compiler: this,
                             entity: this._entity,
                             cmdData: cmdData,
@@ -2007,7 +2002,7 @@ define("src/ares/pixijs/PIXICompiler", ["require", "exports", "src/ares/pixijs/P
                     this.compileTextContent(node, scope, cmdDict);
                 }
                 // 然后递归解析子节点
-                if (node instanceof PIXI.Container) {
+                if ((!options || options.recursive) && node instanceof PIXI.Container) {
                     var children = node.children;
                     var nextChild;
                     for (var i = 0, len = children.length; i < len; i++) {
@@ -2025,6 +2020,8 @@ define("src/ares/pixijs/PIXICompiler", ["require", "exports", "src/ares/pixijs/P
                     }
                 }
             }
+            // 移除标签
+            delete node["__ares_compiling__"];
         };
         /**
          * 获取模板对象，该模板只在该PIXICompiler内部生效
@@ -2059,6 +2056,7 @@ define("src/ares/pixijs/PIXICompiler", ["require", "exports", "src/ares/pixijs/P
                 PIXICommands_1.textContent({
                     scope: scope,
                     target: text,
+                    $target: text,
                     compiler: this,
                     entity: this._entity,
                     cmdData: {
@@ -2421,7 +2419,7 @@ define("src/ares/template/TemplateCompiler", ["require", "exports", "src/ares/te
 // / <reference path="../dist/ares_html.d.ts"/>
 // / <reference path="../dist/ares_pixijs.d.ts"/>
 // / <reference path="../dist/ares_template.d.ts"/>
-define("test/test", ["require", "exports", "src/ares/Ares", "src/ares/pixijs/PIXICompiler"], function (require, exports, ares, ares_pixijs) {
+define("test/test", ["require", "exports", "src/ares/Ares", "src/ares/html/HTMLCompiler", "src/ares/pixijs/PIXICompiler", "src/ares/template/TemplateCompiler"], function (require, exports, ares, ares_html, ares_pixijs, ares_template) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     /**
@@ -2480,27 +2478,27 @@ define("test/test", ["require", "exports", "src/ares/Ares", "src/ares/pixijs/PIX
             var data = {
                 text: "text",
                 testNum: 1,
-                testFor: [1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3,],
+                testFor: [1, 2, 3],
                 testFunc: function (evt) {
                     this.text = "Fuck!!!";
                 }
             };
             ares.bind(data, new ares_pixijs.PIXICompiler(testSkin, renderer));
-            // ares.bind(data, new ares_html.HTMLCompiler("#div_root"));
-            // ares.bind(data, new ares_template.TemplateCompiler("abc$a-{for: i in 10}'$a-{i}'$a-{end for}def", (text:string)=>{
-            //     console.log(text);
-            // }));
-            // var testSkin2:PIXI.Container = new PIXI.Container();
-            // testSkin2["a-tpl"] = "testTpl";
-            // testSkin2["a-y"] = 100;
-            // stage.addChild(testSkin2);
-            // ares.bind(data, new ares_pixijs.PIXICompiler(testSkin2));
-            // setTimeout(()=>{
-            //     data.testFor = [3, "jasdf"];
-            // }, 2000);
-            // setTimeout(()=>{
-            //     data.testFor = ["kn", "j111", "14171a"];
-            // }, 4000);
+            ares.bind(data, new ares_html.HTMLCompiler("#div_root"));
+            ares.bind(data, new ares_template.TemplateCompiler("abc$a-{for: i in 10}'$a-{i}'$a-{end for}def", function (text) {
+                console.log(text);
+            }));
+            var testSkin2 = new PIXI.Container();
+            testSkin2["a-tpl"] = "testTpl";
+            testSkin2["a-y"] = 100;
+            stage.addChild(testSkin2);
+            ares.bind(data, new ares_pixijs.PIXICompiler(testSkin2, renderer));
+            setTimeout(function () {
+                data.testFor = [3, "jasdf"];
+            }, 2000);
+            setTimeout(function () {
+                data.testFor = ["kn", "j111", "14171a"];
+            }, 4000);
         });
     }
 });

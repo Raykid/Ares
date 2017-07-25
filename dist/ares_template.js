@@ -84,7 +84,7 @@ return /******/ (function(modules) { // webpackBootstrap
 "use strict";
 
 Object.defineProperty(exports, "__esModule", { value: true });
-var TemplateCommands_1 = __webpack_require__(9);
+var TemplateCommands_1 = __webpack_require__(7);
 var TemplateCompiler = (function () {
     /**
      * 创建模板绑定
@@ -303,7 +303,7 @@ exports.TemplateCompiler = TemplateCompiler;
 
 /***/ }),
 
-/***/ 9:
+/***/ 7:
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";

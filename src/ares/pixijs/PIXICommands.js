@@ -16,7 +16,7 @@ function addCommand(name, command) {
 exports.addCommand = addCommand;
 /** 文本域命令 */
 function textContent(context) {
-    context.entity.createWatcher(context.target, context.cmdData.exp, context.scope, function (value) {
+    context.entity.createWatcher(context.$target, context.cmdData.exp, context.scope, function (value) {
         var text = context.target;
         text.text = value;
     });
@@ -70,8 +70,8 @@ exports.commands = {
     /** 修改任意属性命令 */
     prop: function (context) {
         var cmdData = context.cmdData;
-        var target = context.target;
-        context.entity.createWatcher(target, cmdData.exp, context.scope, function (value) {
+        context.entity.createWatcher(context.$target, cmdData.exp, context.scope, function (value) {
+            var target = context.target;
             if (cmdData.subCmd != "") {
                 // 子命令形式
                 target[cmdData.subCmd] = value;
@@ -84,7 +84,7 @@ exports.commands = {
             }
         });
         // 返回节点
-        return target;
+        return context.target;
     },
     /** 绑定事件 */
     on: function (context) {
@@ -123,7 +123,7 @@ exports.commands = {
         var index = parent.getChildIndex(context.target);
         parent.addChildAt(refNode, index);
         // 只有在条件为true时才启动编译
-        var watcher = context.entity.createWatcher(context.target, cmdData.exp, context.scope, function (value) {
+        var watcher = context.entity.createWatcher(context.$target, cmdData.exp, context.scope, function (value) {
             // 如果refNode被从显示列表移除了，则表示该if指令要作废了
             if (!refNode.parent) {
                 watcher.dispose();
@@ -195,7 +195,7 @@ exports.commands = {
         // 记录顺序窗口范围，左闭右开
         var orderRange;
         // 添加订阅
-        var watcher = context.entity.createWatcher(context.target, arrName, forScope, function (value) {
+        var watcher = context.entity.createWatcher(context.$target, arrName, forScope, function (value) {
             // 如果refNode被从显示列表移除了，则表示该for指令要作废了
             if (!parent.parent) {
                 watcher.dispose();
@@ -278,7 +278,7 @@ exports.commands = {
             }
         });
         // 使用原始显示对象编译一次parent
-        context.compiler.compile(parent, forScope);
+        context.compiler.compile(parent, forScope, { recursive: false });
         // 记录viewport数据
         viewportData = PIXIUtils_1.PIXIUtils.getViewportData(parent);
         if (viewportData) {
@@ -292,6 +292,10 @@ exports.commands = {
         function generateOne(key, value, len, lastNode) {
             // 拷贝一个target
             var newNode = PIXIUtils_1.PIXIUtils.borrowObject(context.target);
+            // 删除for命令，防止递归编译导致堆栈溢出
+            delete newNode["__ares_cmd_dict__"].for;
+            // 删除viewport命令，因为该命令已经转移到父容器上了
+            delete newNode["__ares_cmd_dict__"].viewport;
             // 添加到显示里
             parent.addChild(newNode);
             // 生成子域
@@ -327,7 +331,7 @@ exports.commands = {
                 writable: false
             });
             // 开始编译新节点
-            context.compiler.compile(newNode, newScope);
+            context.compiler.compile(newNode, newScope, { target: context.target });
             // 返回
             return { scope: newScope, node: newNode };
         }
