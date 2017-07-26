@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 var PIXICompiler_1 = require("./PIXICompiler");
 var Utils_1 = require("../Utils");
 var ViewPortHandler_1 = require("./ViewPortHandler");
+var PIXIUtils_1 = require("./PIXIUtils");
 /**
  * 提供给外部的可以注入自定义命令的接口
  * @param name
@@ -53,7 +54,7 @@ exports.commands = {
         if (!template)
             return context.target;
         // 拷贝模板
-        template = cloneObject(template, true);
+        template = PIXIUtils_1.cloneObject(template, true);
         // 使用模板添加到与目标相同的位置
         var target = context.target;
         var parent = target.parent;
@@ -153,6 +154,8 @@ exports.commands = {
     /** for命令 */
     for: function (context) {
         var cmdData = context.cmdData;
+        var options = Utils_1.evalExp(cmdData.subCmd, context.scope) || {};
+        var step = (options.step || Number.MAX_VALUE);
         // 解析表达式
         var reg = /^\s*(\S+)\s+in\s+([\s\S]+?)\s*$/;
         var res = reg.exec(cmdData.exp);
@@ -184,9 +187,13 @@ exports.commands = {
                 delete context.target[viewportCmd.propName];
             }
         }
+        // 使用原始显示对象编译一次parent
+        context.compiler.compile(parent, forScope);
+        // 获取窗口显示范围
+        var viewportHandler = PIXIUtils_1.getViewportHandler(parent);
         // 添加订阅
         var watcher = context.entity.createWatcher(context.target, arrName, forScope, function (value) {
-            // 如果refNode被从显示列表移除了，则表示该if指令要作废了
+            // 如果refNode被从显示列表移除了，则表示该for指令要作废了
             if (!parent.parent) {
                 watcher.dispose();
                 return;
@@ -203,12 +210,28 @@ exports.commands = {
                 }
                 value = temp;
             }
+            // 如果不是数组，而是字典，则转换为数组，方便中断遍历
+            var isArray = (value instanceof Array);
+            var list;
+            if (isArray) {
+                list = value;
+            }
+            else {
+                list = [];
+                for (var key in value) {
+                    list.push({
+                        key: key,
+                        value: value[key]
+                    });
+                }
+            }
+            // 设置步骤值
+            var curStep = step;
             // 开始遍历
             var lastNode = null;
-            var arrLength = (value instanceof Array ? value.length : -1);
-            for (var key in value) {
+            for (var i = 0, len = list.length; i < len; i++) {
                 // 拷贝一个target
-                var newNode = cloneObject(context.target, true);
+                var newNode = PIXIUtils_1.cloneObject(context.target, true);
                 // 添加到显示里
                 parent.addChild(newNode);
                 // 生成子域
@@ -217,9 +240,18 @@ exports.commands = {
                 Object.defineProperty(newScope, "$index", {
                     configurable: true,
                     enumerable: false,
-                    value: (value instanceof Array ? parseInt(key) : key),
+                    value: i,
                     writable: false
                 });
+                // 如果是字典则额外注入一个$key
+                if (!isArray) {
+                    Object.defineProperty(newScope, "$key", {
+                        configurable: true,
+                        enumerable: true,
+                        value: value[i].key,
+                        writable: false
+                    });
+                }
                 // 注入上一个显示节点
                 Object.defineProperty(newScope, "$last", {
                     configurable: true,
@@ -227,20 +259,18 @@ exports.commands = {
                     value: lastNode,
                     writable: false
                 });
-                // 如果是数组再添加一个数组长度
-                if (arrLength >= 0) {
-                    Object.defineProperty(newScope, "$length", {
-                        configurable: true,
-                        enumerable: false,
-                        value: arrLength,
-                        writable: false
-                    });
-                }
+                // 添加长度
+                Object.defineProperty(newScope, "$length", {
+                    configurable: true,
+                    enumerable: false,
+                    value: list.length,
+                    writable: false
+                });
                 // 注入遍历名
                 Object.defineProperty(newScope, itemName, {
                     configurable: true,
                     enumerable: true,
-                    value: value[key],
+                    value: (isArray ? value[i] : value[i].value),
                     writable: false
                 });
                 // 开始编译新节点
@@ -249,117 +279,11 @@ exports.commands = {
                 lastNode = newNode;
             }
         });
-        // 使用原始显示对象编译一次parent
-        context.compiler.compile(parent, forScope);
+        // 进行一次瞬移归位
+        if (viewportHandler)
+            viewportHandler.homing(false);
         // 返回节点
         return context.target;
     }
 };
-function cloneObject(target, deep) {
-    var result;
-    // 基础类型直接返回
-    if (!target || typeof target != "object")
-        return target;
-    // ObservablePoint类型对象需要特殊处理
-    if (target instanceof PIXI.ObservablePoint) {
-        return new PIXI.ObservablePoint(target["cb"], target["scope"]["__ares_cloning__"], target["x"], target["y"]);
-    }
-    // 如果对象有clone方法则直接调用clone方法
-    if (typeof target["clone"] == "function")
-        return target["clone"]();
-    // 浅表复制单独处理
-    if (!deep) {
-        result = Object.create(target["__proto__"] || null);
-        for (var k in target) {
-            result[k] = target[k];
-        }
-        return result;
-    }
-    // 下面是深表复制了
-    var cls = (target.constructor || Object);
-    try {
-        result = new cls();
-    }
-    catch (err) {
-        return null;
-    }
-    // 打个标签
-    target["__ares_cloning__"] = result;
-    for (var key in target) {
-        // 标签不复制
-        if (key == "__ares_cloning__")
-            continue;
-        // 非属性方法不复制
-        if (typeof target[key] == "function" && !target.hasOwnProperty(key))
-            continue;
-        // Text的_texture属性不复制
-        if (key == "_texture" && target instanceof PIXI.Text)
-            continue;
-        // 显示对象的parent属性要特殊处理
-        if (key == "parent" && target instanceof PIXI.DisplayObject) {
-            if (target["parent"] && target["parent"]["__ares_cloning__"]) {
-                // 如果target的parent正在被复制，则使用复制后的parent
-                result["parent"] = target["parent"]["__ares_cloning__"];
-            }
-            else {
-                // 如果target的parent没有被复制，则直接使用当前parent
-                result["parent"] = target["parent"];
-            }
-            continue;
-        }
-        // EventEmitter的_events属性要进行浅表复制
-        if (key == "_events" && target instanceof PIXI.utils.EventEmitter) {
-            result["_events"] = cloneObject(target["_events"], false);
-            // 如果target的某个监听里的context就是target本身，则将result的context改为result本身
-            for (var k in target["_events"]) {
-                var temp = target["_events"][k];
-                result["_events"][k] = cloneObject(temp, false);
-                if (temp.context == target) {
-                    result["_events"][k].context = result;
-                }
-            }
-            continue;
-        }
-        // 容器对象的children属性要特殊处理
-        if (key == "children" && target instanceof PIXI.Container) {
-            // 首先要清除已有的显示对象（例如原始对象在构造函数中添加了显示对象的话，再经过复制会产生重复对象）
-            var children = result["children"];
-            for (var j = 0, lenJ = children.length; j < lenJ; j++) {
-                result["removeChildAt"](0).destroy();
-            }
-            // 开始复制子对象
-            children = target["children"];
-            for (var j = 0, lenJ = children.length; j < lenJ; j++) {
-                var child = cloneObject(children[j], true);
-                result["addChild"](child);
-            }
-            continue;
-        }
-        // Sprite的vertexData属性需要特殊处理
-        if (key == "vertexData" && target instanceof PIXI.Sprite) {
-            result[key] = target[key]["slice"]();
-            continue;
-        }
-        // 通用处理
-        var oriValue = target[key];
-        if (oriValue && oriValue["__ares_cloning__"]) {
-            // 已经复制过的对象不再复制，直接使用之
-            result[key] = oriValue["__ares_cloning__"];
-        }
-        else {
-            // 还没复制过的对象，复制之
-            var value = cloneObject(oriValue, true);
-            if (value != null) {
-                try {
-                    // 这里加try catch是为了防止给只读属性赋值时报错
-                    result[key] = value;
-                }
-                catch (err) { }
-            }
-        }
-    }
-    // 移除标签
-    delete target["__ares_cloning__"];
-    return result;
-}
 //# sourceMappingURL=PIXICommands.js.map

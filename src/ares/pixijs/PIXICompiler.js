@@ -35,12 +35,14 @@ var PIXICompiler = (function () {
     /**
      * 创建PIXI绑定
      * @param root 根显示对象，从这里传入的绑定数据属性名必须以“a_”开头
+     * @param renderer PIXI渲染器
      * @param config 绑定数据，从这里传入的绑定数据属性名可以不以“a_”开头
      * @param tplDict 模板字典，可以在这里给出模板定义表
      */
-    function PIXICompiler(root, config, tplDict) {
+    function PIXICompiler(root, renderer, config, tplDict) {
         this._nameDict = {};
         this._root = root;
+        this._renderer = renderer;
         this._config = config;
         this._tplDict = tplDict || {};
     }
@@ -48,6 +50,14 @@ var PIXICompiler = (function () {
         /** 获取根显示对象 */
         get: function () {
             return this._root;
+        },
+        enumerable: true,
+        configurable: true
+    });
+    Object.defineProperty(PIXICompiler.prototype, "renderer", {
+        /** 获取PIXI渲染器 */
+        get: function () {
+            return this._renderer;
         },
         enumerable: true,
         configurable: true

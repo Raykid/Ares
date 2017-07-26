@@ -2,7 +2,7 @@ import {IAres, IWatcher, AresCommandData} from "../Interfaces";
 import {PIXICompiler, CmdDict, getTemplate} from "./PIXICompiler";
 import {runExp, evalExp} from "../Utils";
 import {ViewPortHandler, ViewPortHandlerOptions} from "./ViewPortHandler";
-import {PIXIUtils} from "./PIXIUtils";
+import {cloneObject, getViewportHandler} from "./PIXIUtils";
 
 /**
  * Created by Raykid on 2016/12/27.
@@ -26,6 +26,17 @@ export interface CommandContext
     cmdData:AresCommandData;
     cmdDict:CmdDict;
     [name:string]:any;
+}
+
+export interface ForOptions
+{
+    step?:number;
+}
+
+interface KeyValuePair
+{
+    key:string;
+    value:any;
 }
 
 /**
@@ -81,7 +92,7 @@ export const commands:{[name:string]:Command} = {
         // 仍然没有找到，放弃
         if(!template) return context.target;
         // 拷贝模板
-        template = PIXIUtils.cloneObject(template, true);
+        template = cloneObject(template, true);
         // 使用模板添加到与目标相同的位置
         var target:PIXI.DisplayObject = context.target;
         var parent:PIXI.Container = target.parent;
@@ -200,6 +211,8 @@ export const commands:{[name:string]:Command} = {
     for: (context:CommandContext)=>
     {
         var cmdData:AresCommandData = context.cmdData;
+        var options:ForOptions = evalExp(cmdData.subCmd, context.scope) || {};
+        var step:number = (options.step || Number.MAX_VALUE);
         // 解析表达式
         var reg:RegExp = /^\s*(\S+)\s+in\s+([\s\S]+?)\s*$/;
         var res:RegExpExecArray = reg.exec(cmdData.exp);
@@ -234,9 +247,13 @@ export const commands:{[name:string]:Command} = {
                 delete context.target[viewportCmd.propName];
             }
         }
+        // 使用原始显示对象编译一次parent
+        context.compiler.compile(parent, forScope);
+        // 获取窗口显示范围
+        var viewportHandler:ViewPortHandler = getViewportHandler(parent);
         // 添加订阅
         var watcher:IWatcher = context.entity.createWatcher(context.target, arrName, forScope, (value:any)=>{
-            // 如果refNode被从显示列表移除了，则表示该if指令要作废了
+            // 如果refNode被从显示列表移除了，则表示该for指令要作废了
             if(!parent.parent)
             {
                 watcher.dispose();
@@ -257,13 +274,32 @@ export const commands:{[name:string]:Command} = {
                 }
                 value = temp;
             }
+            // 如果不是数组，而是字典，则转换为数组，方便中断遍历
+            var isArray:boolean = (value instanceof Array);
+            var list:any[];
+            if(isArray)
+            {
+                list = value;
+            }
+            else
+            {
+                list = [];
+                for(var key in value)
+                {
+                    list.push(<KeyValuePair>{
+                        key:key,
+                        value:value[key]
+                    });
+                }
+            }
+            // 设置步骤值
+            var curStep:number = step;
             // 开始遍历
             var lastNode:PIXI.DisplayObject = null;
-            var arrLength:number = (value instanceof Array ? value.length : -1);
-            for(var key in value)
+            for(var i:number = 0, len:number = list.length; i < len; i++)
             {
                 // 拷贝一个target
-                var newNode:PIXI.DisplayObject = PIXIUtils.cloneObject(context.target, true);
+                var newNode:PIXI.DisplayObject = cloneObject(context.target, true);
                 // 添加到显示里
                 parent.addChild(newNode);
                 // 生成子域
@@ -272,9 +308,19 @@ export const commands:{[name:string]:Command} = {
                 Object.defineProperty(newScope, "$index", {
                     configurable: true,
                     enumerable: false,
-                    value: (value instanceof Array ? parseInt(key) : key),
+                    value: i,
                     writable: false
                 });
+                // 如果是字典则额外注入一个$key
+                if(!isArray)
+                {
+                    Object.defineProperty(newScope, "$key", {
+                        configurable: true,
+                        enumerable: true,
+                        value: value[i].key,
+                        writable: false
+                    });
+                }
                 // 注入上一个显示节点
                 Object.defineProperty(newScope, "$last", {
                     configurable: true,
@@ -282,21 +328,18 @@ export const commands:{[name:string]:Command} = {
                     value: lastNode,
                     writable: false
                 });
-                // 如果是数组再添加一个数组长度
-                if(arrLength >= 0)
-                {
-                    Object.defineProperty(newScope, "$length", {
-                        configurable: true,
-                        enumerable: false,
-                        value: arrLength,
-                        writable: false
-                    });
-                }
+                // 添加长度
+                Object.defineProperty(newScope, "$length", {
+                    configurable: true,
+                    enumerable: false,
+                    value: list.length,
+                    writable: false
+                });
                 // 注入遍历名
                 Object.defineProperty(newScope, itemName, {
                     configurable: true,
                     enumerable: true,
-                    value: value[key],
+                    value: (isArray ? value[i] : value[i].value),
                     writable: false
                 });
                 // 开始编译新节点
@@ -305,8 +348,8 @@ export const commands:{[name:string]:Command} = {
                 lastNode = newNode;
             }
         });
-        // 使用原始显示对象编译一次parent
-        context.compiler.compile(parent, forScope);
+        // 进行一次瞬移归位
+        if(viewportHandler) viewportHandler.homing(false);
         // 返回节点
         return context.target;
     }

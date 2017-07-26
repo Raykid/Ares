@@ -27,6 +27,11 @@ export interface ViewPortHandlerOptions
     lockV?:boolean;
 }
 
+export interface ViewPortObserver
+{
+    (viewport:PIXI.Rectangle):void;
+}
+
 export class ViewPortHandler
 {
     private static DIRECTION_H:number = 1;
@@ -34,6 +39,7 @@ export class ViewPortHandler
 
     private _target:PIXI.DisplayObject;
     private _viewPort:PIXI.Rectangle;
+    private _viewPortGlobal:PIXI.Rectangle;
     private _ticker:PIXI.ticker.Ticker;
     private _masker:PIXI.Graphics;
     private _options:ViewPortHandlerOptions;
@@ -47,6 +53,14 @@ export class ViewPortHandler
     private _speed:PIXI.Point;
     private _dragging:boolean = false;
     private _direction:number = 0;
+
+    private _observers:ViewPortObserver[] = [];
+
+    /** 获取全局视窗范围 */
+    public get viewportGlobal():PIXI.Rectangle
+    {
+        return this._viewPortGlobal;
+    }
 
     public constructor(target:PIXI.DisplayObject, options?:ViewPortHandlerOptions)
     {
@@ -152,7 +166,7 @@ export class ViewPortHandler
             this._downTarget = null;
             this._dragging = false;
             // 开始缓动
-            this._ticker.start();
+            this.homing(true);
         }
     }
 
@@ -195,7 +209,10 @@ export class ViewPortHandler
             var pos:PIXI.Point = this._target.position;
             if(this._movableH) pos.x += (d.x != 0 ? x * 0.33 / ELASTICITY_COEFFICIENT : x);
             if(this._movableV) pos.y += (d.y != 0 ? y * 0.33 / ELASTICITY_COEFFICIENT : y);
+            // 更新位置
             this._target.position = pos;
+            // 通知观察者
+            this.notify();
         }
     }
 
@@ -276,12 +293,49 @@ export class ViewPortHandler
                 doneY = true;
             }
         }
+        // 通知观察者
+        this.notify();
         // 停止tick
         if(doneX && doneY)
         {
             this._ticker.stop();
             // 重置方向
             this._direction = 0;
+        }
+    }
+
+    /**
+     * 获取全局范围
+     * @return 全局范围
+     */
+    private getGlocalBounds():PIXI.Rectangle
+    {
+        var pos:PIXI.Point = this._target.parent.getGlobalPosition();
+        var bounds:PIXI.Rectangle = this._viewPort.clone();
+        bounds.x += (pos.x - this._target.x);
+        bounds.y += (pos.y - this._target.y);
+        return bounds;
+    }
+
+    private notify():void
+    {
+        // 这里通知所有观察者位置变更
+        for(var i:number = 0, len:number = this._observers.length; i < len; i++)
+        {
+            var observer:ViewPortObserver = this._observers[i];
+            observer(this._viewPort);
+        }
+    }
+
+    /**
+     * 观察移动
+     * @param observer 观察者
+     */
+    public observe(observer:ViewPortObserver):void
+    {
+        if(this._observers.indexOf(observer) < 0)
+        {
+            this._observers.push(observer);
         }
     }
 
@@ -298,6 +352,7 @@ export class ViewPortHandler
         this._viewPort.y = y;
         this._viewPort.width = width;
         this._viewPort.height = height;
+        this._viewPortGlobal = this.getGlocalBounds();
         // 如果masker的父容器不是当前target的父容器则将masker移动过去
         if(this._masker.parent != this._target.parent && this._target.parent)
         {
@@ -309,8 +364,28 @@ export class ViewPortHandler
         this._masker.drawRect(x, y, width, height);
         this._masker.endFill();
         // 瞬移归位
-        var d:{x:number, y:number} = this.getDelta(this._target.x, this._target.y);
-        this._target.x += d.x;
-        this._target.y += d.y;
+        this.homing(false);
+        // 为当前显示对象设置viewport范围
+        this._target["__ares_viewport__"] = this;
+        // 通知观察者
+        this.notify();
+    }
+
+    /**
+     * 归位内容
+     * @param tween 是否使用缓动归位，默认使用
+     */
+    public homing(tween:boolean):void
+    {
+        if(tween)
+        {
+            this._ticker.start();
+        }
+        else
+        {
+            var d:{x:number, y:number} = this.getDelta(this._target.x, this._target.y);
+            this._target.x += d.x;
+            this._target.y += d.y;
+        }
     }
 }

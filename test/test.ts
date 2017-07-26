@@ -44,7 +44,7 @@ function go():void
         requestAnimationFrame(render);
     }
 
-    PIXI.loader.add("http://pic.qiantucdn.com/58pic/14/45/39/57i58PICI2K_1024.png");
+    PIXI.loader.add("test.png");
     PIXI.loader.load(()=>{
         var testSkin:PIXI.Container = new PIXI.Container();
         stage.addChild(testSkin);
@@ -54,13 +54,13 @@ function go():void
         testSkin.addChild(testContainer);
 
         var testSprite:PIXI.Sprite = new PIXI.Sprite();
-        testSprite.texture = PIXI.Texture.fromImage("http://pic.qiantucdn.com/58pic/14/45/39/57i58PICI2K_1024.png");
+        testSprite.texture = PIXI.Texture.fromImage("test.png");
         testSprite.width = testSprite.height = 200;
         testSprite.interactive = true;
         testSprite["a-on:click"] = "testFunc";
         testSprite["a-for"] = "item in testFor";
         testSprite["a-y"] = "$target.y + $index * 200";
-        testSprite["a-viewport${oneway:true}"] = "$target.x, $target.y, $target.width - 100, $target.height * 2";
+        testSprite["a-viewport"] = "$target.x, $target.y, $target.width - 100, $target.height * 2";
         testSprite.x = 200;
         testContainer.addChild(testSprite);
 
@@ -87,7 +87,7 @@ function go():void
             }
         };
 
-        ares.bind(data, new ares_pixijs.PIXICompiler(testSkin));
+        ares.bind(data, new ares_pixijs.PIXICompiler(testSkin, renderer));
 
         ares.bind(data, new ares_html.HTMLCompiler("#div_root"));
 
@@ -99,7 +99,7 @@ function go():void
         testSkin2["a-tpl"] = "testTpl";
         testSkin2["a-y"] = 100;
         stage.addChild(testSkin2);
-        ares.bind(data, new ares_pixijs.PIXICompiler(testSkin2));
+        ares.bind(data, new ares_pixijs.PIXICompiler(testSkin2, renderer));
 
         setTimeout(()=>{
             data.testFor = [3, "jasdf"];
