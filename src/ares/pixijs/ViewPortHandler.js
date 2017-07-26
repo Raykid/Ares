@@ -253,7 +253,7 @@ var ViewPortHandler = (function () {
         // 这里通知所有观察者位置变更
         for (var i = 0, len = this._observers.length; i < len; i++) {
             var observer = this._observers[i];
-            observer(this._viewPort);
+            observer(this);
         }
     };
     /**
@@ -261,9 +261,17 @@ var ViewPortHandler = (function () {
      * @param observer 观察者
      */
     ViewPortHandler.prototype.observe = function (observer) {
-        if (this._observers.indexOf(observer) < 0) {
+        if (this._observers.indexOf(observer) < 0)
             this._observers.push(observer);
-        }
+    };
+    /**
+     * 停止观察移动
+     * @param observer 观察者
+     */
+    ViewPortHandler.prototype.unobserve = function (observer) {
+        var index = this._observers.indexOf(observer);
+        if (index >= 0)
+            this._observers.splice(index, 1);
     };
     /**
      * 设置视点范围

@@ -29,7 +29,7 @@ export interface ViewPortHandlerOptions
 
 export interface ViewPortObserver
 {
-    (viewport:PIXI.Rectangle):void;
+    (handler?:ViewPortHandler):void;
 }
 
 export class ViewPortHandler
@@ -323,7 +323,7 @@ export class ViewPortHandler
         for(var i:number = 0, len:number = this._observers.length; i < len; i++)
         {
             var observer:ViewPortObserver = this._observers[i];
-            observer(this._viewPort);
+            if(observer) observer(this);
         }
     }
 
@@ -334,9 +334,17 @@ export class ViewPortHandler
     public observe(observer:ViewPortObserver):void
     {
         if(this._observers.indexOf(observer) < 0)
-        {
             this._observers.push(observer);
-        }
+    }
+
+    /**
+     * 停止观察移动
+     * @param observer 观察者
+     */
+    public unobserve(observer:ViewPortObserver):void
+    {
+        var index:number = this._observers.indexOf(observer);
+        if(index >= 0) this._observers.splice(index, 1);
     }
 
     /**

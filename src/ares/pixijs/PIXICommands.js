@@ -155,7 +155,7 @@ exports.commands = {
     for: function (context) {
         var cmdData = context.cmdData;
         var options = Utils_1.evalExp(cmdData.subCmd, context.scope) || {};
-        var step = (options.step || Number.MAX_VALUE);
+        var page = (options.page || Number.MAX_VALUE);
         // 解析表达式
         var reg = /^\s*(\S+)\s+in\s+([\s\S]+?)\s*$/;
         var res = reg.exec(cmdData.exp);
@@ -191,6 +191,11 @@ exports.commands = {
         context.compiler.compile(parent, forScope);
         // 获取窗口显示范围
         var viewportHandler = PIXIUtils_1.getViewportHandler(parent);
+        // 声明闭包数据
+        var isArray;
+        var curList;
+        var curIndex;
+        var lastNode;
         // 添加订阅
         var watcher = context.entity.createWatcher(context.target, arrName, forScope, function (value) {
             // 如果refNode被从显示列表移除了，则表示该for指令要作废了
@@ -211,7 +216,7 @@ exports.commands = {
                 value = temp;
             }
             // 如果不是数组，而是字典，则转换为数组，方便中断遍历
-            var isArray = (value instanceof Array);
+            isArray = (value instanceof Array);
             var list;
             if (isArray) {
                 list = value;
@@ -225,11 +230,40 @@ exports.commands = {
                     });
                 }
             }
-            // 设置步骤值
-            var curStep = step;
+            // 初始化数据
+            curList = list;
+            curIndex = 0;
+            lastNode = null;
+            // 添加监听
+            if (viewportHandler)
+                viewportHandler.observe(updateView);
+            // 显示首页内容
+            showNextPage();
+        });
+        // 进行一次瞬移归位
+        if (viewportHandler)
+            viewportHandler.homing(false);
+        // 返回节点
+        return context.target;
+        function updateView() {
+            // 如果已经生成完毕则停止
+            if (curIndex >= curList.length) {
+                if (viewportHandler)
+                    viewportHandler.unobserve(updateView);
+                return;
+            }
+            // 判断当前最后一个生成的节点是否进入视窗范围内，如果是则生成下一页内容
+            var viewportGlobal = (viewportHandler.viewportGlobal || context.compiler.renderer.screen);
+            var lastBounds = PIXIUtils_1.getGlobalBounds(lastNode);
+            var crossRect = PIXIUtils_1.rectCross(viewportGlobal, lastBounds);
+            if (!PIXIUtils_1.rectEmpty(crossRect)) {
+                // 进入了，显示下一页
+                showNextPage();
+            }
+        }
+        function showNextPage() {
             // 开始遍历
-            var lastNode = null;
-            for (var i = 0, len = list.length; i < len; i++) {
+            for (var end = Math.min(curIndex + page, curList.length); curIndex < end; curIndex++) {
                 // 拷贝一个target
                 var newNode = PIXIUtils_1.cloneObject(context.target, true);
                 // 添加到显示里
@@ -240,7 +274,7 @@ exports.commands = {
                 Object.defineProperty(newScope, "$index", {
                     configurable: true,
                     enumerable: false,
-                    value: i,
+                    value: curIndex,
                     writable: false
                 });
                 // 如果是字典则额外注入一个$key
@@ -248,7 +282,7 @@ exports.commands = {
                     Object.defineProperty(newScope, "$key", {
                         configurable: true,
                         enumerable: true,
-                        value: value[i].key,
+                        value: curList[curIndex].key,
                         writable: false
                     });
                 }
@@ -263,14 +297,14 @@ exports.commands = {
                 Object.defineProperty(newScope, "$length", {
                     configurable: true,
                     enumerable: false,
-                    value: list.length,
+                    value: curList.length,
                     writable: false
                 });
                 // 注入遍历名
                 Object.defineProperty(newScope, itemName, {
                     configurable: true,
                     enumerable: true,
-                    value: (isArray ? value[i] : value[i].value),
+                    value: (isArray ? curList[curIndex] : curList[curIndex].value),
                     writable: false
                 });
                 // 开始编译新节点
@@ -278,12 +312,9 @@ exports.commands = {
                 // 赋值上一个节点
                 lastNode = newNode;
             }
-        });
-        // 进行一次瞬移归位
-        if (viewportHandler)
-            viewportHandler.homing(false);
-        // 返回节点
-        return context.target;
+            // 继续判断
+            updateView();
+        }
     }
 };
 //# sourceMappingURL=PIXICommands.js.map

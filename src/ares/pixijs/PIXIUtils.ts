@@ -24,6 +24,46 @@ export function rectCross(rect1:PIXI.Rectangle, rect2:PIXI.Rectangle):PIXI.Recta
 }
 
 /**
+ * 判断两个矩形是否相等
+ * @param rect1 矩形1
+ * @param rect2 矩形2
+ * @return {boolean} 是否相等
+ */
+export function rectEquals(rect1:PIXI.Rectangle, rect2:PIXI.Rectangle):boolean
+{
+    return (
+        rect1.x == rect2.x &&
+        rect1.y == rect2.y &&
+        rect1.width == rect2.width &&
+        rect1.height == rect2.height
+    );
+}
+
+/**
+ * 判断矩形范围是否为0
+ * @param rect 矩形
+ * @return {boolean} 矩形范围是否为0（宽度或高度为0）
+ */
+export function rectEmpty(rect:PIXI.Rectangle):boolean
+{
+    return (rect.width <= 0 || rect.height <= 0);
+}
+
+/**
+ * 获取显示对象的全局范围
+ * @param target 显示对象
+ * @return {PIXI.Rectangle} 显示对象的全局范围
+ */
+export function getGlobalBounds(target:PIXI.DisplayObject):PIXI.Rectangle
+{
+    var bounds:PIXI.Rectangle = target.getLocalBounds(new PIXI.Rectangle());
+    var pos:PIXI.Point = target.getGlobalPosition(new PIXI.Point());
+    bounds.x += pos.x;
+    bounds.y += pos.y;
+    return bounds;
+}
+
+/**
  * 赋值pixi对象（包括显示对象）
  * @param target 原始对象
  * @param deep 是否深度复制（复制子对象）

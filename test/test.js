@@ -1116,7 +1116,7 @@ define("src/ares/pixijs/ViewPortHandler", ["require", "exports"], function (requ
             // 这里通知所有观察者位置变更
             for (var i = 0, len = this._observers.length; i < len; i++) {
                 var observer = this._observers[i];
-                observer(this._viewPort);
+                observer(this);
             }
         };
         /**
@@ -1124,9 +1124,17 @@ define("src/ares/pixijs/ViewPortHandler", ["require", "exports"], function (requ
          * @param observer 观察者
          */
         ViewPortHandler.prototype.observe = function (observer) {
-            if (this._observers.indexOf(observer) < 0) {
+            if (this._observers.indexOf(observer) < 0)
                 this._observers.push(observer);
-            }
+        };
+        /**
+         * 停止观察移动
+         * @param observer 观察者
+         */
+        ViewPortHandler.prototype.unobserve = function (observer) {
+            var index = this._observers.indexOf(observer);
+            if (index >= 0)
+                this._observers.splice(index, 1);
         };
         /**
          * 设置视点范围
@@ -1200,6 +1208,41 @@ define("src/ares/pixijs/PIXIUtils", ["require", "exports"], function (require, e
         return new PIXI.Rectangle(left, top, width, height);
     }
     exports.rectCross = rectCross;
+    /**
+     * 判断两个矩形是否相等
+     * @param rect1 矩形1
+     * @param rect2 矩形2
+     * @return {boolean} 是否相等
+     */
+    function rectEquals(rect1, rect2) {
+        return (rect1.x == rect2.x &&
+            rect1.y == rect2.y &&
+            rect1.width == rect2.width &&
+            rect1.height == rect2.height);
+    }
+    exports.rectEquals = rectEquals;
+    /**
+     * 判断矩形范围是否为0
+     * @param rect 矩形
+     * @return {boolean} 矩形范围是否为0（宽度或高度为0）
+     */
+    function rectEmpty(rect) {
+        return (rect.width <= 0 || rect.height <= 0);
+    }
+    exports.rectEmpty = rectEmpty;
+    /**
+     * 获取显示对象的全局范围
+     * @param target 显示对象
+     * @return {PIXI.Rectangle} 显示对象的全局范围
+     */
+    function getGlobalBounds(target) {
+        var bounds = target.getLocalBounds(new PIXI.Rectangle());
+        var pos = target.getGlobalPosition(new PIXI.Point());
+        bounds.x += pos.x;
+        bounds.y += pos.y;
+        return bounds;
+    }
+    exports.getGlobalBounds = getGlobalBounds;
     /**
      * 赋值pixi对象（包括显示对象）
      * @param target 原始对象
@@ -1483,7 +1526,7 @@ define("src/ares/pixijs/PIXICommands", ["require", "exports", "src/ares/pixijs/P
         for: function (context) {
             var cmdData = context.cmdData;
             var options = Utils_4.evalExp(cmdData.subCmd, context.scope) || {};
-            var step = (options.step || Number.MAX_VALUE);
+            var page = (options.page || Number.MAX_VALUE);
             // 解析表达式
             var reg = /^\s*(\S+)\s+in\s+([\s\S]+?)\s*$/;
             var res = reg.exec(cmdData.exp);
@@ -1519,6 +1562,11 @@ define("src/ares/pixijs/PIXICommands", ["require", "exports", "src/ares/pixijs/P
             context.compiler.compile(parent, forScope);
             // 获取窗口显示范围
             var viewportHandler = PIXIUtils_1.getViewportHandler(parent);
+            // 声明闭包数据
+            var isArray;
+            var curList;
+            var curIndex;
+            var lastNode;
             // 添加订阅
             var watcher = context.entity.createWatcher(context.target, arrName, forScope, function (value) {
                 // 如果refNode被从显示列表移除了，则表示该for指令要作废了
@@ -1539,7 +1587,7 @@ define("src/ares/pixijs/PIXICommands", ["require", "exports", "src/ares/pixijs/P
                     value = temp;
                 }
                 // 如果不是数组，而是字典，则转换为数组，方便中断遍历
-                var isArray = (value instanceof Array);
+                isArray = (value instanceof Array);
                 var list;
                 if (isArray) {
                     list = value;
@@ -1553,11 +1601,40 @@ define("src/ares/pixijs/PIXICommands", ["require", "exports", "src/ares/pixijs/P
                         });
                     }
                 }
-                // 设置步骤值
-                var curStep = step;
+                // 初始化数据
+                curList = list;
+                curIndex = 0;
+                lastNode = null;
+                // 添加监听
+                if (viewportHandler)
+                    viewportHandler.observe(updateView);
+                // 显示首页内容
+                showNextPage();
+            });
+            // 进行一次瞬移归位
+            if (viewportHandler)
+                viewportHandler.homing(false);
+            // 返回节点
+            return context.target;
+            function updateView() {
+                // 如果已经生成完毕则停止
+                if (curIndex >= curList.length) {
+                    if (viewportHandler)
+                        viewportHandler.unobserve(updateView);
+                    return;
+                }
+                // 判断当前最后一个生成的节点是否进入视窗范围内，如果是则生成下一页内容
+                var viewportGlobal = (viewportHandler.viewportGlobal || context.compiler.renderer.screen);
+                var lastBounds = PIXIUtils_1.getGlobalBounds(lastNode);
+                var crossRect = PIXIUtils_1.rectCross(viewportGlobal, lastBounds);
+                if (!PIXIUtils_1.rectEmpty(crossRect)) {
+                    // 进入了，显示下一页
+                    showNextPage();
+                }
+            }
+            function showNextPage() {
                 // 开始遍历
-                var lastNode = null;
-                for (var i = 0, len = list.length; i < len; i++) {
+                for (var end = Math.min(curIndex + page, curList.length); curIndex < end; curIndex++) {
                     // 拷贝一个target
                     var newNode = PIXIUtils_1.cloneObject(context.target, true);
                     // 添加到显示里
@@ -1568,7 +1645,7 @@ define("src/ares/pixijs/PIXICommands", ["require", "exports", "src/ares/pixijs/P
                     Object.defineProperty(newScope, "$index", {
                         configurable: true,
                         enumerable: false,
-                        value: i,
+                        value: curIndex,
                         writable: false
                     });
                     // 如果是字典则额外注入一个$key
@@ -1576,7 +1653,7 @@ define("src/ares/pixijs/PIXICommands", ["require", "exports", "src/ares/pixijs/P
                         Object.defineProperty(newScope, "$key", {
                             configurable: true,
                             enumerable: true,
-                            value: value[i].key,
+                            value: curList[curIndex].key,
                             writable: false
                         });
                     }
@@ -1591,14 +1668,14 @@ define("src/ares/pixijs/PIXICommands", ["require", "exports", "src/ares/pixijs/P
                     Object.defineProperty(newScope, "$length", {
                         configurable: true,
                         enumerable: false,
-                        value: list.length,
+                        value: curList.length,
                         writable: false
                     });
                     // 注入遍历名
                     Object.defineProperty(newScope, itemName, {
                         configurable: true,
                         enumerable: true,
-                        value: (isArray ? value[i] : value[i].value),
+                        value: (isArray ? curList[curIndex] : curList[curIndex].value),
                         writable: false
                     });
                     // 开始编译新节点
@@ -1606,12 +1683,9 @@ define("src/ares/pixijs/PIXICommands", ["require", "exports", "src/ares/pixijs/P
                     // 赋值上一个节点
                     lastNode = newNode;
                 }
-            });
-            // 进行一次瞬移归位
-            if (viewportHandler)
-                viewportHandler.homing(false);
-            // 返回节点
-            return context.target;
+                // 继续判断
+                updateView();
+            }
         }
     };
 });
@@ -2269,7 +2343,7 @@ define("test/test", ["require", "exports", "src/ares/Ares", "src/ares/html/HTMLC
             testSprite.width = testSprite.height = 200;
             testSprite.interactive = true;
             testSprite["a-on:click"] = "testFunc";
-            testSprite["a-for"] = "item in testFor";
+            testSprite["a-for${page:3}"] = "item in testFor";
             testSprite["a-y"] = "$target.y + $index * 200";
             testSprite["a-viewport"] = "$target.x, $target.y, $target.width - 100, $target.height * 2";
             testSprite.x = 200;
@@ -2288,7 +2362,7 @@ define("test/test", ["require", "exports", "src/ares/Ares", "src/ares/html/HTMLC
             var data = {
                 text: "text",
                 testNum: 1,
-                testFor: [1, 2, 3],
+                testFor: [1, 2, 3, 4, 5, 1, 2, 3, 4, 5, 1, 2, 3, 4, 5, 1, 2, 3, 4, 5, 1, 2, 3, 4, 5],
                 testFunc: function (evt) {
                     this.text = "Fuck!!!";
                 }
@@ -2303,12 +2377,12 @@ define("test/test", ["require", "exports", "src/ares/Ares", "src/ares/html/HTMLC
             testSkin2["a-y"] = 100;
             stage.addChild(testSkin2);
             ares.bind(data, new ares_pixijs.PIXICompiler(testSkin2, renderer));
-            setTimeout(function () {
-                data.testFor = [3, "jasdf"];
-            }, 2000);
-            setTimeout(function () {
-                data.testFor = ["kn", "j111", "14171a"];
-            }, 4000);
+            // setTimeout(()=>{
+            //     data.testFor = [3, "jasdf"];
+            // }, 2000);
+            // setTimeout(()=>{
+            //     data.testFor = ["kn", "j111", "14171a"];
+            // }, 4000);
         });
     }
 });

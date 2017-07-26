@@ -479,6 +479,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 var Mutator_1 = __webpack_require__(4);
 var Watcher_1 = __webpack_require__(1);
 var Commands_1 = __webpack_require__(3);
+exports.defaultCmdRegExp = /^(data\-)?a[\-_](\w+)([:\$](.+))?$/;
 /**
  * 将数据模型和视图进行绑定
  * @param model 数据模型
@@ -492,7 +493,6 @@ function bind(data, compiler, options) {
 exports.bind = bind;
 var Ares = (function () {
     function Ares(data, compiler, options) {
-        this._cmdRegExp = /^(data\-)?a[\-_](\w+)([:\$](.+))?$/;
         // 记录变异对象
         this._data = Mutator_1.Mutator.mutate(data);
         this._compiler = compiler;
@@ -527,10 +527,11 @@ var Ares = (function () {
      * 解析表达式成为命令数据
      * @param key 属性名，合法的属性名应以a-或a_开头，以:或$分隔主命令和子命令
      * @param value 属性值，如果属性名合法则会被用来作为表达式的字符串
+     * @param cmdRegExp 可选，如果不传则使用默认的命令正则表达式解析命令
      * @return {CommandData|null} 命令数据，如果不是命令则返回null
      */
-    Ares.prototype.parseCommand = function (key, value) {
-        var result = this._cmdRegExp.exec(key);
+    Ares.prototype.parseCommand = function (key, value, cmdRegExp) {
+        var result = (cmdRegExp || exports.defaultCmdRegExp).exec(key);
         if (!result)
             return null;
         // 取到key

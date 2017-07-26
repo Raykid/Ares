@@ -184,12 +184,14 @@ var PIXICompiler = (function () {
     /**
      * 创建PIXI绑定
      * @param root 根显示对象，从这里传入的绑定数据属性名必须以“a_”开头
+     * @param renderer PIXI渲染器
      * @param config 绑定数据，从这里传入的绑定数据属性名可以不以“a_”开头
      * @param tplDict 模板字典，可以在这里给出模板定义表
      */
-    function PIXICompiler(root, config, tplDict) {
+    function PIXICompiler(root, renderer, config, tplDict) {
         this._nameDict = {};
         this._root = root;
+        this._renderer = renderer;
         this._config = config;
         this._tplDict = tplDict || {};
     }
@@ -197,6 +199,14 @@ var PIXICompiler = (function () {
         /** 获取根显示对象 */
         get: function () {
             return this._root;
+        },
+        enumerable: true,
+        configurable: true
+    });
+    Object.defineProperty(PIXICompiler.prototype, "renderer", {
+        /** 获取PIXI渲染器 */
+        get: function () {
+            return this._renderer;
         },
         enumerable: true,
         configurable: true
@@ -426,7 +436,8 @@ exports.PIXICompiler = PIXICompiler;
 Object.defineProperty(exports, "__esModule", { value: true });
 var PIXICompiler_1 = __webpack_require__(2);
 var Utils_1 = __webpack_require__(0);
-var ViewPortHandler_1 = __webpack_require__(11);
+var ViewPortHandler_1 = __webpack_require__(12);
+var PIXIUtils_1 = __webpack_require__(11);
 /**
  * 提供给外部的可以注入自定义命令的接口
  * @param name
@@ -477,7 +488,7 @@ exports.commands = {
         if (!template)
             return context.target;
         // 拷贝模板
-        template = cloneObject(template, true);
+        template = PIXIUtils_1.cloneObject(template, true);
         // 使用模板添加到与目标相同的位置
         var target = context.target;
         var parent = target.parent;
@@ -577,6 +588,8 @@ exports.commands = {
     /** for命令 */
     for: function (context) {
         var cmdData = context.cmdData;
+        var options = Utils_1.evalExp(cmdData.subCmd, context.scope) || {};
+        var page = (options.page || Number.MAX_VALUE);
         // 解析表达式
         var reg = /^\s*(\S+)\s+in\s+([\s\S]+?)\s*$/;
         var res = reg.exec(cmdData.exp);
@@ -608,9 +621,18 @@ exports.commands = {
                 delete context.target[viewportCmd.propName];
             }
         }
+        // 使用原始显示对象编译一次parent
+        context.compiler.compile(parent, forScope);
+        // 获取窗口显示范围
+        var viewportHandler = PIXIUtils_1.getViewportHandler(parent);
+        // 声明闭包数据
+        var isArray;
+        var curList;
+        var curIndex;
+        var lastNode;
         // 添加订阅
         var watcher = context.entity.createWatcher(context.target, arrName, forScope, function (value) {
-            // 如果refNode被从显示列表移除了，则表示该if指令要作废了
+            // 如果refNode被从显示列表移除了，则表示该for指令要作废了
             if (!parent.parent) {
                 watcher.dispose();
                 return;
@@ -627,12 +649,57 @@ exports.commands = {
                 }
                 value = temp;
             }
+            // 如果不是数组，而是字典，则转换为数组，方便中断遍历
+            isArray = (value instanceof Array);
+            var list;
+            if (isArray) {
+                list = value;
+            }
+            else {
+                list = [];
+                for (var key in value) {
+                    list.push({
+                        key: key,
+                        value: value[key]
+                    });
+                }
+            }
+            // 初始化数据
+            curList = list;
+            curIndex = 0;
+            lastNode = null;
+            // 添加监听
+            if (viewportHandler)
+                viewportHandler.observe(updateView);
+            // 显示首页内容
+            showNextPage();
+        });
+        // 进行一次瞬移归位
+        if (viewportHandler)
+            viewportHandler.homing(false);
+        // 返回节点
+        return context.target;
+        function updateView() {
+            // 如果已经生成完毕则停止
+            if (curIndex >= curList.length) {
+                if (viewportHandler)
+                    viewportHandler.unobserve(updateView);
+                return;
+            }
+            // 判断当前最后一个生成的节点是否进入视窗范围内，如果是则生成下一页内容
+            var viewportGlobal = (viewportHandler.viewportGlobal || context.compiler.renderer.screen);
+            var lastBounds = PIXIUtils_1.getGlobalBounds(lastNode);
+            var crossRect = PIXIUtils_1.rectCross(viewportGlobal, lastBounds);
+            if (!PIXIUtils_1.rectEmpty(crossRect)) {
+                // 进入了，显示下一页
+                showNextPage();
+            }
+        }
+        function showNextPage() {
             // 开始遍历
-            var lastNode = null;
-            var arrLength = (value instanceof Array ? value.length : -1);
-            for (var key in value) {
+            for (var end = Math.min(curIndex + page, curList.length); curIndex < end; curIndex++) {
                 // 拷贝一个target
-                var newNode = cloneObject(context.target, true);
+                var newNode = PIXIUtils_1.cloneObject(context.target, true);
                 // 添加到显示里
                 parent.addChild(newNode);
                 // 生成子域
@@ -641,9 +708,18 @@ exports.commands = {
                 Object.defineProperty(newScope, "$index", {
                     configurable: true,
                     enumerable: false,
-                    value: (value instanceof Array ? parseInt(key) : key),
+                    value: curIndex,
                     writable: false
                 });
+                // 如果是字典则额外注入一个$key
+                if (!isArray) {
+                    Object.defineProperty(newScope, "$key", {
+                        configurable: true,
+                        enumerable: true,
+                        value: curList[curIndex].key,
+                        writable: false
+                    });
+                }
                 // 注入上一个显示节点
                 Object.defineProperty(newScope, "$last", {
                     configurable: true,
@@ -651,20 +727,18 @@ exports.commands = {
                     value: lastNode,
                     writable: false
                 });
-                // 如果是数组再添加一个数组长度
-                if (arrLength >= 0) {
-                    Object.defineProperty(newScope, "$length", {
-                        configurable: true,
-                        enumerable: false,
-                        value: arrLength,
-                        writable: false
-                    });
-                }
+                // 添加长度
+                Object.defineProperty(newScope, "$length", {
+                    configurable: true,
+                    enumerable: false,
+                    value: curList.length,
+                    writable: false
+                });
                 // 注入遍历名
                 Object.defineProperty(newScope, itemName, {
                     configurable: true,
                     enumerable: true,
-                    value: value[key],
+                    value: (isArray ? curList[curIndex] : curList[curIndex].value),
                     writable: false
                 });
                 // 开始编译新节点
@@ -672,13 +746,85 @@ exports.commands = {
                 // 赋值上一个节点
                 lastNode = newNode;
             }
-        });
-        // 使用原始显示对象编译一次parent
-        context.compiler.compile(parent, forScope);
-        // 返回节点
-        return context.target;
+            // 继续判断
+            updateView();
+        }
     }
 };
+
+
+/***/ }),
+/* 7 */,
+/* 8 */,
+/* 9 */,
+/* 10 */,
+/* 11 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+/**
+ * 求两个矩形的相交矩形，并将结果放到第一个矩形中
+ * @param rect1 第一个矩形
+ * @param rect2 第二个矩形
+ * @return {PIXI.Rectangle} 相交后的矩形
+ */
+function rectCross(rect1, rect2) {
+    var left = Math.max(rect1.x, rect2.x);
+    var right = Math.min(rect1.x + rect1.width, rect2.x + rect2.width);
+    var width = right - left;
+    if (width < 0)
+        width = 0;
+    var top = Math.max(rect1.y, rect2.y);
+    var bottom = Math.min(rect1.y + rect1.height, rect2.y + rect2.height);
+    var height = bottom - top;
+    if (height < 0)
+        height = 0;
+    return new PIXI.Rectangle(left, top, width, height);
+}
+exports.rectCross = rectCross;
+/**
+ * 判断两个矩形是否相等
+ * @param rect1 矩形1
+ * @param rect2 矩形2
+ * @return {boolean} 是否相等
+ */
+function rectEquals(rect1, rect2) {
+    return (rect1.x == rect2.x &&
+        rect1.y == rect2.y &&
+        rect1.width == rect2.width &&
+        rect1.height == rect2.height);
+}
+exports.rectEquals = rectEquals;
+/**
+ * 判断矩形范围是否为0
+ * @param rect 矩形
+ * @return {boolean} 矩形范围是否为0（宽度或高度为0）
+ */
+function rectEmpty(rect) {
+    return (rect.width <= 0 || rect.height <= 0);
+}
+exports.rectEmpty = rectEmpty;
+/**
+ * 获取显示对象的全局范围
+ * @param target 显示对象
+ * @return {PIXI.Rectangle} 显示对象的全局范围
+ */
+function getGlobalBounds(target) {
+    var bounds = target.getLocalBounds(new PIXI.Rectangle());
+    var pos = target.getGlobalPosition(new PIXI.Point());
+    bounds.x += pos.x;
+    bounds.y += pos.y;
+    return bounds;
+}
+exports.getGlobalBounds = getGlobalBounds;
+/**
+ * 赋值pixi对象（包括显示对象）
+ * @param target 原始对象
+ * @param deep 是否深度复制（复制子对象）
+ * @return 复制对象
+ */
 function cloneObject(target, deep) {
     var result;
     // 基础类型直接返回
@@ -786,14 +932,25 @@ function cloneObject(target, deep) {
     delete target["__ares_cloning__"];
     return result;
 }
+exports.cloneObject = cloneObject;
+/**
+ * 获取当前显示对象所属的ViewPortHandler
+ * @param target 当前显示对象
+ * @return {ViewPortHandler|null} 当前显示对象所属ViewPortHandler，如果没有设定范围则返回null
+ */
+function getViewportHandler(target) {
+    for (; target; target = target.parent) {
+        var temp = target["__ares_viewport__"];
+        if (temp)
+            return temp;
+    }
+    return null;
+}
+exports.getViewportHandler = getViewportHandler;
 
 
 /***/ }),
-/* 7 */,
-/* 8 */,
-/* 9 */,
-/* 10 */,
-/* 11 */
+/* 12 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -817,6 +974,7 @@ var ViewPortHandler = (function () {
         this._movableV = false;
         this._dragging = false;
         this._direction = 0;
+        this._observers = [];
         this._target = target;
         this._options = options || {};
         this._viewPort = new PIXI.Rectangle();
@@ -833,6 +991,14 @@ var ViewPortHandler = (function () {
         target.on("pointerup", this.onPointerUp, this);
         target.on("pointerupoutside", this.onPointerUp, this);
     }
+    Object.defineProperty(ViewPortHandler.prototype, "viewportGlobal", {
+        /** 获取全局视窗范围 */
+        get: function () {
+            return this._viewPortGlobal;
+        },
+        enumerable: true,
+        configurable: true
+    });
     ViewPortHandler.prototype.onPointerDown = function (evt) {
         if (!this._downTarget) {
             // 初始化状态
@@ -908,7 +1074,7 @@ var ViewPortHandler = (function () {
             this._downTarget = null;
             this._dragging = false;
             // 开始缓动
-            this._ticker.start();
+            this.homing(true);
         }
     };
     ViewPortHandler.prototype.getContentBounds = function (targetX, targetY) {
@@ -946,7 +1112,10 @@ var ViewPortHandler = (function () {
                 pos.x += (d.x != 0 ? x * 0.33 / ELASTICITY_COEFFICIENT : x);
             if (this._movableV)
                 pos.y += (d.y != 0 ? y * 0.33 / ELASTICITY_COEFFICIENT : y);
+            // 更新位置
             this._target.position = pos;
+            // 通知观察者
+            this.notify();
         }
     };
     ViewPortHandler.prototype.onTick = function (delta) {
@@ -1016,12 +1185,50 @@ var ViewPortHandler = (function () {
                 doneY = true;
             }
         }
+        // 通知观察者
+        this.notify();
         // 停止tick
         if (doneX && doneY) {
             this._ticker.stop();
             // 重置方向
             this._direction = 0;
         }
+    };
+    /**
+     * 获取全局范围
+     * @return 全局范围
+     */
+    ViewPortHandler.prototype.getGlocalBounds = function () {
+        var pos = this._target.parent.getGlobalPosition();
+        var bounds = this._viewPort.clone();
+        bounds.x += (pos.x - this._target.x);
+        bounds.y += (pos.y - this._target.y);
+        return bounds;
+    };
+    ViewPortHandler.prototype.notify = function () {
+        // 这里通知所有观察者位置变更
+        for (var i = 0, len = this._observers.length; i < len; i++) {
+            var observer = this._observers[i];
+            if (observer)
+                observer(this);
+        }
+    };
+    /**
+     * 观察移动
+     * @param observer 观察者
+     */
+    ViewPortHandler.prototype.observe = function (observer) {
+        if (this._observers.indexOf(observer) < 0)
+            this._observers.push(observer);
+    };
+    /**
+     * 停止观察移动
+     * @param observer 观察者
+     */
+    ViewPortHandler.prototype.unobserve = function (observer) {
+        var index = this._observers.indexOf(observer);
+        if (index >= 0)
+            this._observers.splice(index, 1);
     };
     /**
      * 设置视点范围
@@ -1035,6 +1242,7 @@ var ViewPortHandler = (function () {
         this._viewPort.y = y;
         this._viewPort.width = width;
         this._viewPort.height = height;
+        this._viewPortGlobal = this.getGlocalBounds();
         // 如果masker的父容器不是当前target的父容器则将masker移动过去
         if (this._masker.parent != this._target.parent && this._target.parent) {
             this._target.parent.addChild(this._masker);
@@ -1045,9 +1253,25 @@ var ViewPortHandler = (function () {
         this._masker.drawRect(x, y, width, height);
         this._masker.endFill();
         // 瞬移归位
-        var d = this.getDelta(this._target.x, this._target.y);
-        this._target.x += d.x;
-        this._target.y += d.y;
+        this.homing(false);
+        // 为当前显示对象设置viewport范围
+        this._target["__ares_viewport__"] = this;
+        // 通知观察者
+        this.notify();
+    };
+    /**
+     * 归位内容
+     * @param tween 是否使用缓动归位，默认使用
+     */
+    ViewPortHandler.prototype.homing = function (tween) {
+        if (tween) {
+            this._ticker.start();
+        }
+        else {
+            var d = this.getDelta(this._target.x, this._target.y);
+            this._target.x += d.x;
+            this._target.y += d.y;
+        }
     };
     ViewPortHandler.DIRECTION_H = 1;
     ViewPortHandler.DIRECTION_V = 2;

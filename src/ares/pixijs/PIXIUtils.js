@@ -21,6 +21,41 @@ function rectCross(rect1, rect2) {
 }
 exports.rectCross = rectCross;
 /**
+ * 判断两个矩形是否相等
+ * @param rect1 矩形1
+ * @param rect2 矩形2
+ * @return {boolean} 是否相等
+ */
+function rectEquals(rect1, rect2) {
+    return (rect1.x == rect2.x &&
+        rect1.y == rect2.y &&
+        rect1.width == rect2.width &&
+        rect1.height == rect2.height);
+}
+exports.rectEquals = rectEquals;
+/**
+ * 判断矩形范围是否为0
+ * @param rect 矩形
+ * @return {boolean} 矩形范围是否为0（宽度或高度为0）
+ */
+function rectEmpty(rect) {
+    return (rect.width <= 0 || rect.height <= 0);
+}
+exports.rectEmpty = rectEmpty;
+/**
+ * 获取显示对象的全局范围
+ * @param target 显示对象
+ * @return {PIXI.Rectangle} 显示对象的全局范围
+ */
+function getGlobalBounds(target) {
+    var bounds = target.getLocalBounds(new PIXI.Rectangle());
+    var pos = target.getGlobalPosition(new PIXI.Point());
+    bounds.x += pos.x;
+    bounds.y += pos.y;
+    return bounds;
+}
+exports.getGlobalBounds = getGlobalBounds;
+/**
  * 赋值pixi对象（包括显示对象）
  * @param target 原始对象
  * @param deep 是否深度复制（复制子对象）

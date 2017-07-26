@@ -2,7 +2,7 @@ import {IAres, IWatcher, AresCommandData} from "../Interfaces";
 import {PIXICompiler, CmdDict, getTemplate} from "./PIXICompiler";
 import {runExp, evalExp} from "../Utils";
 import {ViewPortHandler, ViewPortHandlerOptions} from "./ViewPortHandler";
-import {cloneObject, getViewportHandler} from "./PIXIUtils";
+import {cloneObject, getViewportHandler, getGlobalBounds, rectCross, rectEmpty} from "./PIXIUtils";
 
 /**
  * Created by Raykid on 2016/12/27.
@@ -30,7 +30,7 @@ export interface CommandContext
 
 export interface ForOptions
 {
-    step?:number;
+    page?:number;
 }
 
 interface KeyValuePair
@@ -212,7 +212,7 @@ export const commands:{[name:string]:Command} = {
     {
         var cmdData:AresCommandData = context.cmdData;
         var options:ForOptions = evalExp(cmdData.subCmd, context.scope) || {};
-        var step:number = (options.step || Number.MAX_VALUE);
+        var page:number = (options.page || Number.MAX_VALUE);
         // 解析表达式
         var reg:RegExp = /^\s*(\S+)\s+in\s+([\s\S]+?)\s*$/;
         var res:RegExpExecArray = reg.exec(cmdData.exp);
@@ -251,6 +251,11 @@ export const commands:{[name:string]:Command} = {
         context.compiler.compile(parent, forScope);
         // 获取窗口显示范围
         var viewportHandler:ViewPortHandler = getViewportHandler(parent);
+        // 声明闭包数据
+        var isArray:boolean;
+        var curList:any[];
+        var curIndex:number;
+        var lastNode:PIXI.DisplayObject;
         // 添加订阅
         var watcher:IWatcher = context.entity.createWatcher(context.target, arrName, forScope, (value:any)=>{
             // 如果refNode被从显示列表移除了，则表示该for指令要作废了
@@ -275,7 +280,7 @@ export const commands:{[name:string]:Command} = {
                 value = temp;
             }
             // 如果不是数组，而是字典，则转换为数组，方便中断遍历
-            var isArray:boolean = (value instanceof Array);
+            isArray = (value instanceof Array);
             var list:any[];
             if(isArray)
             {
@@ -292,11 +297,44 @@ export const commands:{[name:string]:Command} = {
                     });
                 }
             }
-            // 设置步骤值
-            var curStep:number = step;
+            // 初始化数据
+            curList = list;
+            curIndex = 0;
+            lastNode = null;
+            // 添加监听
+            if(viewportHandler) viewportHandler.observe(updateView);
+            // 显示首页内容
+            showNextPage();
+        });
+        // 进行一次瞬移归位
+        if(viewportHandler) viewportHandler.homing(false);
+        // 返回节点
+        return context.target;
+
+
+        function updateView():void
+        {
+            // 如果已经生成完毕则停止
+            if(curIndex >= curList.length)
+            {
+                if(viewportHandler) viewportHandler.unobserve(updateView);
+                return;
+            }
+            // 判断当前最后一个生成的节点是否进入视窗范围内，如果是则生成下一页内容
+            var viewportGlobal:PIXI.Rectangle = (viewportHandler.viewportGlobal || context.compiler.renderer.screen);
+            var lastBounds:PIXI.Rectangle = getGlobalBounds(lastNode);
+            var crossRect:PIXI.Rectangle = rectCross(viewportGlobal, lastBounds);
+            if(!rectEmpty(crossRect))
+            {
+                // 进入了，显示下一页
+                showNextPage();
+            }
+        }
+
+        function showNextPage():void
+        {
             // 开始遍历
-            var lastNode:PIXI.DisplayObject = null;
-            for(var i:number = 0, len:number = list.length; i < len; i++)
+            for(var end:number = Math.min(curIndex + page, curList.length); curIndex < end; curIndex++)
             {
                 // 拷贝一个target
                 var newNode:PIXI.DisplayObject = cloneObject(context.target, true);
@@ -308,7 +346,7 @@ export const commands:{[name:string]:Command} = {
                 Object.defineProperty(newScope, "$index", {
                     configurable: true,
                     enumerable: false,
-                    value: i,
+                    value: curIndex,
                     writable: false
                 });
                 // 如果是字典则额外注入一个$key
@@ -317,7 +355,7 @@ export const commands:{[name:string]:Command} = {
                     Object.defineProperty(newScope, "$key", {
                         configurable: true,
                         enumerable: true,
-                        value: value[i].key,
+                        value: curList[curIndex].key,
                         writable: false
                     });
                 }
@@ -332,14 +370,14 @@ export const commands:{[name:string]:Command} = {
                 Object.defineProperty(newScope, "$length", {
                     configurable: true,
                     enumerable: false,
-                    value: list.length,
+                    value: curList.length,
                     writable: false
                 });
                 // 注入遍历名
                 Object.defineProperty(newScope, itemName, {
                     configurable: true,
                     enumerable: true,
-                    value: (isArray ? value[i] : value[i].value),
+                    value: (isArray ? curList[curIndex] : curList[curIndex].value),
                     writable: false
                 });
                 // 开始编译新节点
@@ -347,10 +385,8 @@ export const commands:{[name:string]:Command} = {
                 // 赋值上一个节点
                 lastNode = newNode;
             }
-        });
-        // 进行一次瞬移归位
-        if(viewportHandler) viewportHandler.homing(false);
-        // 返回节点
-        return context.target;
+            // 继续判断
+            updateView();
+        }
     }
 };
