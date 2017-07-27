@@ -253,7 +253,8 @@ var ViewPortHandler = (function () {
         // 这里通知所有观察者位置变更
         for (var i = 0, len = this._observers.length; i < len; i++) {
             var observer = this._observers[i];
-            observer(this);
+            if (observer)
+                observer(this);
         }
     };
     /**

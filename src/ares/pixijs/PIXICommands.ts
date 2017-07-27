@@ -182,17 +182,17 @@ export const commands:{[name:string]:Command} = {
             }
             if(value == true)
             {
-                // 启动编译
-                if(!compiled)
-                {
-                    context.compiler.compile(context.target, context.scope);
-                    compiled = true;
-                }
                 // 插入节点
                 if(!context.target.parent)
                 {
                     var index:number = refNode.parent.getChildIndex(refNode);
                     refNode.parent.addChildAt(context.target, index);
+                }
+                // 启动编译
+                if(!compiled)
+                {
+                    context.compiler.compile(context.target, context.scope);
+                    compiled = true;
                 }
             }
             else
