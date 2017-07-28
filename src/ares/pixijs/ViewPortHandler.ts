@@ -56,6 +56,8 @@ export class ViewPortHandler
 
     private _observers:ViewPortObserver[] = [];
 
+    private _onPointerUp:(evt:Event)=>void;
+
     /** 获取全局视窗范围 */
     public get viewportGlobal():PIXI.Rectangle
     {
@@ -77,8 +79,8 @@ export class ViewPortHandler
         target.interactive = true;
         target.on("pointerdown", this.onPointerDown, this);
         target.on("pointermove", this.onPointerMove, this);
-        target.on("pointerup", this.onPointerUp, this);
-        target.on("pointerupoutside", this.onPointerUp, this);
+        // 记录绑定this的引用
+        this._onPointerUp = this.onPointerUp.bind(this);
     }
     
     private onPointerDown(evt:PIXI.interaction.InteractionEvent):void
@@ -98,10 +100,12 @@ export class ViewPortHandler
             // 记录最后时刻
             this._lastTime = Date.now();
             // 对目标对象实施抬起监听
-            this._downTarget.on("mouseup", this.onPointerUp, this);
-            this._downTarget.on("mouseupoutside", this.onPointerUp, this);
-            this._downTarget.on("pointerup", this.onPointerUp, this);
-            this._downTarget.on("pointerupoutside", this.onPointerUp, this);
+            this._downTarget.on("mouseup", this.onTargetPointerUp, this);
+            this._downTarget.on("mouseupoutside", this.onTargetPointerUp, this);
+            this._downTarget.on("pointerup", this.onTargetPointerUp, this);
+            this._downTarget.on("pointerupoutside", this.onTargetPointerUp, this);
+            window.addEventListener("mouseup", this._onPointerUp, true);
+            window.addEventListener("touchend", this._onPointerUp, true);
         }
     }
     
@@ -150,16 +154,28 @@ export class ViewPortHandler
             this._lastTime = nowTime;
         }
     }
-    
-    private onPointerUp(evt:PIXI.interaction.InteractionEvent):void
+
+    private onTargetPointerUp(evt:PIXI.interaction.InteractionEvent):void
     {
         if(this._downTarget)
         {
             // 移除抬起监听
-            this._downTarget.off("mouseup", this.onPointerUp, this);
-            this._downTarget.off("mouseupoutside", this.onPointerUp, this);
-            this._downTarget.off("pointerup", this.onPointerUp, this);
-            this._downTarget.off("pointerupoutside", this.onPointerUp, this);
+            this._downTarget.off("mouseup", this.onTargetPointerUp, this);
+            this._downTarget.off("mouseupoutside", this.onTargetPointerUp, this);
+            this._downTarget.off("pointerup", this.onTargetPointerUp, this);
+            this._downTarget.off("pointerupoutside", this.onTargetPointerUp, this);
+            // 如果按下时有移动，则禁止抬起事件继续向下传递
+            if(this._dragging) evt.stopPropagation();
+        }
+    }
+    
+    private onPointerUp(evt:Event):void
+    {
+        if(this._downTarget)
+        {
+            // 移除抬起监听
+            window.removeEventListener("mouseup", this._onPointerUp, true);
+            window.removeEventListener("touchend", this._onPointerUp, true);
             // 如果按下时有移动，则禁止抬起事件继续向下传递
             if(this._dragging) evt.stopPropagation();
             // 重置状态

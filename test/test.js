@@ -895,8 +895,9 @@ define("src/ares/pixijs/ViewPortHandler", ["require", "exports"], function (requ
             target.interactive = true;
             target.on("pointerdown", this.onPointerDown, this);
             target.on("pointermove", this.onPointerMove, this);
-            target.on("pointerup", this.onPointerUp, this);
-            target.on("pointerupoutside", this.onPointerUp, this);
+            // target.on("pointerup", this.onPointerUp, this);
+            // target.on("pointerupoutside", this.onPointerUp, this);
+            this._onPointerUp = this.onPointerUp.bind(this);
         }
         Object.defineProperty(ViewPortHandler.prototype, "viewportGlobal", {
             /** 获取全局视窗范围 */
@@ -921,10 +922,12 @@ define("src/ares/pixijs/ViewPortHandler", ["require", "exports"], function (requ
                 // 记录最后时刻
                 this._lastTime = Date.now();
                 // 对目标对象实施抬起监听
-                this._downTarget.on("mouseup", this.onPointerUp, this);
-                this._downTarget.on("mouseupoutside", this.onPointerUp, this);
-                this._downTarget.on("pointerup", this.onPointerUp, this);
-                this._downTarget.on("pointerupoutside", this.onPointerUp, this);
+                this._downTarget.on("mouseup", this.onTargetPointerUp, this);
+                this._downTarget.on("mouseupoutside", this.onTargetPointerUp, this);
+                this._downTarget.on("pointerup", this.onTargetPointerUp, this);
+                this._downTarget.on("pointerupoutside", this.onTargetPointerUp, this);
+                window.addEventListener("mouseup", this._onPointerUp, true);
+                window.addEventListener("touchend", this._onPointerUp, true);
             }
         };
         ViewPortHandler.prototype.onPointerMove = function (evt) {
@@ -967,13 +970,23 @@ define("src/ares/pixijs/ViewPortHandler", ["require", "exports"], function (requ
                 this._lastTime = nowTime;
             }
         };
+        ViewPortHandler.prototype.onTargetPointerUp = function (evt) {
+            if (this._downTarget) {
+                // 移除抬起监听
+                this._downTarget.off("mouseup", this.onTargetPointerUp, this);
+                this._downTarget.off("mouseupoutside", this.onTargetPointerUp, this);
+                this._downTarget.off("pointerup", this.onTargetPointerUp, this);
+                this._downTarget.off("pointerupoutside", this.onTargetPointerUp, this);
+                // 如果按下时有移动，则禁止抬起事件继续向下传递
+                if (this._dragging)
+                    evt.stopPropagation();
+            }
+        };
         ViewPortHandler.prototype.onPointerUp = function (evt) {
             if (this._downTarget) {
                 // 移除抬起监听
-                this._downTarget.off("mouseup", this.onPointerUp, this);
-                this._downTarget.off("mouseupoutside", this.onPointerUp, this);
-                this._downTarget.off("pointerup", this.onPointerUp, this);
-                this._downTarget.off("pointerupoutside", this.onPointerUp, this);
+                window.removeEventListener("mouseup", this._onPointerUp, true);
+                window.removeEventListener("touchend", this._onPointerUp, true);
                 // 如果按下时有移动，则禁止抬起事件继续向下传递
                 if (this._dragging)
                     evt.stopPropagation();
