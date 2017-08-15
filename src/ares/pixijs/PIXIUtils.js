@@ -143,7 +143,7 @@ function cloneObject(target, deep) {
         }
         // Sprite的vertexData属性需要特殊处理
         if (key == "vertexData" && target instanceof PIXI.Sprite) {
-            result[key] = target[key]["slice"]();
+            result[key] = new Float32Array(target[key]);
             continue;
         }
         // 通用处理

@@ -895,8 +895,7 @@ define("src/ares/pixijs/ViewPortHandler", ["require", "exports"], function (requ
             target.interactive = true;
             target.on("pointerdown", this.onPointerDown, this);
             target.on("pointermove", this.onPointerMove, this);
-            // target.on("pointerup", this.onPointerUp, this);
-            // target.on("pointerupoutside", this.onPointerUp, this);
+            // 记录绑定this的引用
             this._onPointerUp = this.onPointerUp.bind(this);
         }
         Object.defineProperty(ViewPortHandler.prototype, "viewportGlobal", {
@@ -1345,7 +1344,7 @@ define("src/ares/pixijs/PIXIUtils", ["require", "exports"], function (require, e
             }
             // Sprite的vertexData属性需要特殊处理
             if (key == "vertexData" && target instanceof PIXI.Sprite) {
-                result[key] = target[key]["slice"]();
+                result[key] = new Float32Array(target[key]);
                 continue;
             }
             // 通用处理

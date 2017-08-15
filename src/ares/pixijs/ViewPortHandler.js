@@ -32,8 +32,7 @@ var ViewPortHandler = (function () {
         target.interactive = true;
         target.on("pointerdown", this.onPointerDown, this);
         target.on("pointermove", this.onPointerMove, this);
-        // target.on("pointerup", this.onPointerUp, this);
-        // target.on("pointerupoutside", this.onPointerUp, this);
+        // 记录绑定this的引用
         this._onPointerUp = this.onPointerUp.bind(this);
     }
     Object.defineProperty(ViewPortHandler.prototype, "viewportGlobal", {
