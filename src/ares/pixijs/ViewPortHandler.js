@@ -154,7 +154,7 @@ var ViewPortHandler = (function () {
         else if (bounds.top < this._viewPort.top && bounds.bottom < this._viewPort.bottom)
             deltaY = Math.min(this._viewPort.top - bounds.top, this._viewPort.bottom - bounds.bottom);
         // 返回结果
-        return { x: Math.round(deltaX), y: Math.round(deltaY) };
+        return { x: deltaX, y: deltaY };
     };
     ViewPortHandler.prototype.moveTarget = function (x, y) {
         if (this._movableH || this._movableV) {
@@ -187,7 +187,13 @@ var ViewPortHandler = (function () {
         var doneY = false;
         // 横向
         if (d.x != 0) {
-            if (this._speed.x != 0) {
+            if (!this._options.damping) {
+                // 不进行阻尼复位，瞬移复位
+                this._target.x += d.x;
+                this._speed.x = 0;
+                doneX = true;
+            }
+            else if (this._speed.x != 0) {
                 // 超出范围减速中
                 this._target.x += this._speed.x * delta;
                 var speedX = this._speed.x + d.x * ELASTICITY_COEFFICIENT * 0.01 * delta;
@@ -215,7 +221,13 @@ var ViewPortHandler = (function () {
         }
         // 纵向
         if (d.y != 0) {
-            if (this._speed.y != 0) {
+            if (!this._options.damping) {
+                // 不进行阻尼复位，瞬移复位
+                this._target.y += d.y;
+                this._speed.y = 0;
+                doneY = true;
+            }
+            else if (this._speed.y != 0) {
                 // 超出范围减速中
                 this._target.y += this._speed.y * delta;
                 var speedY = this._speed.y + d.y * ELASTICITY_COEFFICIENT * 0.01 * delta;
