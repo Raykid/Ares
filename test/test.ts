@@ -60,7 +60,7 @@ function go():void
         testSprite["a-on:click"] = "testFunc";
         testSprite["a-for${page:3}"] = "item in testFor";
         testSprite["a-y"] = "$target.y + $index * 200";
-        testSprite["a-viewport"] = "$target.x, $target.y, $target.width - 100, $target.height * 2";
+        testSprite["a-viewport${damping:false}"] = "$target.x, $target.y, $target.width - 100, $target.height * 2";
         testSprite.x = 200;
         testContainer.addChild(testSprite);
 

@@ -249,7 +249,7 @@ export class ViewPortHandler
         // 横向
         if(d.x != 0)
         {
-            if(!this._options.damping)
+            if(!!this._options.damping)
             {
                 // 不进行阻尼复位，瞬移复位
                 this._target.x += d.x;
@@ -271,24 +271,21 @@ export class ViewPortHandler
                 if(moveX != 0) this._target.x += moveX;
             }
         }
+        else if(this._speed.x != 0 && !this._options.damping)
+        {
+            // 未超范围，阻尼减速
+            this._target.x += this._speed.x * delta;
+            this._speed.x = this._speed.x * (1 - FRICTION_COEFFICIENT);
+            if(Math.abs(this._speed.x) < 0.5) this._speed.x = 0;
+        }
         else
         {
-            if(this._speed.x != 0)
-            {
-                // 未超范围，阻尼减速
-                this._target.x += this._speed.x * delta;
-                this._speed.x = this._speed.x * (1 - FRICTION_COEFFICIENT);
-                if(Math.abs(this._speed.x) < 0.5) this._speed.x = 0;
-            }
-            else
-            {
-                doneX = true;
-            }
+            doneX = true;
         }
         // 纵向
         if(d.y != 0)
         {
-            if(!this._options.damping)
+            if(!!this._options.damping)
             {
                 // 不进行阻尼复位，瞬移复位
                 this._target.y += d.y;
@@ -310,19 +307,16 @@ export class ViewPortHandler
                 if(moveY != 0) this._target.y += moveY;
             }
         }
+        else if(this._speed.y != 0 && !this._options.damping)
+        {
+            // 未超范围，阻尼减速
+            this._target.y += this._speed.y * delta;
+            this._speed.y = this._speed.y * (1 - FRICTION_COEFFICIENT);
+            if(Math.abs(this._speed.y) < 0.5) this._speed.y = 0;
+        }
         else
         {
-            if(this._speed.y != 0)
-            {
-                // 未超范围，阻尼减速
-                this._target.y += this._speed.y * delta;
-                this._speed.y = this._speed.y * (1 - FRICTION_COEFFICIENT);
-                if(Math.abs(this._speed.y) < 0.5) this._speed.y = 0;
-            }
-            else
-            {
-                doneY = true;
-            }
+            doneY = true;
         }
         // 通知观察者
         this.notify();
